@@ -1,0 +1,1 @@
+self.__REACT_LOADABLE_MANIFEST="{\"app\\\\page.tsx -> ../components/AudioPlayer\":{\"id\":\"app\\\\page.tsx -> ../components/AudioPlayer\",\"files\":[\"static/chunks/_app-pages-browser_src_components_AudioPlayer_tsx.js\"]}}"
