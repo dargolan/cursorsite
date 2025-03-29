@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import WaveSurfer from 'wavesurfer.js';
 import { Tag, Stem, Track, CartItem } from '../types';
@@ -22,161 +22,190 @@ export default function AudioPlayer({
 }: AudioPlayerProps): React.ReactElement {
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
+  
+  const [currentTime, setCurrentTime] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
   const [isStemsOpen, setIsStemsOpen] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
   const [stemAddedToCart, setStemAddedToCart] = useState<Record<string, boolean>>({});
   
-  // Format track's tags for display
-  const tagsByType = track.tags.reduce((acc: Record<string, Tag[]>, tag) => {
-    if (!tag || !tag.type) return acc; // Skip undefined tags or tags without type
-    if (!acc[tag.type]) acc[tag.type] = [];
-    acc[tag.type].push(tag);
+  // Group tags by type for display
+  const tagsByType = track.tags.reduce<Record<string, Tag[]>>((acc, tag) => {
+    const type = tag.type;
+    if (!acc[type]) {
+      acc[type] = [];
+    }
+    acc[type].push(tag);
     return acc;
   }, {});
   
-  const formattedGenreTags = tagsByType['genre']?.map(tag => tag.name).join(', ');
-  const formattedOtherTags = [...(tagsByType['mood'] || []), ...(tagsByType['instrument'] || [])]
-    .map(tag => tag.name).join(', ');
-
-  // Initialize wavesurfer
+  // Initialize WaveSurfer
   useEffect(() => {
-    if (waveformRef.current) {
-      // Destroy previous instance
+    if (!waveformRef.current) return;
+    
+    // Cleanup previous instance
+    if (wavesurferRef.current) {
+      wavesurferRef.current.destroy();
+      wavesurferRef.current = null;
+    }
+
+    try {
+      // Create static waveform instead of loading audio initially
+      renderStaticWaveform();
+      
+      // Initialize wavesurfer only when needed (e.g. on play)
+      if (isPlaying) {
+        const initWaveSurfer = async () => {
+          try {
+            const WaveSurfer = (await import('wavesurfer.js')).default;
+            
+            wavesurferRef.current = WaveSurfer.create({
+              container: waveformRef.current!,
+              waveColor: '#767676',
+              progressColor: '#1DF7CE',
+              cursorColor: 'transparent',
+              barWidth: 2,
+              barGap: 1,
+              height: 30,
+              barRadius: 1,
+              normalize: true,
+              hideScrollbar: true,
+            });
+            
+            wavesurferRef.current.load(track.audioUrl);
+            
+            wavesurferRef.current.on('ready', () => {
+              if (isPlaying) {
+                wavesurferRef.current?.play();
+              }
+            });
+            
+            wavesurferRef.current.on('audioprocess', () => {
+              setCurrentTime(wavesurferRef.current?.getCurrentTime() || 0);
+            });
+            
+            // Use generic event handler for seek
+            (wavesurferRef.current as any).on('seek', () => {
+              setCurrentTime(wavesurferRef.current?.getCurrentTime() || 0);
+            });
+          } catch (error) {
+            console.error('Error initializing WaveSurfer:', error);
+            // Fallback to static waveform if wavesurfer fails
+            renderStaticWaveform();
+          }
+        };
+        
+        initWaveSurfer();
+      }
+    } catch (error) {
+      console.error('Error in waveform initialization:', error);
+      // Fallback to static waveform if any error occurs
+      renderStaticWaveform();
+    }
+    
+    return () => {
       if (wavesurferRef.current) {
         wavesurferRef.current.destroy();
+        wavesurferRef.current = null;
       }
-
-      try {
-        // Create WaveSurfer instance with static waveform
-        renderStaticWaveform();
-        
-        // Keep reference even though we're using static waveform
-        wavesurferRef.current = {
-          getCurrentTime: () => currentTime,
-          destroy: () => {
-            if (waveformRef.current) {
-              waveformRef.current.innerHTML = '';
-            }
-          }
-        } as any;
-      } catch (error) {
-        console.error("Error initializing waveform:", error);
-        renderStaticWaveform();
-      }
-
-      // Cleanup
-      return () => {
-        if (wavesurferRef.current) {
-          wavesurferRef.current.destroy();
-        }
-      };
-    }
-  }, [track.id]); // Only recreate when track changes
-
-  // Render a static waveform that's stable
+    };
+  }, [track.id, isPlaying]);
+  
+  // Render a static waveform when not playing
   const renderStaticWaveform = () => {
     if (!waveformRef.current) return;
     
-    const container = waveformRef.current;
-    container.innerHTML = '';
-    
-    // Create a progress and background element
-    const waveformBackground = document.createElement('div');
-    waveformBackground.style.width = '100%';
-    waveformBackground.style.height = '40px';
-    waveformBackground.style.background = 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100%\' height=\'100%\' viewBox=\'0 0 100 100\'><path d=\'M 0,50 Q 10,30 20,50 T 40,50 T 60,50 T 80,50 T 100,50\' stroke=\'%23767676\' fill=\'none\' stroke-width=\'1\'/></svg>") repeat-x';
-    waveformBackground.style.backgroundSize = 'auto 100%';
-    
-    const waveformProgress = document.createElement('div');
-    waveformProgress.style.width = `${(currentTime / track.duration) * 100}%`;
-    waveformProgress.style.height = '40px';
-    waveformProgress.style.position = 'absolute';
-    waveformProgress.style.left = '0';
-    waveformProgress.style.top = '0';
-    waveformProgress.style.background = 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100%\' height=\'100%\' viewBox=\'0 0 100 100\'><path d=\'M 0,50 Q 10,30 20,50 T 40,50 T 60,50 T 80,50 T 100,50\' stroke=\'white\' fill=\'none\' stroke-width=\'1\'/></svg>") repeat-x';
-    waveformProgress.style.backgroundSize = 'auto 100%';
-    waveformProgress.style.zIndex = '1';
-    waveformProgress.style.pointerEvents = 'none';
-    
-    container.style.position = 'relative';
-    container.style.width = '100%';
-    container.style.height = '40px';
-    container.style.overflow = 'hidden';
-    
-    container.appendChild(waveformBackground);
-    container.appendChild(waveformProgress);
+    try {
+      // Clear previous content
+      while (waveformRef.current.firstChild) {
+        waveformRef.current.removeChild(waveformRef.current.firstChild);
+      }
+      
+      const container = waveformRef.current;
+      const width = container.clientWidth;
+      const height = 30;
+      const samples = track.waveform || Array(100).fill(0).map(() => Math.random() * 0.8 + 0.2);
+      
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', '100%');
+      svg.setAttribute('height', `${height}px`);
+      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      svg.setAttribute('preserveAspectRatio', 'none');
+      
+      const barWidth = 2;
+      const barGap = 1;
+      const numBars = Math.floor(width / (barWidth + barGap));
+      const samplesPerBar = Math.ceil(samples.length / numBars);
+      
+      for (let i = 0; i < numBars; i++) {
+        const startSample = i * samplesPerBar;
+        const sampleSlice = samples.slice(startSample, startSample + samplesPerBar);
+        let sampleValue = 0;
+        
+        if (sampleSlice.length > 0) {
+          sampleValue = sampleSlice.reduce((sum, val) => sum + val, 0) / sampleSlice.length;
+        }
+        
+        const barHeight = Math.max(1, Math.round(sampleValue * height));
+        const x = i * (barWidth + barGap);
+        const y = (height - barHeight) / 2;
+        
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', `${x}`);
+        rect.setAttribute('y', `${y}`);
+        rect.setAttribute('width', `${barWidth}`);
+        rect.setAttribute('height', `${barHeight}`);
+        rect.setAttribute('rx', '1');
+        rect.setAttribute('ry', '1');
+        rect.setAttribute('fill', '#767676');
+        
+        svg.appendChild(rect);
+      }
+      
+      container.appendChild(svg);
+    } catch (error) {
+      console.error('Error rendering static waveform:', error);
+    }
   };
   
-  // Update waveform playback progress
+  // Update play state when isPlaying changes
   useEffect(() => {
-    renderStaticWaveform();
-  }, [currentTime, isPlaying]);
-  
-  // Limit the number of tags displayed per type
-  const limitedTags = React.useMemo(() => {
-    const limited: Record<string, Tag[]> = {};
-    
-    // For each tag type, limit to max 2 tags
-    Object.entries(tagsByType).forEach(([type, tags]) => {
-      limited[type] = tags.slice(0, 1); // Show only 1 tag per type
-    });
-    
-    return limited;
-  }, [tagsByType]);
-
-  // Control playback state
-  useEffect(() => {
-    if (wavesurferRef.current) {
-      try {
-        if (isPlaying) {
-          wavesurferRef.current.play();
-        } else {
-          wavesurferRef.current.pause();
-        }
-      } catch (error) {
-        console.error("Error controlling playback:", error);
-      }
+    if (isPlaying) {
+      wavesurferRef.current?.play();
+    } else {
+      wavesurferRef.current?.pause();
     }
   }, [isPlaying]);
-
-  // Ensure waveform container has fixed dimensions to prevent layout shifts
-  useEffect(() => {
-    if (waveformRef.current) {
-      waveformRef.current.style.height = '40px';
-      waveformRef.current.style.width = '100%';
-      waveformRef.current.style.minWidth = '100px';
-    }
-  }, []);
-
+  
+  // Format time for display (mm:ss)
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
-
+  
   const handlePlayPause = () => {
     onPlayPause(track.id);
   };
-
+  
   const handleStemPlayPause = (stemId: string) => {
-    // Stem playback logic would go here
+    // This would play individual stems in a real implementation
+    console.log('Play/pause stem:', stemId);
   };
-
+  
   const handleStemAddToCart = (stem: Stem) => {
-    onAddToCart({ id: stem.id, type: 'stem', price: stem.price });
     setStemAddedToCart(prev => ({ ...prev, [stem.id]: true }));
+    onAddToCart({ id: stem.id, type: 'stem', price: stem.price });
   };
-
+  
   const handleDownloadAllStems = () => {
     if (!track.stems) return;
     
-    // Calculate total price and discounted price
-    const totalPrice = track.stems.reduce((sum, stem) => sum + stem.price, 0);
-    const discountedPrice = Math.floor(totalPrice * 0.75 * 100) / 100;
-    
-    // Add all stems to cart with discounted price
-    onAddToCart({ id: `${track.id}-all-stems`, type: 'stem', price: discountedPrice });
+    track.stems.forEach(stem => {
+      if (!stemAddedToCart[stem.id]) {
+        setStemAddedToCart(prev => ({ ...prev, [stem.id]: true }));
+        onAddToCart({ id: stem.id, type: 'stem', price: stem.price });
+      }
+    });
   };
 
   // Calculate total stems price

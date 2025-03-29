@@ -416,14 +416,14 @@ export default function MusicLibrary() {
             onRemoveTag={handleTagDeselect}
             onClearAllTags={handleClearAllTags}
           />
-        </div>
-        
+              </div>
+              
         {/* Track listing */}
         <div className="w-full">
           {filteredTracks.length === 0 && !loading ? (
             <div className="text-center text-[#CDCDCD] p-12">
               <p>No tracks match your filters. Try adjusting your search criteria.</p>
-            </div>
+                </div>
           ) : (
             <div>
               {loading ? (
