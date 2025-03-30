@@ -119,12 +119,13 @@ export default function FilterSidebar({
 
       {/* Genre Filter */}
       <div className="mb-6">
-        <div 
-          className="flex items-center justify-between cursor-pointer"
+        <button 
+          className="flex w-full items-center justify-between cursor-pointer"
           onClick={() => setGenreExpanded(!genreExpanded)}
+          type="button"
         >
           <h3 className="text-white font-normal text-xs mb-2">Genre</h3>
-          <button className="text-sm text-gray-400">
+          <span className="text-sm text-gray-400">
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
               className={`h-4 w-4 transition-transform ${genreExpanded ? 'rotate-180' : ''}`} 
@@ -134,12 +135,12 @@ export default function FilterSidebar({
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
-          </button>
-        </div>
+          </span>
+        </button>
         
         {genreExpanded && (
           <div className="flex flex-wrap gap-1">
-            {genres.map(genre => (
+            {genres.length > 0 ? genres.map(genre => (
               <button
                 key={genre.id}
                 className={`text-xs font-normal px-3 py-1 rounded-full mr-1 mb-1 flex items-center ${
@@ -148,6 +149,7 @@ export default function FilterSidebar({
                     : 'bg-[#303030] text-[#CDCDCD] hover:bg-[#474545]'
                 }`}
                 onClick={() => handleTagClick(genre)}
+                type="button"
               >
                 {genre.name}
                 {isTagSelected(genre.id) && (
@@ -156,19 +158,22 @@ export default function FilterSidebar({
                   </svg>
                 )}
               </button>
-            ))}
+            )) : (
+              <p className="text-gray-500 text-xs">No genres available</p>
+            )}
           </div>
         )}
       </div>
 
       {/* Mood Filter */}
       <div className="mb-6">
-        <div 
-          className="flex items-center justify-between cursor-pointer"
+        <button 
+          className="flex w-full items-center justify-between cursor-pointer"
           onClick={() => setMoodExpanded(!moodExpanded)}
+          type="button"
         >
           <h3 className="text-white font-normal text-xs mb-2">Mood</h3>
-          <button className="text-sm text-gray-400">
+          <span className="text-sm text-gray-400">
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
               className={`h-4 w-4 transition-transform ${moodExpanded ? 'rotate-180' : ''}`} 
@@ -178,12 +183,12 @@ export default function FilterSidebar({
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
-          </button>
-        </div>
+          </span>
+        </button>
         
         {moodExpanded && (
           <div className="flex flex-wrap gap-1">
-            {moods.map(mood => (
+            {moods.length > 0 ? moods.map(mood => (
               <button
                 key={mood.id}
                 className={`text-xs font-normal px-3 py-1 rounded-full mr-1 mb-1 flex items-center ${
@@ -192,6 +197,7 @@ export default function FilterSidebar({
                     : 'bg-[#303030] text-[#CDCDCD] hover:bg-[#474545]'
                 }`}
                 onClick={() => handleTagClick(mood)}
+                type="button"
               >
                 {mood.name}
                 {isTagSelected(mood.id) && (
@@ -200,19 +206,22 @@ export default function FilterSidebar({
                   </svg>
                 )}
               </button>
-            ))}
+            )) : (
+              <p className="text-gray-500 text-xs">No moods available</p>
+            )}
           </div>
         )}
       </div>
 
       {/* Instruments Filter */}
       <div className="mb-6">
-        <div 
-          className="flex items-center justify-between cursor-pointer"
+        <button 
+          className="flex w-full items-center justify-between cursor-pointer"
           onClick={() => setInstrumentsExpanded(!instrumentsExpanded)}
+          type="button"
         >
           <h3 className="text-white font-normal text-xs mb-2">Instruments</h3>
-          <button className="text-sm text-gray-400">
+          <span className="text-sm text-gray-400">
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
               className={`h-4 w-4 transition-transform ${instrumentsExpanded ? 'rotate-180' : ''}`} 
@@ -222,12 +231,12 @@ export default function FilterSidebar({
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
-          </button>
-        </div>
+          </span>
+        </button>
         
         {instrumentsExpanded && (
           <div className="flex flex-wrap gap-1">
-            {instruments.map(instrument => (
+            {instruments.length > 0 ? instruments.map(instrument => (
               <button
                 key={instrument.id}
                 className={`text-xs font-normal px-3 py-1 rounded-full mr-1 mb-1 flex items-center ${
@@ -236,6 +245,7 @@ export default function FilterSidebar({
                     : 'bg-[#303030] text-[#CDCDCD] hover:bg-[#474545]'
                 }`}
                 onClick={() => handleTagClick(instrument)}
+                type="button"
               >
                 {instrument.name}
                 {isTagSelected(instrument.id) && (
@@ -244,7 +254,9 @@ export default function FilterSidebar({
                   </svg>
                 )}
               </button>
-            ))}
+            )) : (
+              <p className="text-gray-500 text-xs">No instruments available</p>
+            )}
           </div>
         )}
       </div>

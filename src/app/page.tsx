@@ -7,6 +7,8 @@ import TagFilter from '../components/TagFilter';
 import { Tag, Stem, Track, CartItem } from '../types';
 import Header from '../components/Header';
 import Image from 'next/image';
+import { getTracks, getTags, printStrapiAPIStructure } from '../services/api';
+import { getCart, addToCart, removeFromCart, getCartTotal } from '../services/cart';
 
 // Lazy load the AudioPlayer component to improve performance
 const AudioPlayer = dynamic(() => import('../components/AudioPlayer'), {
@@ -33,420 +35,297 @@ export default function MusicLibrary() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartTotal, setCartTotal] = useState(0);
 
-  // Mock data for genre, mood, and instrument filters
+  // Tags categorized by type
   const [genres, setGenres] = useState<Tag[]>([]);
   const [moods, setMoods] = useState<Tag[]>([]);
   const [instruments, setInstruments] = useState<Tag[]>([]);
 
-  // Generate mock tracks data
+  // Fetch data from Strapi
   useEffect(() => {
-    // Create sample tags
-    const sampleGenres: Tag[] = [
-      { id: 'g1', name: 'Pop', type: 'genre', count: 12 },
-      { id: 'g2', name: 'Rock', type: 'genre', count: 8 },
-      { id: 'g3', name: 'Hip Hop', type: 'genre', count: 10 },
-      { id: 'g4', name: 'Electronic', type: 'genre', count: 15 },
-      { id: 'g5', name: 'Ambient', type: 'genre', count: 5 },
-    ];
-    
-    const sampleMoods: Tag[] = [
-      { id: 'm1', name: 'Happy', type: 'mood', count: 14 },
-      { id: 'm2', name: 'Sad', type: 'mood', count: 7 },
-      { id: 'm3', name: 'Energetic', type: 'mood', count: 12 },
-      { id: 'm4', name: 'Relaxed', type: 'mood', count: 9 },
-      { id: 'm5', name: 'Dark', type: 'mood', count: 6 },
-    ];
-    
-    const sampleInstruments: Tag[] = [
-      { id: 'i1', name: 'Piano', type: 'instrument', count: 16 },
-      { id: 'i2', name: 'Guitar', type: 'instrument', count: 13 },
-      { id: 'i3', name: 'Drums', type: 'instrument', count: 18 },
-      { id: 'i4', name: 'Synth', type: 'instrument', count: 14 },
-      { id: 'i5', name: 'Strings', type: 'instrument', count: 8 },
-    ];
-    
-    setGenres(sampleGenres);
-    setMoods(sampleMoods);
-    setInstruments(sampleInstruments);
-
-    // Use a stable seed for random numbers to ensure consistent data between renders
-    // This would normally be an API call
-    const mockTracks: Track[] = [
-      {
-        id: 'track-1',
-        title: 'Ska Music 1',
-        bpm: 93,
-        tags: [
-          { id: 'g2', name: 'Rock', type: 'genre' },
-          { id: 'g4', name: 'Electronic', type: 'genre' },
-          { id: 'm3', name: 'Energetic', type: 'mood' },
-          { id: 'm5', name: 'Dark', type: 'mood' },
-          { id: 'm1', name: 'Happy', type: 'mood' },
-          { id: 'i2', name: 'Guitar', type: 'instrument' },
-          { id: 'i3', name: 'Drums', type: 'instrument' },
-          { id: 'i4', name: 'Synth', type: 'instrument' }
-        ],
-        duration: 169,
-        imageUrl: 'https://picsum.photos/seed/1/200/200',
-        audioUrl: '/dummy-audio.mp3',
-        waveform: Array(100).fill(0).map((_, i) => Math.sin(i / 5) * 0.5 + 0.5),
-        hasStems: true,
-        stems: [
-          { id: 'stem-1-1', name: 'Drums', url: '/dummy-audio.mp3', price: 0.99, duration: 169 },
-          { id: 'stem-1-2', name: 'Bass', url: '/dummy-audio.mp3', price: 0.99, duration: 169 },
-          { id: 'stem-1-3', name: 'Guitar', url: '/dummy-audio.mp3', price: 0.99, duration: 169 },
-          { id: 'stem-1-4', name: 'Vocals', url: '/dummy-audio.mp3', price: 0.99, duration: 169 }
-        ]
-      },
-      {
-        id: 'track-2',
-        title: 'Ska Music 2',
-        bpm: 176,
-        tags: [
-          { id: 'g4', name: 'Electronic', type: 'genre' },
-          { id: 'm5', name: 'Dark', type: 'mood' },
-          { id: 'm1', name: 'Happy', type: 'mood' },
-          { id: 'i4', name: 'Synth', type: 'instrument' }
-        ],
-        duration: 357,
-        imageUrl: 'https://picsum.photos/seed/2/200/200',
-        audioUrl: '/dummy-audio.mp3',
-        waveform: Array(100).fill(0).map((_, i) => Math.sin(i / 4) * 0.5 + 0.5),
-        hasStems: true,
-        stems: [
-          { id: 'stem-2-1', name: 'Drums', url: '/dummy-audio.mp3', price: 0.99, duration: 357 },
-          { id: 'stem-2-2', name: 'Bass', url: '/dummy-audio.mp3', price: 0.99, duration: 357 },
-          { id: 'stem-2-3', name: 'Synth', url: '/dummy-audio.mp3', price: 0.99, duration: 357 },
-          { id: 'stem-2-4', name: 'Vocals', url: '/dummy-audio.mp3', price: 0.99, duration: 357 }
-        ]
-      },
-      {
-        id: 'track-3',
-        title: 'Ska Music 3',
-        bpm: 129,
-        tags: [
-          { id: 'g1', name: 'Pop', type: 'genre' },
-          { id: 'm3', name: 'Energetic', type: 'mood' },
-          { id: 'i5', name: 'Strings', type: 'instrument' },
-          { id: 'i3', name: 'Drums', type: 'instrument' }
-        ],
-        duration: 185,
-        imageUrl: 'https://picsum.photos/seed/3/200/200',
-        audioUrl: '/dummy-audio.mp3',
-        waveform: Array(100).fill(0).map((_, i) => Math.sin(i / 6) * 0.5 + 0.5),
-        hasStems: false
-      },
-      {
-        id: 'track-4',
-        title: 'Ska Music 4',
-        bpm: 108,
-        tags: [
-          { id: 'g4', name: 'Electronic', type: 'genre' },
-          { id: 'm1', name: 'Happy', type: 'mood' },
-          { id: 'i2', name: 'Guitar', type: 'instrument' }
-        ],
-        duration: 256,
-        imageUrl: 'https://picsum.photos/seed/4/200/200',
-        audioUrl: '/dummy-audio.mp3',
-        waveform: Array(100).fill(0).map((_, i) => Math.sin(i / 3) * 0.5 + 0.5),
-        hasStems: false
-      },
-      {
-        id: 'track-5',
-        title: 'Ska Music 5',
-        bpm: 105,
-        tags: [
-          { id: 'g5', name: 'Ambient', type: 'genre' },
-          { id: 'g1', name: 'Pop', type: 'genre' },
-          { id: 'm1', name: 'Happy', type: 'mood' },
-          { id: 'm4', name: 'Relaxed', type: 'mood' },
-          { id: 'm2', name: 'Sad', type: 'mood' },
-          { id: 'i1', name: 'Piano', type: 'instrument' },
-          { id: 'i5', name: 'Strings', type: 'instrument' },
-          { id: 'i4', name: 'Synth', type: 'instrument' }
-        ],
-        duration: 317,
-        imageUrl: 'https://picsum.photos/seed/5/200/200',
-        audioUrl: '/dummy-audio.mp3',
-        waveform: Array(100).fill(0).map((_, i) => Math.sin(i / 5) * 0.5 + 0.5),
-        hasStems: true,
-        stems: [
-          { id: 'stem-5-1', name: 'Piano', url: '/dummy-audio.mp3', price: 0.99, duration: 317 },
-          { id: 'stem-5-2', name: 'Strings', url: '/dummy-audio.mp3', price: 0.99, duration: 317 },
-          { id: 'stem-5-3', name: 'Pads', url: '/dummy-audio.mp3', price: 0.99, duration: 317 }
-        ]
-      },
-      {
-        id: 'track-6',
-        title: 'Ska Music 6',
-        bpm: 143,
-        tags: [
-          { id: 'g3', name: 'Hip Hop', type: 'genre' },
-          { id: 'm1', name: 'Happy', type: 'mood' },
-          { id: 'i5', name: 'Strings', type: 'instrument' },
-          { id: 'i3', name: 'Drums', type: 'instrument' }
-        ],
-        duration: 205,
-        imageUrl: 'https://picsum.photos/seed/6/200/200',
-        audioUrl: '/dummy-audio.mp3',
-        waveform: Array(100).fill(0).map((_, i) => Math.sin(i / 4) * 0.5 + 0.5),
-        hasStems: true,
-        stems: [
-          { id: 'stem-6-1', name: 'Drums', url: '/dummy-audio.mp3', price: 0.99, duration: 205 },
-          { id: 'stem-6-2', name: 'Bass', url: '/dummy-audio.mp3', price: 0.99, duration: 205 },
-          { id: 'stem-6-3', name: 'Strings', url: '/dummy-audio.mp3', price: 0.99, duration: 205 },
-          { id: 'stem-6-4', name: 'Vocals', url: '/dummy-audio.mp3', price: 0.99, duration: 205 }
-        ]
-      },
-      {
-        id: 'track-7',
-        title: 'Ska Music 7',
-        bpm: 132,
-        tags: [
-          { id: 'g3', name: 'Hip Hop', type: 'genre' },
-          { id: 'm1', name: 'Happy', type: 'mood' },
-          { id: 'i5', name: 'Strings', type: 'instrument' }
-        ],
-        duration: 267,
-        imageUrl: 'https://picsum.photos/seed/7/200/200',
-        audioUrl: '/dummy-audio.mp3',
-        waveform: Array(100).fill(0).map((_, i) => Math.sin(i / 3) * 0.5 + 0.5),
-        hasStems: false
-      },
-      {
-        id: 'track-8',
-        title: 'Ska Music 8',
-        bpm: 159,
-        tags: [
-          { id: 'g5', name: 'Ambient', type: 'genre' },
-          { id: 'm5', name: 'Dark', type: 'mood' },
-          { id: 'i4', name: 'Synth', type: 'instrument' }
-        ],
-        duration: 350,
-        imageUrl: 'https://picsum.photos/seed/8/200/200',
-        audioUrl: '/dummy-audio.mp3',
-        waveform: Array(100).fill(0).map((_, i) => Math.sin(i / 7) * 0.5 + 0.5),
-        hasStems: true,
-        stems: [
-          { id: 'stem-8-1', name: 'Synth 1', url: '/dummy-audio.mp3', price: 0.99, duration: 350 },
-          { id: 'stem-8-2', name: 'Synth 2', url: '/dummy-audio.mp3', price: 0.99, duration: 350 },
-          { id: 'stem-8-3', name: 'Pads', url: '/dummy-audio.mp3', price: 0.99, duration: 350 },
-          { id: 'stem-8-4', name: 'Ambient Textures', url: '/dummy-audio.mp3', price: 0.99, duration: 350 }
-        ]
-      },
-      {
-        id: 'track-9',
-        title: 'Ska Music 9',
-        bpm: 71,
-        tags: [
-          { id: 'g4', name: 'Electronic', type: 'genre' },
-          { id: 'm1', name: 'Happy', type: 'mood' },
-          { id: 'm2', name: 'Sad', type: 'mood' },
-          { id: 'i3', name: 'Drums', type: 'instrument' }
-        ],
-        duration: 199,
-        imageUrl: 'https://picsum.photos/seed/9/200/200',
-        audioUrl: '/dummy-audio.mp3',
-        waveform: Array(100).fill(0).map((_, i) => Math.sin(i / 6) * 0.5 + 0.5),
-        hasStems: true,
-        stems: [
-          { id: 'stem-9-1', name: 'Drums', url: '/dummy-audio.mp3', price: 0.99, duration: 199 },
-          { id: 'stem-9-2', name: 'Bass', url: '/dummy-audio.mp3', price: 0.99, duration: 199 },
-          { id: 'stem-9-3', name: 'Synth', url: '/dummy-audio.mp3', price: 0.99, duration: 199 }
-        ]
-      },
-      {
-        id: 'track-10',
-        title: 'Ska Music 10',
-        bpm: 117,
-        tags: [
-          { id: 'g2', name: 'Rock', type: 'genre' },
-          { id: 'm3', name: 'Energetic', type: 'mood' },
-          { id: 'm1', name: 'Happy', type: 'mood' },
-          { id: 'i2', name: 'Guitar', type: 'instrument' }
-        ],
-        duration: 260,
-        imageUrl: 'https://picsum.photos/seed/10/200/200',
-        audioUrl: '/dummy-audio.mp3',
-        waveform: Array(100).fill(0).map((_, i) => Math.sin(i / 5) * 0.5 + 0.5),
-        hasStems: false
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        console.log('Fetching tracks and tags...');
+        
+        // Debug the Strapi API structure
+        await printStrapiAPIStructure();
+        
+        // Fetch tracks
+        const tracksData = await getTracks();
+        console.log('Tracks fetched:', tracksData.length);
+        setTracks(tracksData);
+        setFilteredTracks(tracksData);
+        
+        // Fetch tags
+        const tagsData = await getTags();
+        console.log('Tags fetched:', tagsData.length);
+        
+        // Categorize tags
+        const genresList = tagsData.filter(tag => tag.type === 'genre');
+        const moodsList = tagsData.filter(tag => tag.type === 'mood');
+        const instrumentsList = tagsData.filter(tag => tag.type === 'instrument');
+        
+        console.log('Genres:', genresList.length);
+        console.log('Moods:', moodsList.length);
+        console.log('Instruments:', instrumentsList.length);
+        
+        // Count tag occurrences in tracks
+        const tagCounts = new Map<string, number>();
+        tracksData.forEach(track => {
+          track.tags.forEach(tag => {
+            const count = tagCounts.get(tag.id) || 0;
+            tagCounts.set(tag.id, count + 1);
+          });
+        });
+        
+        // Add count property to tags
+        genresList.forEach(tag => tag.count = tagCounts.get(tag.id) || 0);
+        moodsList.forEach(tag => tag.count = tagCounts.get(tag.id) || 0);
+        instrumentsList.forEach(tag => tag.count = tagCounts.get(tag.id) || 0);
+        
+        setGenres(genresList);
+        setMoods(moodsList);
+        setInstruments(instrumentsList);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        // If API fails, use an empty state
+        setTracks([]);
+        setFilteredTracks([]);
+        setGenres([]);
+        setMoods([]);
+        setInstruments([]);
+      } finally {
+        setLoading(false);
       }
-    ];
-
-    setTracks(mockTracks);
-    setFilteredTracks(mockTracks);
-    setLoading(false);
-  }, []); // Empty dependency array to ensure this runs only once
-
-  // Optimize filtering to prevent rerendering when nothing has changed
-  useEffect(() => {
-    if (tracks.length === 0) return;
+    };
     
+    fetchData();
+  }, []);
+
+  // Load cart from localStorage
+  useEffect(() => {
+    const loadCart = () => {
+      const cart = getCart();
+      setCartItems(cart);
+      setCartTotal(getCartTotal());
+    };
+    
+    loadCart();
+    
+    // Listen for storage events to update cart if changed in another tab
+    window.addEventListener('storage', loadCart);
+    
+    return () => {
+      window.removeEventListener('storage', loadCart);
+    };
+  }, []);
+
+  // Filter tracks based on selected tags, search query, and ranges
+  useEffect(() => {
+    // Start with all tracks
     let filtered = [...tracks];
     
-    // Apply tag filters
+    // Filter by selected tags
     if (selectedTags.length > 0) {
-      const tagIds = selectedTags.map(tag => tag.id);
       filtered = filtered.filter(track => {
-        const trackTagIds = track.tags.map(tag => tag.id);
-        return tagIds.every(tagId => trackTagIds.includes(tagId));
+        // Track must have ALL selected tags
+        return selectedTags.every(selectedTag => 
+          track.tags.some(tag => tag.id === selectedTag.id)
+        );
       });
     }
     
-    // Apply search query
+    // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(track => {
-        const titleMatch = track.title.toLowerCase().includes(query);
-        const tagMatch = track.tags.some(tag => tag.name.toLowerCase().includes(query));
-        return titleMatch || tagMatch;
-      });
+      filtered = filtered.filter(track => 
+        track.title.toLowerCase().includes(query) ||
+        track.tags.some(tag => tag.name.toLowerCase().includes(query))
+      );
     }
     
-    // Apply BPM range
-    filtered = filtered.filter(track => {
-      return track.bpm >= bpmRange[0] && track.bpm <= bpmRange[1];
-    });
+    // Filter by BPM range
+    filtered = filtered.filter(track => 
+      track.bpm >= bpmRange[0] && track.bpm <= bpmRange[1]
+    );
     
-    // Apply duration range
-    filtered = filtered.filter(track => {
-      return track.duration >= durationRange[0] && track.duration <= durationRange[1];
-    });
-    
-    // Maintain consistent order by sorting by id (or title)
-    filtered.sort((a, b) => {
-      // Extract the numeric part from "track-X" id format and compare
-      const idA = parseInt(a.id.split('-')[1]);
-      const idB = parseInt(b.id.split('-')[1]);
-      return idA - idB;
-    });
+    // Filter by duration range
+    filtered = filtered.filter(track => 
+      track.duration >= durationRange[0] && track.duration <= durationRange[1]
+    );
     
     setFilteredTracks(filtered);
   }, [tracks, selectedTags, searchQuery, bpmRange, durationRange]);
 
-  // Update cart total when items change
-  useEffect(() => {
-    const total = cartItems.reduce((sum, item) => sum + item.price, 0);
-    setCartTotal(total);
-    
-    // Update the header cart count
-    const headerCartCounter = document.getElementById('header-cart-total');
-    if (headerCartCounter) {
-      headerCartCounter.textContent = total.toFixed(2);
-    }
-  }, [cartItems]);
-
-  // Handler functions
-  const handleTagSelect = useCallback((tag: Tag) => {
-    setSelectedTags(prev => [...prev, tag]);
-  }, []);
-
-  const handleTagDeselect = useCallback((tagId: string) => {
-    setSelectedTags(prev => prev.filter(tag => tag.id !== tagId));
-  }, []);
-
-  const handleClearAllTags = useCallback(() => {
-    setSelectedTags([]);
-  }, []);
-
-  const handleSearchChange = useCallback((query: string) => {
-    setSearchQuery(query);
-  }, []);
-
-  const handleBpmRangeChange = useCallback((min: number, max: number) => {
-    setBpmRange([min, max]);
-  }, []);
-
-  const handleDurationRangeChange = useCallback((min: number, max: number) => {
-    setDurationRange([min, max]);
-  }, []);
-
-  const handlePlayPause = useCallback((trackId: string) => {
-    setPlayingTrackId(prev => prev === trackId ? null : trackId);
-  }, []);
-
-  const handleAddToCart = useCallback((item: { id: string, type: 'track' | 'stem', price: number }) => {
-    setCartItems(prev => {
-      // Check if item already exists
-      if (prev.some(prevItem => prevItem.id === item.id)) {
-        return prev;
+  // Handler for toggling a tag
+  const handleTagToggle = useCallback((tag: Tag) => {
+    setSelectedTags(prevTags => {
+      const isSelected = prevTags.some(t => t.id === tag.id);
+      if (isSelected) {
+        return prevTags.filter(t => t.id !== tag.id);
+      } else {
+        return [...prevTags, tag];
       }
-      return [...prev, item];
     });
   }, []);
 
-  // Memoize the filtered tracks count to prevent it from changing on every render
-  const filteredTracksCount = React.useMemo(() => filteredTracks.length, [filteredTracks]);
-  
-  // Create a stable count display text
-  const trackCountText = React.useMemo(() => {
-    return `${filteredTracksCount} track${filteredTracksCount !== 1 ? 's' : ''} found`;
-  }, [filteredTracksCount]);
+  // Handler for clearing all tags
+  const handleClearTags = useCallback(() => {
+    setSelectedTags([]);
+  }, []);
+
+  // Handler for search input
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, []);
+
+  // Handler for BPM range change
+  const handleBpmChange = useCallback((range: [number, number]) => {
+    setBpmRange(range);
+  }, []);
+
+  // Handler for duration range change
+  const handleDurationChange = useCallback((range: [number, number]) => {
+    setDurationRange(range);
+  }, []);
+
+  // Handler for adding a stem to cart
+  const handleAddToCart = useCallback((stem: Stem, track: Track) => {
+    addToCart(stem, track);
+    setCartItems(getCart());
+    setCartTotal(getCartTotal());
+  }, []);
+
+  // Handler for removing an item from cart
+  const handleRemoveFromCart = useCallback((itemId: string) => {
+    removeFromCart(itemId);
+    setCartItems(getCart());
+    setCartTotal(getCartTotal());
+  }, []);
+
+  // Handler for tag click
+  const handleTagClick = useCallback((tag: Tag) => {
+    setSelectedTags(prevTags => {
+      const isSelected = prevTags.some(t => t.id === tag.id);
+      if (isSelected) {
+        return prevTags.filter(t => t.id !== tag.id);
+      } else {
+        return [...prevTags, tag];
+      }
+    });
+  }, []);
+
+  // Function to format duration from seconds to mm:ss
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Display loading state or no results message
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64">
+          <div className="w-12 h-12 border-4 border-[#1DF7CE] border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-400">Loading tracks...</p>
+        </div>
+      );
+    }
+
+    if (filteredTracks.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 text-center">
+          <h3 className="text-lg text-gray-300 mb-2">No tracks found</h3>
+          <p className="text-sm text-gray-500 max-w-md">
+            Try adjusting your filters or search query
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-6">
+        {filteredTracks.map(track => (
+          <div key={track.id} className="relative">
+            <AudioPlayer
+              track={track}
+              isPlaying={playingTrackId === track.id}
+              onPlay={() => setPlayingTrackId(track.id)}
+              onStop={() => setPlayingTrackId(null)}
+              onAddToCart={handleAddToCart}
+              onTagClick={handleTagClick}
+            />
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
-    <div className="flex flex-1">
-      {/* Sidebar with filters */}
-      <FilterSidebar
-        genres={genres}
-        moods={moods}
-        instruments={instruments}
-        selectedTags={selectedTags}
-        onTagSelect={handleTagSelect}
-        onTagDeselect={handleTagDeselect}
-        onSearchChange={handleSearchChange}
-        onBpmRangeChange={handleBpmRangeChange}
-        onDurationRangeChange={handleDurationRangeChange}
-        bpmRange={bpmRange}
-        durationRange={durationRange}
-      />
-
-      {/* Main content */}
-      <div className="flex-grow px-6 py-8">
-        <div className="mb-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-white pl-[30px]">Music Library</h1>
-          <div className="text-white min-w-[100px] text-right">
-            {trackCountText}
-          </div>
-        </div>
+    <div className="flex flex-col min-h-screen bg-[#121212] text-white">
+      <Header cartItems={cartItems} cartTotal={cartTotal} onRemoveFromCart={handleRemoveFromCart} />
+      
+      <main className="flex flex-1">
+        {/* Sidebar with filter controls */}
+        <FilterSidebar 
+          genres={genres}
+          moods={moods}
+          instruments={instruments}
+          selectedTags={selectedTags}
+          onTagToggle={handleTagToggle}
+          bpmRange={bpmRange}
+          onBpmChange={handleBpmChange}
+          durationRange={durationRange}
+          onDurationChange={handleDurationChange}
+        />
         
-        {/* Active filters area with fixed height */}
-        <div className="pl-[30px] mb-2 min-h-[50px]">
-          <TagFilter
-            selectedTags={selectedTags}
-            onRemoveTag={handleTagDeselect}
-            onClearAllTags={handleClearAllTags}
-          />
+        {/* Main content area */}
+        <div className="flex-1 p-8">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-5xl font-bold">Music list</h1>
+            
+            {/* Search input */}
+            <div className="relative w-64">
+              <input
+                type="text"
+                placeholder="Search Tracks..."
+                className="w-full py-2 pl-10 pr-4 text-white bg-[#2A2A2A] rounded-full focus:outline-none focus:ring-1 focus:ring-[#1DF7CE]"
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+              />
+              <div className="absolute left-3 top-2.5">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
               </div>
-              
-        {/* Track listing */}
-        <div className="w-full">
-          {filteredTracks.length === 0 && !loading ? (
-            <div className="text-center text-[#CDCDCD] p-12">
-              <p>No tracks match your filters. Try adjusting your search criteria.</p>
-                </div>
-          ) : (
-            <div>
-              {loading ? (
-                <div className="w-full flex justify-center p-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#1DF7CE]"></div>
-                </div>
-              ) : (
-                filteredTracks.map(track => (
-                  <div key={track.id} className="mb-[-1px]">
-                    <AudioPlayer 
-                      track={track}
-                      isPlaying={playingTrackId === track.id}
-                      onPlayPause={handlePlayPause}
-                      onAddToCart={handleAddToCart}
-                      onTagClick={handleTagSelect}
-                    />
-                  </div>
-                ))
-              )}
+            </div>
+          </div>
+          
+          {/* Selected tags display with clear button */}
+          {selectedTags.length > 0 && (
+            <div className="mb-6 flex flex-wrap items-center gap-2">
+              {selectedTags.map(tag => (
+                <TagFilter 
+                  key={tag.id}
+                  tag={tag} 
+                  selected={true} 
+                  onClick={() => handleTagToggle(tag)}
+                />
+              ))}
+              <button 
+                onClick={handleClearTags}
+                className="text-sm text-white bg-transparent hover:text-[#1DF7CE] transition-colors ml-2 flex items-center"
+              >
+                Clear All <span className="ml-1">×</span>
+              </button>
             </div>
           )}
+          
+          {/* Tracks list */}
+          {renderContent()}
         </div>
-      </div>
+      </main>
     </div>
   );
 } 

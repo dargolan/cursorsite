@@ -1,22 +1,12 @@
-import React from 'react';
 import '../styles/globals.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import Header from '../components/Header';
-
-// Load Inter font
-const inter = Inter({ 
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-inter',
-});
 
 export const metadata: Metadata = {
-  title: 'Music Library - Dar Golan',
-  description: 'High-quality royalty-free music for your creative projects',
+  title: 'Music Library',
+  description: 'Browse and purchase high-quality music stems',
   icons: {
     icon: '/logo.svg',
-  },
+  }
 };
 
 export default function RootLayout({
@@ -25,13 +15,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en">
       <head>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
+          rel="stylesheet"
+        />
       </head>
-      <body style={{ backgroundColor: '#1E1E1E' }} className="min-h-screen flex flex-col">
-        <Header cartTotal={0} />
-        <main className="flex-1">
+      <body className="bg-[#121212]">
+        <main className="min-h-screen">
           {children}
         </main>
       </body>

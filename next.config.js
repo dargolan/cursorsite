@@ -8,6 +8,11 @@ const nextConfig = {
         hostname: 'picsum.photos',
         pathname: '**',
       },
+      {
+        protocol: 'https',
+        hostname: 'dargo-strapi-media.s3.eu-north-1.amazonaws.com',
+        pathname: '**',
+      },
     ],
   },
 };

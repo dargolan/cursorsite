@@ -32,4 +32,7 @@ export interface CartItem {
   id: string;
   type: 'track' | 'stem';
   price: number;
+  name: string;
+  trackTitle: string;
+  imageUrl: string;
 } 
