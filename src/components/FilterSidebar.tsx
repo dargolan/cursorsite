@@ -4,33 +4,28 @@ import React, { useState, useEffect } from 'react';
 import { Tag } from '../types';
 
 interface FilterSidebarProps {
-  onSearchChange: (query: string) => void;
-  onTagSelect: (tag: Tag) => void;
-  onTagDeselect: (tagId: string) => void;
-  onBpmRangeChange: (min: number, max: number) => void;
-  onDurationRangeChange: (min: number, max: number) => void;
   selectedTags: Tag[];
   genres: Tag[];
   moods: Tag[];
   instruments: Tag[];
   bpmRange: [number, number];
   durationRange: [number, number]; // in seconds
+  onTagToggle: (tag: Tag) => void;
+  onBpmChange: (range: [number, number]) => void;
+  onDurationChange: (range: [number, number]) => void;
 }
 
 export default function FilterSidebar({
-  onSearchChange,
-  onTagSelect,
-  onTagDeselect,
-  onBpmRangeChange,
-  onDurationRangeChange,
   selectedTags,
   genres,
   moods,
   instruments,
   bpmRange,
-  durationRange
+  durationRange,
+  onTagToggle,
+  onBpmChange,
+  onDurationChange
 }: FilterSidebarProps): React.ReactElement {
-  const [searchQuery, setSearchQuery] = useState('');
   const [genreExpanded, setGenreExpanded] = useState(true);
   const [moodExpanded, setMoodExpanded] = useState(true);
   const [instrumentsExpanded, setInstrumentsExpanded] = useState(true);
@@ -56,17 +51,7 @@ export default function FilterSidebar({
   });
 
   const handleTagClick = (tag: Tag) => {
-    const isSelected = selectedTags.some(t => t.id === tag.id);
-    if (isSelected) {
-      onTagDeselect(tag.id);
-    } else {
-      onTagSelect(tag);
-    }
-  };
-
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-    onSearchChange(e.target.value);
+    onTagToggle(tag);
   };
 
   const toggleParentExpanded = (parentId: string) => {
@@ -95,7 +80,7 @@ export default function FilterSidebar({
     // Ensure min doesn't exceed max - 10
     const newMin = Math.min(min, localBpmMax - 10);
     setLocalBpmMin(newMin);
-    onBpmRangeChange(newMin, localBpmMax);
+    onBpmChange([newMin, localBpmMax]);
   };
 
   const handleBpmMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,7 +88,7 @@ export default function FilterSidebar({
     // Ensure max doesn't go below min + 10
     const newMax = Math.max(max, localBpmMin + 10);
     setLocalBpmMax(newMax);
-    onBpmRangeChange(localBpmMin, newMax);
+    onBpmChange([localBpmMin, newMax]);
   };
 
   const handleDurationMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,7 +96,7 @@ export default function FilterSidebar({
     // Ensure min doesn't exceed max - 30
     const newMin = Math.min(min, localDurationMax - 30);
     setLocalDurationMin(newMin);
-    onDurationRangeChange(newMin, localDurationMax);
+    onDurationChange([newMin, localDurationMax]);
   };
 
   const handleDurationMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,7 +104,7 @@ export default function FilterSidebar({
     // Ensure max doesn't go below min + 30
     const newMax = Math.max(max, localDurationMin + 30);
     setLocalDurationMax(newMax);
-    onDurationRangeChange(localDurationMin, newMax);
+    onDurationChange([localDurationMin, newMax]);
   };
   
   const isTagSelected = (tagId: string) => {
@@ -127,29 +112,9 @@ export default function FilterSidebar({
   };
 
   return (
-    <div 
-      className="w-64 bg-[#1B1B1B] min-h-screen p-4 border-r border-gray-800 sticky top-0 left-0 h-screen overflow-y-auto"
-      style={{ minWidth: '250px', maxWidth: '300px' }}
-    >
+    <div className="w-64 bg-[#1B1B1B] min-h-screen p-4 border-r border-gray-800 sticky top-0 left-0 h-screen overflow-y-auto">
       <div className="mb-6">
-        <div className="relative">
-          <div className="absolute inset-y-0 left-3 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#CDCDCD]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-          <input 
-            type="text" 
-            placeholder="Search Tracks..." 
-            value={searchQuery}
-            onChange={handleSearch}
-            className="w-full p-2 pl-10 rounded-full bg-transparent border border-[#CDCDCD] text-white placeholder-[#CDCDCD] text-xs font-normal"
-          />
-        </div>
-      </div>
-      
-      <div className="mb-6">
-        <h3 className="text-[#1DF7CE] font-normal text-xs mb-2">Filters</h3>
+        <h3 className="text-[#1DF7CE] font-normal text-sm mb-2">Filters</h3>
       </div>
 
       {/* Genre Filter */}
@@ -284,241 +249,215 @@ export default function FilterSidebar({
         )}
       </div>
 
-      {/* BPM Range Slider - entirely new implementation */}
+      {/* BPM Range Slider */}
       <div className="mb-6">
         <h3 className="text-white font-normal text-xs mb-2">BPM Range</h3>
         <div className="text-xs text-gray-400 flex justify-between mb-1">
-          <span>{localBpmMin}</span>
+          <span>{localBpmMin} BPM</span>
           <span>{localBpmMax} BPM</span>
         </div>
-        
-        {/* Slider track with clickable area */}
-        <div 
-          className="h-7 relative flex items-center cursor-pointer"
-          onClick={(e) => {
-            // Get click position relative to the slider track
-            const rect = e.currentTarget.getBoundingClientRect();
-            const position = (e.clientX - rect.left) / rect.width;
-            
-            // Convert position to BPM value (60-180 range)
-            const bpmValue = Math.round(60 + position * (180 - 60));
-            
-            // Determine which handle to move (closest one)
-            const distToMin = Math.abs(bpmValue - localBpmMin);
-            const distToMax = Math.abs(bpmValue - localBpmMax);
-            
-            if (distToMin <= distToMax) {
-              // Move min handle (ensuring it doesn't exceed max - 10)
-              const newMin = Math.min(bpmValue, localBpmMax - 10);
-              setLocalBpmMin(newMin);
-              onBpmRangeChange(newMin, localBpmMax);
-            } else {
-              // Move max handle (ensuring it doesn't go below min + 10)
-              const newMax = Math.max(bpmValue, localBpmMin + 10);
-              setLocalBpmMax(newMax);
-              onBpmRangeChange(localBpmMin, newMax);
-            }
-          }}
-        >
-          {/* Background track */}
-          <div className="h-1 absolute left-0 right-0 bg-[#3C3C3C] rounded-full"></div>
-          
-          {/* Active track area */}
+        <div className="relative h-1 bg-[#474545] rounded-full mb-4">
           <div 
-            className="h-1 absolute bg-[#1DF7CE] rounded-full"
+            className="absolute h-1 bg-[#1DF7CE] rounded-full"
             style={{ 
-              left: `${((localBpmMin - 60) / (180 - 60)) * 100}%`, 
-              width: `${((localBpmMax - localBpmMin) / (180 - 60)) * 100}%` 
+              left: `${((localBpmMin - 0) / (200 - 0)) * 100}%`, 
+              right: `${100 - ((localBpmMax - 0) / (200 - 0)) * 100}%` 
             }}
           ></div>
           
-          {/* Min handle - draggable */}
+          {/* Min thumb */}
           <div 
-            className="w-4 h-4 bg-[#1DF7CE] rounded-full shadow-md absolute cursor-grab active:cursor-grabbing"
-            style={{ left: `calc(${((localBpmMin - 60) / (180 - 60)) * 100}% - 8px)` }}
+            className="absolute w-3 h-3 bg-white rounded-full -ml-1.5 top-1/2 transform -translate-y-1/2 cursor-pointer hover:bg-[#1DF7CE]"
+            style={{ left: `${((localBpmMin - 0) / (200 - 0)) * 100}%` }}
             onMouseDown={(e) => {
-              e.stopPropagation();
+              e.preventDefault();
               
-              // Starting position
+              const slider = e.currentTarget.parentElement;
+              if (!slider) return;
+              
+              const sliderRect = slider.getBoundingClientRect();
+              const sliderWidth = sliderRect.width;
               const startX = e.clientX;
-              const startBpm = localBpmMin;
-              const trackWidth = e.currentTarget.parentElement?.getBoundingClientRect().width || 0;
-              const bpmRange = 180 - 60; // Max - Min BPM
+              const startLeft = ((localBpmMin - 0) / (200 - 0)) * sliderWidth;
               
-              // Handle mouse move
               const handleMouseMove = (moveEvent: MouseEvent) => {
                 const deltaX = moveEvent.clientX - startX;
-                const deltaBpm = Math.round((deltaX / trackWidth) * bpmRange);
-                const newBpm = Math.max(60, Math.min(localBpmMax - 10, startBpm + deltaBpm));
-                
-                setLocalBpmMin(newBpm);
-                onBpmRangeChange(newBpm, localBpmMax);
+                const newLeft = Math.max(0, Math.min(startLeft + deltaX, sliderWidth));
+                const newMin = Math.round((newLeft / sliderWidth) * (200 - 0));
+                if (newMin < localBpmMax - 10) {
+                  setLocalBpmMin(newMin);
+                  onBpmChange([newMin, localBpmMax]);
+                }
               };
               
-              // Handle mouse up - remove listeners
               const handleMouseUp = () => {
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
               };
               
-              // Add listeners
               document.addEventListener('mousemove', handleMouseMove);
               document.addEventListener('mouseup', handleMouseUp);
             }}
           ></div>
           
-          {/* Max handle - draggable */}
+          {/* Max thumb */}
           <div 
-            className="w-4 h-4 bg-[#1DF7CE] rounded-full shadow-md absolute cursor-grab active:cursor-grabbing"
-            style={{ left: `calc(${((localBpmMax - 60) / (180 - 60)) * 100}% - 8px)` }}
+            className="absolute w-3 h-3 bg-white rounded-full -mr-1.5 top-1/2 transform -translate-y-1/2 cursor-pointer hover:bg-[#1DF7CE]"
+            style={{ left: `${((localBpmMax - 0) / (200 - 0)) * 100}%` }}
             onMouseDown={(e) => {
-              e.stopPropagation();
+              e.preventDefault();
               
-              // Starting position
+              const slider = e.currentTarget.parentElement;
+              if (!slider) return;
+              
+              const sliderRect = slider.getBoundingClientRect();
+              const sliderWidth = sliderRect.width;
               const startX = e.clientX;
-              const startBpm = localBpmMax;
-              const trackWidth = e.currentTarget.parentElement?.getBoundingClientRect().width || 0;
-              const bpmRange = 180 - 60; // Max - Min BPM
+              const startLeft = ((localBpmMax - 0) / (200 - 0)) * sliderWidth;
               
-              // Handle mouse move
               const handleMouseMove = (moveEvent: MouseEvent) => {
                 const deltaX = moveEvent.clientX - startX;
-                const deltaBpm = Math.round((deltaX / trackWidth) * bpmRange);
-                const newBpm = Math.min(180, Math.max(localBpmMin + 10, startBpm + deltaBpm));
-                
-                setLocalBpmMax(newBpm);
-                onBpmRangeChange(localBpmMin, newBpm);
+                const newLeft = Math.max(0, Math.min(startLeft + deltaX, sliderWidth));
+                const newMax = Math.round((newLeft / sliderWidth) * (200 - 0));
+                if (newMax > localBpmMin + 10) {
+                  setLocalBpmMax(newMax);
+                  onBpmChange([localBpmMin, newMax]);
+                }
               };
               
-              // Handle mouse up - remove listeners
               const handleMouseUp = () => {
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
               };
               
-              // Add listeners
               document.addEventListener('mousemove', handleMouseMove);
               document.addEventListener('mouseup', handleMouseUp);
             }}
           ></div>
+        </div>
+        
+        <div className="flex gap-2">
+          <input 
+            type="number" 
+            value={localBpmMin}
+            onChange={handleBpmMinChange}
+            min="0"
+            max={localBpmMax - 10}
+            className="w-20 bg-[#303030] text-white text-xs p-2 rounded"
+          />
+          <span className="text-white self-center">-</span>
+          <input 
+            type="number" 
+            value={localBpmMax}
+            onChange={handleBpmMaxChange}
+            min={localBpmMin + 10}
+            max="200"
+            className="w-20 bg-[#303030] text-white text-xs p-2 rounded"
+          />
         </div>
       </div>
 
-      {/* Duration Slider - entirely new implementation */}
+      {/* Duration Range Slider */}
       <div className="mb-6">
         <h3 className="text-white font-normal text-xs mb-2">Duration</h3>
         <div className="text-xs text-gray-400 flex justify-between mb-1">
           <span>{formatDurationForDisplay(localDurationMin)}</span>
           <span>{formatDurationForDisplay(localDurationMax)}</span>
         </div>
-        
-        {/* Slider track with clickable area */}
-        <div 
-          className="h-7 relative flex items-center cursor-pointer"
-          onClick={(e) => {
-            // Get click position relative to the slider track
-            const rect = e.currentTarget.getBoundingClientRect();
-            const position = (e.clientX - rect.left) / rect.width;
-            
-            // Convert position to duration value (0-600 range)
-            const durationValue = Math.round(position * 600);
-            
-            // Determine which handle to move (closest one)
-            const distToMin = Math.abs(durationValue - localDurationMin);
-            const distToMax = Math.abs(durationValue - localDurationMax);
-            
-            if (distToMin <= distToMax) {
-              // Move min handle (ensuring it doesn't exceed max - 30)
-              const newMin = Math.min(durationValue, localDurationMax - 30);
-              setLocalDurationMin(newMin);
-              onDurationRangeChange(newMin, localDurationMax);
-            } else {
-              // Move max handle (ensuring it doesn't go below min + 30)
-              const newMax = Math.max(durationValue, localDurationMin + 30);
-              setLocalDurationMax(newMax);
-              onDurationRangeChange(localDurationMin, newMax);
-            }
-          }}
-        >
-          {/* Background track */}
-          <div className="h-1 absolute left-0 right-0 bg-[#3C3C3C] rounded-full"></div>
-          
-          {/* Active track area */}
+        <div className="relative h-1 bg-[#474545] rounded-full mb-4">
           <div 
-            className="h-1 absolute bg-[#1DF7CE] rounded-full"
+            className="absolute h-1 bg-[#1DF7CE] rounded-full"
             style={{ 
-              left: `${(localDurationMin / 600) * 100}%`, 
-              width: `${((localDurationMax - localDurationMin) / 600) * 100}%` 
+              left: `${((localDurationMin - 0) / (600 - 0)) * 100}%`, 
+              right: `${100 - ((localDurationMax - 0) / (600 - 0)) * 100}%` 
             }}
           ></div>
           
-          {/* Min handle - draggable */}
+          {/* Min thumb */}
           <div 
-            className="w-4 h-4 bg-[#1DF7CE] rounded-full shadow-md absolute cursor-grab active:cursor-grabbing"
-            style={{ left: `calc(${(localDurationMin / 600) * 100}% - 8px)` }}
+            className="absolute w-3 h-3 bg-white rounded-full -ml-1.5 top-1/2 transform -translate-y-1/2 cursor-pointer hover:bg-[#1DF7CE]"
+            style={{ left: `${((localDurationMin - 0) / (600 - 0)) * 100}%` }}
             onMouseDown={(e) => {
-              e.stopPropagation();
+              e.preventDefault();
               
-              // Starting position
+              const slider = e.currentTarget.parentElement;
+              if (!slider) return;
+              
+              const sliderRect = slider.getBoundingClientRect();
+              const sliderWidth = sliderRect.width;
               const startX = e.clientX;
-              const startDuration = localDurationMin;
-              const trackWidth = e.currentTarget.parentElement?.getBoundingClientRect().width || 0;
+              const startLeft = ((localDurationMin - 0) / (600 - 0)) * sliderWidth;
               
-              // Handle mouse move
               const handleMouseMove = (moveEvent: MouseEvent) => {
                 const deltaX = moveEvent.clientX - startX;
-                const deltaDuration = Math.round((deltaX / trackWidth) * 600);
-                const newDuration = Math.max(0, Math.min(localDurationMax - 30, startDuration + deltaDuration));
-                
-                setLocalDurationMin(newDuration);
-                onDurationRangeChange(newDuration, localDurationMax);
+                const newLeft = Math.max(0, Math.min(startLeft + deltaX, sliderWidth));
+                const newMin = Math.round((newLeft / sliderWidth) * (600 - 0));
+                if (newMin < localDurationMax - 30) {
+                  setLocalDurationMin(newMin);
+                  onDurationChange([newMin, localDurationMax]);
+                }
               };
               
-              // Handle mouse up - remove listeners
               const handleMouseUp = () => {
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
               };
               
-              // Add listeners
               document.addEventListener('mousemove', handleMouseMove);
               document.addEventListener('mouseup', handleMouseUp);
             }}
           ></div>
           
-          {/* Max handle - draggable */}
+          {/* Max thumb */}
           <div 
-            className="w-4 h-4 bg-[#1DF7CE] rounded-full shadow-md absolute cursor-grab active:cursor-grabbing"
-            style={{ left: `calc(${(localDurationMax / 600) * 100}% - 8px)` }}
+            className="absolute w-3 h-3 bg-white rounded-full -mr-1.5 top-1/2 transform -translate-y-1/2 cursor-pointer hover:bg-[#1DF7CE]"
+            style={{ left: `${((localDurationMax - 0) / (600 - 0)) * 100}%` }}
             onMouseDown={(e) => {
-              e.stopPropagation();
+              e.preventDefault();
               
-              // Starting position
+              const slider = e.currentTarget.parentElement;
+              if (!slider) return;
+              
+              const sliderRect = slider.getBoundingClientRect();
+              const sliderWidth = sliderRect.width;
               const startX = e.clientX;
-              const startDuration = localDurationMax;
-              const trackWidth = e.currentTarget.parentElement?.getBoundingClientRect().width || 0;
+              const startLeft = ((localDurationMax - 0) / (600 - 0)) * sliderWidth;
               
-              // Handle mouse move
               const handleMouseMove = (moveEvent: MouseEvent) => {
                 const deltaX = moveEvent.clientX - startX;
-                const deltaDuration = Math.round((deltaX / trackWidth) * 600);
-                const newDuration = Math.min(600, Math.max(localDurationMin + 30, startDuration + deltaDuration));
-                
-                setLocalDurationMax(newDuration);
-                onDurationRangeChange(localDurationMin, newDuration);
+                const newLeft = Math.max(0, Math.min(startLeft + deltaX, sliderWidth));
+                const newMax = Math.round((newLeft / sliderWidth) * (600 - 0));
+                if (newMax > localDurationMin + 30) {
+                  setLocalDurationMax(newMax);
+                  onDurationChange([localDurationMin, newMax]);
+                }
               };
               
-              // Handle mouse up - remove listeners
               const handleMouseUp = () => {
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
               };
               
-              // Add listeners
               document.addEventListener('mousemove', handleMouseMove);
               document.addEventListener('mouseup', handleMouseUp);
             }}
           ></div>
+        </div>
+        
+        <div className="flex gap-2">
+          <input 
+            type="text" 
+            value={formatDurationForDisplay(localDurationMin)}
+            readOnly
+            className="w-20 bg-[#303030] text-white text-xs p-2 rounded"
+          />
+          <span className="text-white self-center">-</span>
+          <input 
+            type="text" 
+            value={formatDurationForDisplay(localDurationMax)}
+            readOnly
+            className="w-20 bg-[#303030] text-white text-xs p-2 rounded"
+          />
         </div>
       </div>
     </div>

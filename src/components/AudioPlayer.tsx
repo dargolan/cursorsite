@@ -8,15 +8,17 @@ import { Tag, Stem, Track, CartItem } from '../types';
 interface AudioPlayerProps {
   track: Track;
   isPlaying: boolean;
-  onPlayPause: (trackId: string) => void;
-  onAddToCart: (item: CartItem) => void;
+  onPlay: () => void;
+  onStop: () => void;
+  onAddToCart: (stem: Stem, track: Track) => void;
   onTagClick: (tag: Tag) => void;
 }
 
 export default function AudioPlayer({ 
   track, 
   isPlaying,
-  onPlayPause,
+  onPlay,
+  onStop,
   onAddToCart,
   onTagClick
 }: AudioPlayerProps): React.ReactElement {
@@ -184,7 +186,11 @@ export default function AudioPlayer({
   };
   
   const handlePlayPause = () => {
-    onPlayPause(track.id);
+    if (isPlaying) {
+      onStop();
+    } else {
+      onPlay();
+    }
   };
   
   const handleStemPlayPause = (stemId: string) => {
@@ -194,7 +200,7 @@ export default function AudioPlayer({
   
   const handleStemAddToCart = (stem: Stem) => {
     setStemAddedToCart(prev => ({ ...prev, [stem.id]: true }));
-    onAddToCart({ id: stem.id, type: 'stem', price: stem.price });
+    onAddToCart(stem, track);
   };
   
   const handleDownloadAllStems = () => {
@@ -203,7 +209,7 @@ export default function AudioPlayer({
     track.stems.forEach(stem => {
       if (!stemAddedToCart[stem.id]) {
         setStemAddedToCart(prev => ({ ...prev, [stem.id]: true }));
-        onAddToCart({ id: stem.id, type: 'stem', price: stem.price });
+        onAddToCart(stem, track);
       }
     });
   };
@@ -323,8 +329,8 @@ export default function AudioPlayer({
           </button>
           
           <button 
-            onClick={() => onAddToCart({ id: track.id, type: 'track', price: 0 })}
             className="text-[#1DF7CE] hover:text-[#19d9b6] transition-colors"
+            onClick={() => window.open(track.audioUrl, '_blank')}
           >
             <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>
               download
