@@ -234,12 +234,6 @@ export default function AudioPlayer({
             ref={progressBarRef}
             onClick={handleProgressBarClick}
           >
-            {/* Teal dot at the beginning */}
-            <div 
-              className="absolute left-0 top-1/2 w-2.5 h-2.5 rounded-full bg-[#1DF7CE] transform -translate-y-1/2"
-              style={{ zIndex: 3 }}
-            />
-            
             {/* Gray track background */}
             <div className="w-full h-[8px] bg-[#3A3A3A] rounded-full cursor-pointer" />
             
@@ -247,6 +241,16 @@ export default function AudioPlayer({
             <div 
               className="absolute top-0 left-0 h-[8px] bg-[#1DF7CE] rounded-full"
               style={{ width: `${progress}%`, zIndex: 2 }}
+            />
+            
+            {/* Teal dot at the edge of progress */}
+            <div 
+              className="absolute top-1/2 w-3.5 h-3.5 rounded-full bg-[#1DF7CE]"
+              style={{ 
+                left: `${progress}%`, 
+                zIndex: 3,
+                transform: 'translateY(-50%)' 
+              }}
             />
           </div>
         </div>
@@ -336,7 +340,7 @@ export default function AudioPlayer({
                 </div>
                 
                 <div className="flex flex-col items-center">
-                  <button 
+        <button 
                     onClick={() => handleStemAddToCart(stem)}
                     disabled={stemAddedToCart[stem.id]}
                     className={`w-8 h-8 rounded-full flex items-center justify-center ${
@@ -348,14 +352,14 @@ export default function AudioPlayer({
                     {stemAddedToCart[stem.id] ? (
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12"></polyline>
-                      </svg>
-                    ) : (
+            </svg>
+          ) : (
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M4 12l2 2 4-4" />
                         <path d="M17 9v6h3" />
-                      </svg>
-                    )}
-                  </button>
+            </svg>
+          )}
+        </button>
                   <span className="mt-1 text-xs text-[#999999]">${stem.price}</span>
                 </div>
               </div>
@@ -373,8 +377,8 @@ export default function AudioPlayer({
               className="bg-[#1DF7CE] hover:bg-[#19d9b6] text-[#1E1E1E] px-4 py-2 rounded text-sm font-bold transition-colors"
             >
               Add to Cart
-            </button>
-          </div>
+        </button>
+      </div>
         </div>
       )}
     </div>
