@@ -228,26 +228,25 @@ export default function AudioPlayer({
         </div>
         
         {/* Progress bar - using all remaining space */}
-        <div className="flex-1 ml-2 mr-4">
+        <div className="flex-1 ml-2 mr-4 flex items-center">
           <div 
+            className="relative w-full"
             ref={progressBarRef}
             onClick={handleProgressBarClick}
-            className="cursor-pointer w-full relative bg-[#3A3A3A] rounded-full overflow-hidden"
-            style={{ height: '8px', marginTop: '11px', marginBottom: '11px' }}
           >
-            {/* Progress indicator */}
+            {/* Teal dot at the beginning */}
             <div 
-              className="absolute top-0 left-0 h-full bg-[#1DF7CE] rounded-full"
-              style={{ width: `${progress}%`, zIndex: 1 }}
+              className="absolute left-0 top-1/2 w-2.5 h-2.5 rounded-full bg-[#1DF7CE] transform -translate-y-1/2"
+              style={{ zIndex: 3 }}
             />
             
-            {/* Slider thumb */}
+            {/* Gray track background */}
+            <div className="w-full h-[8px] bg-[#3A3A3A] rounded-full cursor-pointer" />
+            
+            {/* Teal progress fill */}
             <div 
-              className="absolute top-1/2 h-2.5 w-2.5 bg-[#1DF7CE] rounded-full transform -translate-y-1/2"
-              style={{ 
-                left: `calc(${progress}% - 5px)`, 
-                zIndex: 2
-              }}
+              className="absolute top-0 left-0 h-[8px] bg-[#1DF7CE] rounded-full"
+              style={{ width: `${progress}%`, zIndex: 2 }}
             />
           </div>
         </div>
