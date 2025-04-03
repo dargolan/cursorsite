@@ -243,9 +243,9 @@ export default function AudioPlayer({
             
             {/* Slider thumb */}
             <div 
-              className="absolute top-1/2 h-4 w-4 bg-[#1DF7CE] rounded-full transform -translate-y-1/2"
+              className="absolute top-1/2 h-2.5 w-2.5 bg-[#1DF7CE] rounded-full transform -translate-y-1/2"
               style={{ 
-                left: `calc(${progress}% - 8px)`, 
+                left: `calc(${progress}% - 5px)`, 
                 zIndex: 2
               }}
             />
