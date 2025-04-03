@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import FilterSidebar from '../components/FilterSidebar';
 import TagFilter from '../components/TagFilter';
+import SearchBar from '../components/SearchBar';
 import { Tag, Stem, Track, CartItem } from '../types';
 import Header from '../components/Header';
 import Image from 'next/image';
@@ -25,7 +26,7 @@ export default function MusicLibrary() {
   // State for filters
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [bpmRange, setBpmRange] = useState<[number, number]>([60, 180]);
+  const [bpmRange, setBpmRange] = useState<[number, number]>([0, 200]);
   const [durationRange, setDurationRange] = useState<[number, number]>([0, 600]);
   
   // Audio player state
@@ -179,6 +180,17 @@ export default function MusicLibrary() {
     setSearchQuery(query);
   }, []);
 
+  // Handler for clearing search
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+  }, []);
+
+  // Handler for clearing all filters (tags and search)
+  const handleClearAll = useCallback(() => {
+    setSelectedTags([]);
+    setSearchQuery('');
+  }, []);
+
   // Handler for BPM range change
   const handleBpmChange = useCallback((range: [number, number]) => {
     setBpmRange(range);
@@ -225,7 +237,7 @@ export default function MusicLibrary() {
   // Display loading state or no results message
   const renderContent = () => {
     if (loading) {
-      return (
+  return (
         <div className="flex flex-col items-center justify-center h-64">
           <div className="w-12 h-12 border-4 border-[#1DF7CE] border-t-transparent rounded-full animate-spin mb-4"></div>
           <p className="text-gray-400">Loading tracks...</p>
@@ -257,8 +269,8 @@ export default function MusicLibrary() {
               onTagClick={handleTagClick}
             />
           </div>
-        ))}
-      </div>
+            ))}
+          </div>
     );
   };
 
@@ -278,32 +290,17 @@ export default function MusicLibrary() {
           onBpmChange={handleBpmChange}
           durationRange={durationRange}
           onDurationChange={handleDurationChange}
+          onSearch={handleSearch}
         />
         
         {/* Main content area */}
         <div className="flex-1 p-8">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-5xl font-bold">Music list</h1>
-            
-            {/* Search input */}
-            <div className="relative w-64">
-              <input
-                type="text"
-                placeholder="Search Tracks..."
-                className="w-full py-2 pl-10 pr-4 text-white bg-[#2A2A2A] rounded-full focus:outline-none focus:ring-1 focus:ring-[#1DF7CE]"
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-              />
-              <div className="absolute left-3 top-2.5">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-              </div>
-            </div>
           </div>
           
-          {/* Selected tags display with clear button */}
-          {selectedTags.length > 0 && (
+          {/* Selected tags and search query display with clear buttons */}
+          {(selectedTags.length > 0 || searchQuery) && (
             <div className="mb-6 flex flex-wrap items-center gap-2">
               {selectedTags.map(tag => (
                 <TagFilter 
@@ -313,8 +310,21 @@ export default function MusicLibrary() {
                   onClick={() => handleTagToggle(tag)}
                 />
               ))}
+              
+              {searchQuery && (
+                <button
+                  onClick={handleClearSearch}
+                  className="flex items-center space-x-1 text-xs font-normal px-3 py-1 rounded-full transition-colors bg-[#303030] text-[#1DF7CE] border border-[#1DF7CE]"
+                >
+                  <span>{searchQuery}</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+              
               <button 
-                onClick={handleClearTags}
+                onClick={handleClearAll}
                 className="text-sm text-white bg-transparent hover:text-[#1DF7CE] transition-colors ml-2 flex items-center"
               >
                 Clear All <span className="ml-1">×</span>
