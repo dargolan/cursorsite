@@ -240,6 +240,15 @@ export default function AudioPlayer({
               className="absolute top-0 left-0 h-full bg-[#1DF7CE] rounded-full"
               style={{ width: `${progress}%`, zIndex: 1 }}
             />
+            
+            {/* Slider thumb */}
+            <div 
+              className="absolute top-1/2 h-5 w-5 bg-[#1DF7CE] rounded-full shadow-md transform -translate-y-1/2 border-2 border-[#1E1E1E]"
+              style={{ 
+                left: `calc(${progress}% - 10px)`, 
+                zIndex: 2
+              }}
+            />
           </div>
         </div>
         
