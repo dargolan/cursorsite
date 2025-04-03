@@ -232,13 +232,13 @@ export default function AudioPlayer({
           <div 
             ref={progressBarRef}
             onClick={handleProgressBarClick}
-            className="cursor-pointer w-full relative bg-[#3A3A3A] rounded-full"
-            style={{ height: '6px', marginTop: '12px', marginBottom: '12px' }}
+            className="cursor-pointer w-full relative bg-[#3A3A3A] rounded-full overflow-hidden"
+            style={{ height: '8px', marginTop: '11px', marginBottom: '11px' }}
           >
             {/* Progress indicator */}
             <div 
               className="absolute top-0 left-0 h-full bg-[#1DF7CE] rounded-full"
-              style={{ width: `${progress}%` }}
+              style={{ width: `${progress}%`, zIndex: 1 }}
             />
           </div>
         </div>
