@@ -2,7 +2,6 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import WaveSurfer from 'wavesurfer.js';
 import { Tag, Stem, Track, CartItem } from '../types';
 
 interface AudioPlayerProps {
@@ -22,13 +21,14 @@ export default function AudioPlayer({
   onAddToCart,
   onTagClick
 }: AudioPlayerProps): React.ReactElement {
-  const waveformRef = useRef<HTMLDivElement>(null);
-  const wavesurferRef = useRef<WaveSurfer | null>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   
   const [currentTime, setCurrentTime] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
   const [isStemsOpen, setIsStemsOpen] = useState(false);
   const [stemAddedToCart, setStemAddedToCart] = useState<Record<string, boolean>>({});
+  const [progress, setProgress] = useState(0);
   
   // Group tags by type for display
   const tagsByType = track.tags.reduce<Record<string, Tag[]>>((acc, tag) => {
@@ -40,143 +40,81 @@ export default function AudioPlayer({
     return acc;
   }, {});
   
-  // Initialize WaveSurfer
+  // Initialize audio element
   useEffect(() => {
-    if (!waveformRef.current) return;
-    
-    // Cleanup previous instance
-    if (wavesurferRef.current) {
-      wavesurferRef.current.destroy();
-      wavesurferRef.current = null;
-    }
-
-    try {
-      // Create static waveform instead of loading audio initially
-      renderStaticWaveform();
+    if (!audioRef.current) {
+      audioRef.current = new Audio(track.audioUrl);
       
-      // Initialize wavesurfer only when needed (e.g. on play)
-      if (isPlaying) {
-        const initWaveSurfer = async () => {
-          try {
-            const WaveSurfer = (await import('wavesurfer.js')).default;
-            
-            wavesurferRef.current = WaveSurfer.create({
-              container: waveformRef.current!,
-              waveColor: '#767676',
-              progressColor: '#1DF7CE',
-              cursorColor: 'transparent',
-              barWidth: 2,
-              barGap: 1,
-              height: 30,
-              barRadius: 1,
-              normalize: true,
-              hideScrollbar: true,
-            });
-            
-            wavesurferRef.current.load(track.audioUrl);
-            
-            wavesurferRef.current.on('ready', () => {
-              if (isPlaying) {
-                wavesurferRef.current?.play();
-              }
-            });
-            
-            wavesurferRef.current.on('audioprocess', () => {
-              setCurrentTime(wavesurferRef.current?.getCurrentTime() || 0);
-            });
-            
-            // Use generic event handler for seek
-            (wavesurferRef.current as any).on('seek', () => {
-              setCurrentTime(wavesurferRef.current?.getCurrentTime() || 0);
-            });
-          } catch (error) {
-            console.error('Error initializing WaveSurfer:', error);
-            // Fallback to static waveform if wavesurfer fails
-            renderStaticWaveform();
-          }
-        };
-        
-        initWaveSurfer();
-      }
-    } catch (error) {
-      console.error('Error in waveform initialization:', error);
-      // Fallback to static waveform if any error occurs
-      renderStaticWaveform();
+      // Add event listeners
+      audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+      audioRef.current.addEventListener('ended', handleAudioEnded);
+    } else {
+      audioRef.current.src = track.audioUrl;
     }
     
     return () => {
-      if (wavesurferRef.current) {
-        wavesurferRef.current.destroy();
-        wavesurferRef.current = null;
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+        audioRef.current.removeEventListener('ended', handleAudioEnded);
+        audioRef.current.pause();
+        audioRef.current = null;
       }
     };
-  }, [track.id, isPlaying]);
+  }, [track.id]);
   
-  // Render a static waveform when not playing
-  const renderStaticWaveform = () => {
-    if (!waveformRef.current) return;
-    
-    try {
-      // Clear previous content
-      while (waveformRef.current.firstChild) {
-        waveformRef.current.removeChild(waveformRef.current.firstChild);
-      }
-      
-      const container = waveformRef.current;
-      const width = container.clientWidth;
-      const height = 30;
-      const samples = track.waveform || Array(100).fill(0).map(() => Math.random() * 0.8 + 0.2);
-      
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('width', '100%');
-      svg.setAttribute('height', `${height}px`);
-      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-      svg.setAttribute('preserveAspectRatio', 'none');
-      
-      const barWidth = 2;
-      const barGap = 1;
-      const numBars = Math.floor(width / (barWidth + barGap));
-      const samplesPerBar = Math.ceil(samples.length / numBars);
-      
-      for (let i = 0; i < numBars; i++) {
-        const startSample = i * samplesPerBar;
-        const sampleSlice = samples.slice(startSample, startSample + samplesPerBar);
-        let sampleValue = 0;
-        
-        if (sampleSlice.length > 0) {
-          sampleValue = sampleSlice.reduce((sum, val) => sum + val, 0) / sampleSlice.length;
-        }
-        
-        const barHeight = Math.max(1, Math.round(sampleValue * height));
-        const x = i * (barWidth + barGap);
-        const y = (height - barHeight) / 2;
-        
-        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('x', `${x}`);
-        rect.setAttribute('y', `${y}`);
-        rect.setAttribute('width', `${barWidth}`);
-        rect.setAttribute('height', `${barHeight}`);
-        rect.setAttribute('rx', '1');
-        rect.setAttribute('ry', '1');
-        rect.setAttribute('fill', '#767676');
-        
-        svg.appendChild(rect);
-      }
-      
-      container.appendChild(svg);
-    } catch (error) {
-      console.error('Error rendering static waveform:', error);
+  // Handle time updates from audio element
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      const current = audioRef.current.currentTime;
+      const duration = audioRef.current.duration || track.duration;
+      setCurrentTime(current);
+      setProgress((current / duration) * 100);
     }
+  };
+  
+  // Handle audio ending
+  const handleAudioEnded = () => {
+    setCurrentTime(0);
+    setProgress(0);
+    onStop();
   };
   
   // Update play state when isPlaying changes
   useEffect(() => {
-    if (isPlaying) {
-      wavesurferRef.current?.play();
-    } else {
-      wavesurferRef.current?.pause();
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.play().catch(error => {
+          console.error('Error playing audio:', error);
+          onStop();
+        });
+      } else {
+        audioRef.current.pause();
+      }
     }
-  }, [isPlaying]);
+  }, [isPlaying, onStop]);
+  
+  // Handle click on progress bar
+  const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!progressBarRef.current || !audioRef.current) return;
+    
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const percentageClicked = clickX / rect.width;
+    
+    // Set new time based on click position
+    const newTime = percentageClicked * (audioRef.current.duration || track.duration);
+    setCurrentTime(newTime);
+    setProgress(percentageClicked * 100);
+    
+    if (audioRef.current) {
+      audioRef.current.currentTime = newTime;
+    }
+    
+    // Start playing if needed
+    if (!isPlaying) {
+      onPlay();
+    }
+  };
   
   // Format time for display (mm:ss)
   const formatTime = (time: number) => {
@@ -289,13 +227,20 @@ export default function AudioPlayer({
           </div>
         </div>
         
-        {/* Waveform - using all remaining space */}
+        {/* Progress bar - using all remaining space */}
         <div className="flex-1 ml-2 mr-4">
           <div 
-            ref={waveformRef} 
-            className="cursor-pointer w-full" 
-            style={{ height: '30px' }}
-          />
+            ref={progressBarRef}
+            onClick={handleProgressBarClick}
+            className="cursor-pointer w-full relative bg-[#3A3A3A] rounded-full"
+            style={{ height: '6px', marginTop: '12px', marginBottom: '12px' }}
+          >
+            {/* Progress indicator */}
+            <div 
+              className="absolute top-0 left-0 h-full bg-[#1DF7CE] rounded-full"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
         
         {/* Duration - fixed width */}
@@ -339,7 +284,7 @@ export default function AudioPlayer({
         </div>
       </div>
       
-      {/* Stems dropdown */}
+      {/* Stems dropdown - modify this if needed */}
       {isStemsOpen && track.stems && (
         <div className="bg-[#252525] rounded-b p-4 pt-2">
           <div className="flex justify-between items-center mb-3">
@@ -373,8 +318,9 @@ export default function AudioPlayer({
                   </svg>
                 </button>
                 
-                <div className="flex-grow h-8 bg-[#767676] rounded mx-2">
-                  {/* Simplified waveform representation */}
+                {/* Simple progress bar for stems */}
+                <div className="flex-grow h-4 bg-[#3A3A3A] rounded mx-2">
+                  {/* Simplified progress representation */}
                 </div>
                 
                 <div className="w-16 text-white text-xs font-normal text-right mr-3">
@@ -382,7 +328,7 @@ export default function AudioPlayer({
                 </div>
                 
                 <div className="flex flex-col items-center">
-                  <button
+                  <button 
                     onClick={() => handleStemAddToCart(stem)}
                     disabled={stemAddedToCart[stem.id]}
                     className={`w-8 h-8 rounded-full flex items-center justify-center ${
@@ -397,23 +343,28 @@ export default function AudioPlayer({
                       </svg>
                     ) : (
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <path d="M4 12l2 2 4-4" />
+                        <path d="M17 9v6h3" />
                       </svg>
                     )}
                   </button>
-                  <span className="text-[#1DF7CE] text-xs font-normal mt-1">${stem.price.toFixed(2)}</span>
+                  <span className="mt-1 text-xs text-[#999999]">${stem.price}</span>
                 </div>
               </div>
             ))}
           </div>
           
-          <div className="flex justify-end mt-4">
-            <button
+          {/* Buy all stems button */}
+          <div className="flex justify-between items-center mt-4">
+            <div>
+              <p className="text-xs text-[#999999]">Buy all stems:</p>
+              <p className="text-[#1DF7CE] font-bold">${discountedStemsPrice} <span className="line-through text-[#999999] text-xs font-normal">${totalStemsPrice}</span></p>
+            </div>
+            <button 
               onClick={handleDownloadAllStems}
-              className="bg-[#1DF7CE] hover:bg-[#19d9b6] text-[#1E1E1E] font-normal px-4 py-2 rounded transition-colors"
+              className="bg-[#1DF7CE] hover:bg-[#19d9b6] text-[#1E1E1E] px-4 py-2 rounded text-sm font-bold transition-colors"
             >
-              Download All Stems (${discountedStemsPrice.toFixed(2)})
+              Add to Cart
             </button>
           </div>
         </div>
