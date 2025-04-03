@@ -25,7 +25,7 @@ export default function MusicLibrary() {
   
   // State for filters
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchTerms, setSearchTerms] = useState<string[]>([]);
   const [bpmRange, setBpmRange] = useState<[number, number]>([0, 200]);
   const [durationRange, setDurationRange] = useState<[number, number]>([0, 600]);
   
@@ -121,7 +121,7 @@ export default function MusicLibrary() {
     };
   }, []);
 
-  // Filter tracks based on selected tags, search query, and ranges
+  // Filter tracks based on selected tags, search terms, and ranges
   useEffect(() => {
     // Start with all tracks
     let filtered = [...tracks];
@@ -136,13 +136,16 @@ export default function MusicLibrary() {
       });
     }
     
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(track => 
-        track.title.toLowerCase().includes(query) ||
-        track.tags.some(tag => tag.name.toLowerCase().includes(query))
-      );
+    // Filter by search terms
+    if (searchTerms.length > 0) {
+      filtered = filtered.filter(track => {
+        // Track must match ANY of the search terms
+        return searchTerms.some(term => {
+          const lowerTerm = term.toLowerCase();
+          return track.title.toLowerCase().includes(lowerTerm) ||
+                 track.tags.some(tag => tag.name.toLowerCase().includes(lowerTerm));
+        });
+      });
     }
     
     // Filter by BPM range
@@ -156,7 +159,7 @@ export default function MusicLibrary() {
     );
     
     setFilteredTracks(filtered);
-  }, [tracks, selectedTags, searchQuery, bpmRange, durationRange]);
+  }, [tracks, selectedTags, searchTerms, bpmRange, durationRange]);
 
   // Handler for toggling a tag
   const handleTagToggle = useCallback((tag: Tag) => {
@@ -177,18 +180,20 @@ export default function MusicLibrary() {
 
   // Handler for search input
   const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query);
+    if (query.trim()) {
+      setSearchTerms(prev => [...prev, query.trim()]);
+    }
   }, []);
 
-  // Handler for clearing search
-  const handleClearSearch = useCallback(() => {
-    setSearchQuery('');
+  // Handler for removing a specific search term
+  const handleRemoveSearchTerm = useCallback((termToRemove: string) => {
+    setSearchTerms(prev => prev.filter(term => term !== termToRemove));
   }, []);
 
-  // Handler for clearing all filters (tags and search)
+  // Handler for clearing all filters (tags and search terms)
   const handleClearAll = useCallback(() => {
     setSelectedTags([]);
-    setSearchQuery('');
+    setSearchTerms([]);
   }, []);
 
   // Handler for BPM range change
@@ -237,7 +242,7 @@ export default function MusicLibrary() {
   // Display loading state or no results message
   const renderContent = () => {
     if (loading) {
-  return (
+      return (
         <div className="flex flex-col items-center justify-center h-64">
           <div className="w-12 h-12 border-4 border-[#1DF7CE] border-t-transparent rounded-full animate-spin mb-4"></div>
           <p className="text-gray-400">Loading tracks...</p>
@@ -269,8 +274,8 @@ export default function MusicLibrary() {
               onTagClick={handleTagClick}
             />
           </div>
-            ))}
-          </div>
+        ))}
+      </div>
     );
   };
 
@@ -299,8 +304,8 @@ export default function MusicLibrary() {
             <h1 className="text-5xl font-bold">Music list</h1>
           </div>
           
-          {/* Selected tags and search query display with clear buttons */}
-          {(selectedTags.length > 0 || searchQuery) && (
+          {/* Selected tags and search terms display with clear button */}
+          {(selectedTags.length > 0 || searchTerms.length > 0) && (
             <div className="mb-6 flex flex-wrap items-center gap-2">
               {selectedTags.map(tag => (
                 <TagFilter 
@@ -311,17 +316,18 @@ export default function MusicLibrary() {
                 />
               ))}
               
-              {searchQuery && (
+              {searchTerms.map((term, index) => (
                 <button
-                  onClick={handleClearSearch}
+                  key={`search-${index}-${term}`}
+                  onClick={() => handleRemoveSearchTerm(term)}
                   className="flex items-center space-x-1 text-xs font-normal px-3 py-1 rounded-full transition-colors bg-[#303030] text-[#1DF7CE] border border-[#1DF7CE]"
                 >
-                  <span>{searchQuery}</span>
+                  <span>{term}</span>
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
-              )}
+              ))}
               
               <button 
                 onClick={handleClearAll}
