@@ -54,7 +54,7 @@ export default function AudioPlayer({
       audioRef.current.src = track.audioUrl;
     }
     
-    return () => {
+      return () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
         audioRef.current.removeEventListener('ended', handleAudioEnded);
@@ -232,14 +232,11 @@ export default function AudioPlayer({
             className={`absolute inset-0 bg-black ${isHovering || isPlaying ? 'opacity-50' : 'opacity-0'} transition-opacity z-10`}
           />
           <Image 
-            src={track.imageUrl} 
+            src={"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18V5l12-2v13'%3E%3C/path%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Ccircle cx='18' cy='16' r='3'%3E%3C/circle%3E%3C/svg%3E"} 
             alt={track.title}
             width={48}
             height={48}
             className="object-cover"
-            onError={(e) => {
-              e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18V5l12-2v13'%3E%3C/path%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Ccircle cx='18' cy='16' r='3'%3E%3C/circle%3E%3C/svg%3E";
-            }}
           />
           <button 
             onClick={handlePlayPause}
@@ -273,7 +270,11 @@ export default function AudioPlayer({
               tags.map((tag, tagIndex, tagArray) => (
                 <React.Fragment key={tag.id}>
                   <button 
-                    onClick={() => onTagClick(tag)}
+                    onClick={() => {
+                      console.log('[AudioPlayer] Tag clicked:', tag);
+                      console.log('[AudioPlayer] Tag object structure:', JSON.stringify(tag));
+                      onTagClick(tag);
+                    }}
                     className="hover:text-[#1DF7CE] transition-colors inline"
                   >
                     {tag.name}
@@ -386,9 +387,9 @@ export default function AudioPlayer({
                   onClick={() => handleStemPlayPause(stem.id)}
                   className="w-8 h-8 flex items-center justify-center text-white mr-3"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                  </svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
                 </button>
                 
                 {/* Simple progress bar for stems */}
@@ -433,7 +434,7 @@ export default function AudioPlayer({
               <p className="text-xs text-[#999999]">Buy all stems:</p>
               <p className="text-[#1DF7CE] font-bold">${discountedStemsPrice} <span className="line-through text-[#999999] text-xs font-normal">${totalStemsPrice}</span></p>
             </div>
-            <button 
+            <button
               onClick={handleDownloadAllStems}
               className="bg-[#1DF7CE] hover:bg-[#19d9b6] text-[#1E1E1E] px-4 py-2 rounded text-sm font-bold transition-colors"
             >

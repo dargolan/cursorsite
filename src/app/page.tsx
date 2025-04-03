@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import FilterSidebar from '../components/FilterSidebar';
 import TagFilter from '../components/TagFilter';
-import SearchBar from '../components/SearchBar';
 import { Tag, Stem, Track, CartItem } from '../types';
 import Header from '../components/Header';
 import Image from 'next/image';
@@ -23,8 +22,12 @@ export default function MusicLibrary() {
   const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // Add a ref to track if we've already fetched data to prevent double fetching
+  const dataFetchedRef = useRef(false);
+  
   // State for filters
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchTerms, setSearchTerms] = useState<string[]>([]);
   const [bpmRange, setBpmRange] = useState<[number, number]>([0, 200]);
   const [durationRange, setDurationRange] = useState<[number, number]>([0, 600]);
@@ -43,6 +46,9 @@ export default function MusicLibrary() {
 
   // Fetch data from Strapi
   useEffect(() => {
+    // Skip if we've already fetched data (prevents double fetch in StrictMode)
+    if (dataFetchedRef.current) return;
+    
     const fetchData = async () => {
       setLoading(true);
       try {
@@ -97,6 +103,8 @@ export default function MusicLibrary() {
         setInstruments([]);
       } finally {
         setLoading(false);
+        // Mark that we've completed a fetch to prevent duplicate fetches
+        dataFetchedRef.current = true;
       }
     };
     
@@ -121,18 +129,25 @@ export default function MusicLibrary() {
     };
   }, []);
 
-  // Filter tracks based on selected tags, search terms, and ranges
+  // Filter tracks based on selected tags, search query, and ranges
   useEffect(() => {
     // Start with all tracks
     let filtered = [...tracks];
     
     // Filter by selected tags
     if (selectedTags.length > 0) {
+      console.log('Filtering by tags:', selectedTags.map(t => `${t.name} (${t.id})`));
       filtered = filtered.filter(track => {
-        // Track must have ALL selected tags
-        return selectedTags.every(selectedTag => 
-          track.tags.some(tag => tag.id === selectedTag.id)
+        // Track must have ALL selected tags - match by ID or name for mock data
+        const matches = selectedTags.every(selectedTag => 
+          track.tags.some(tag => {
+            // Try matching by ID first, then fall back to matching by name (for mock data)
+            return (tag.id === selectedTag.id) || 
+                   (tag.name.toLowerCase() === selectedTag.name.toLowerCase());
+          })
         );
+        console.log('Track', track.title, 'has tags:', track.tags.map(t => t.name), 'matches?', matches);
+        return matches;
       });
     }
     
@@ -161,28 +176,46 @@ export default function MusicLibrary() {
     setFilteredTracks(filtered);
   }, [tracks, selectedTags, searchTerms, bpmRange, durationRange]);
 
-  // Handler for toggling a tag
+  // Handler for toggling a tag - use this same handler for both components
   const handleTagToggle = useCallback((tag: Tag) => {
+    if (!tag || !tag.id) {
+      console.error('Invalid tag object received:', tag);
+      return;
+    }
+    
+    console.log('Toggle tag:', tag.name, 'ID:', tag.id);
+    
+    // Update selectedTags state
     setSelectedTags(prevTags => {
       const isSelected = prevTags.some(t => t.id === tag.id);
+      console.log('Tag already selected?', isSelected);
+      
       if (isSelected) {
+        // Remove tag if already selected
         return prevTags.filter(t => t.id !== tag.id);
       } else {
-        return [...prevTags, tag];
+        // Add tag if not selected - create fresh tag object to avoid reference issues
+        const newTag: Tag = {
+          id: tag.id,
+          name: tag.name,
+          type: tag.type,
+          count: tag.count || 0,
+          ...(tag.parent ? { parent: tag.parent } : {})
+        };
+        return [...prevTags, newTag];
       }
     });
   }, []);
 
-  // Handler for clearing all tags
-  const handleClearTags = useCallback(() => {
-    setSelectedTags([]);
-  }, []);
+  // Use the same handler for both components
+  const handleTagClick = handleTagToggle;
 
-  // Handler for search input
+  // Handler for search input - updated to add search terms
   const handleSearch = useCallback((query: string) => {
     if (query.trim()) {
       setSearchTerms(prev => [...prev, query.trim()]);
     }
+    setSearchQuery('');
   }, []);
 
   // Handler for removing a specific search term
@@ -220,18 +253,6 @@ export default function MusicLibrary() {
     setCartTotal(getCartTotal());
   }, []);
 
-  // Handler for tag click
-  const handleTagClick = useCallback((tag: Tag) => {
-    setSelectedTags(prevTags => {
-      const isSelected = prevTags.some(t => t.id === tag.id);
-      if (isSelected) {
-        return prevTags.filter(t => t.id !== tag.id);
-      } else {
-        return [...prevTags, tag];
-      }
-    });
-  }, []);
-
   // Function to format duration from seconds to mm:ss
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -242,7 +263,7 @@ export default function MusicLibrary() {
   // Display loading state or no results message
   const renderContent = () => {
     if (loading) {
-      return (
+  return (
         <div className="flex flex-col items-center justify-center h-64">
           <div className="w-12 h-12 border-4 border-[#1DF7CE] border-t-transparent rounded-full animate-spin mb-4"></div>
           <p className="text-gray-400">Loading tracks...</p>
@@ -274,8 +295,8 @@ export default function MusicLibrary() {
               onTagClick={handleTagClick}
             />
           </div>
-        ))}
-      </div>
+            ))}
+          </div>
     );
   };
 
@@ -304,6 +325,12 @@ export default function MusicLibrary() {
             <h1 className="text-5xl font-bold">Music list</h1>
           </div>
           
+          {/* DEBUG: Display of current tag selection state */}
+          <div className="mb-2 text-xs text-gray-500">
+            Debug - Selected Tags: {selectedTags.map(t => t.name).join(', ') || 'None'} | 
+            Search Terms: {searchTerms.join(', ') || 'None'}
+        </div>
+        
           {/* Selected tags and search terms display with clear button */}
           {(selectedTags.length > 0 || searchTerms.length > 0) && (
             <div className="mb-6 flex flex-wrap items-center gap-2">
@@ -313,8 +340,8 @@ export default function MusicLibrary() {
                   tag={tag} 
                   selected={true} 
                   onClick={() => handleTagToggle(tag)}
-                />
-              ))}
+                        />
+                      ))}
               
               {searchTerms.map((term, index) => (
                 <button
@@ -334,7 +361,7 @@ export default function MusicLibrary() {
                 className="text-sm text-white bg-transparent hover:text-[#1DF7CE] transition-colors ml-2 flex items-center"
               >
                 Clear All <span className="ml-1">×</span>
-              </button>
+                </button>
             </div>
           )}
           

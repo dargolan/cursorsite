@@ -1,4 +1,5 @@
 import { Track, Tag, Stem } from '../types';
+import { mockTracks } from "./mockData";
 
 // Define the base URL for your Strapi API
 const API_URL = process.env.NEXT_PUBLIC_STRAPI_API_URL || 'http://localhost:1337';
@@ -10,126 +11,134 @@ const API_TOKEN = process.env.NEXT_PUBLIC_STRAPI_API_TOKEN || '';
  * Get all tracks from Strapi
  */
 export async function getTracks(): Promise<Track[]> {
+  // Debug info
+  const apiUrl = process.env.NEXT_PUBLIC_STRAPI_API_URL;
+  const hasToken = !!process.env.NEXT_PUBLIC_STRAPI_API_TOKEN;
+  console.log(`API URL: ${apiUrl}, Has token: ${hasToken}, Environment: ${typeof window === 'undefined' ? 'server' : 'browser'}`);
+
   try {
-    console.log('API_URL:', API_URL);
-    console.log('API_TOKEN:', API_TOKEN ? 'Token exists' : 'No token');
+    let url = `${process.env.NEXT_PUBLIC_STRAPI_API_URL}/api/tracks?populate=*`;
+    console.log(`Fetching from URL: ${url}`);
     
-    // Check if we're running in browser or server
-    if (typeof window !== 'undefined') {
-      console.log('Running in browser');
-    } else {
-      console.log('Running on server');
-    }
-    
-    // Print the API structure for debugging
-    if (typeof window !== 'undefined') {
-      printStrapiAPIStructure();
-    }
-    
-    // Modified to use public endpoint
-    const fullUrl = `${API_URL}/api/tracks?populate=*`;
-    console.log('Fetching tracks from:', fullUrl);
-    
-    const response = await fetch(fullUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': API_TOKEN ? `Bearer ${API_TOKEN}` : '',
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store'
+    const res = await fetch(url, {
+      headers: process.env.NEXT_PUBLIC_STRAPI_API_TOKEN
+        ? { Authorization: `Bearer ${process.env.NEXT_PUBLIC_STRAPI_API_TOKEN}` }
+        : {},
+      // Add a shorter timeout to fail faster if Strapi is down
+      signal: AbortSignal.timeout(5000)  
     });
-    
-    console.log('Response status:', response.status);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API Error:', response.status, errorText);
-      throw new Error(`Failed to fetch tracks: ${response.status} - ${errorText}`);
+
+    if (!res.ok) {
+      console.error(`API Error: ${res.status} ${res.statusText}`);
+      console.log("Returning mock data due to API error");
+      return mockTracks;
     }
-    
-    const data = await response.json();
-    console.log('Raw tracks data structure:', Object.keys(data));
-    
-    // Return mock data if API returns no data
-    if (!data || !data.data || !Array.isArray(data.data) || data.data.length === 0) {
-      console.warn('No tracks found in API response, returning mock data');
-      return getMockTracks();
+
+    const responseData = await res.json();
+    console.log("API response received");
+
+    // Handle no tracks case
+    if (!responseData.data || !Array.isArray(responseData.data)) {
+      console.log("No tracks data found in API response, using mock data");
+      return mockTracks;
     }
-    
-    console.log(`Received ${data.data.length} tracks from API`);
-    console.log('Full track data:', JSON.stringify(data)); // Log full data to debug
-    
-    // Transform Strapi response to our Track type
-    return data.data.map((item: any) => {
+
+    // Debug info for the first track
+    if (responseData.data.length > 0) {
+      console.log("First track structure:", JSON.stringify(responseData.data[0], null, 2));
+    }
+
+    // Transform the data
+    const tracks = responseData.data.map((item: any) => {
       try {
-        if (!item) {
-          console.warn('Null track item in response');
-          return null;
+        // Extract attributes, handling both new and old Strapi formats
+        const data = item.attributes || item;
+        
+        // Debug stems
+        if (data.stems && Array.isArray(data.stems.data)) {
+          console.log(`Track ${data.title} has ${data.stems.data.length} stems`);
         }
         
-        // Fixed: the track data is directly in the item, not in attributes
-        // And property names are capitalized in Strapi response
-        const track = item; // Changed from item.attributes
-        console.log('Processing track:', track.Title); // Changed from track.title
+        // Process tags - handle both formats
+        let tags: Tag[] = [];
+        if (data.tags) {
+          if (data.tags.data && Array.isArray(data.tags.data)) {
+            // New Strapi format
+            tags = data.tags.data.map((tag: any) => ({
+              id: tag.id.toString(),
+              name: tag.attributes ? tag.attributes.name : (tag.name || 'Unknown Tag'),
+              type: tag.attributes?.type || tag.type || 'genre'
+            }));
+          } else if (Array.isArray(data.tags)) {
+            // Old format
+            tags = data.tags.map((tag: any) => ({
+              id: tag.id.toString(),
+              name: tag.name || 'Unknown Tag',
+              type: tag.type || 'genre'
+            }));
+          }
+        }
+        
+        // Process stems - handle both formats
+        let stems: Stem[] = [];
+        let hasStems = false;
+        if (data.stems) {
+          if (data.stems.data && Array.isArray(data.stems.data)) {
+            // New Strapi format
+            stems = data.stems.data.map((stem: any) => {
+              const stemAttrs = stem.attributes || stem;
+              return {
+                id: stem.id.toString(),
+                name: stemAttrs.name || 'Unknown Stem',
+                url: stemAttrs.url || stemAttrs.audio?.data?.attributes?.url || '',
+                price: Number(stemAttrs.price || 0),
+                duration: Number(stemAttrs.duration || 0)
+              };
+            });
+          } else if (Array.isArray(data.stems)) {
+            // Old format
+            stems = data.stems.map((stem: any) => ({
+              id: stem.id.toString(),
+              name: stem.name || 'Unknown Stem',
+              url: stem.url || stem.audio?.url || '',
+              price: Number(stem.price || 0),
+              duration: Number(stem.duration || 0)
+            }));
+          }
+          hasStems = stems.length > 0;
+        }
+        
+        // Create waveform array from URL if needed
+        const waveform = data.waveform?.data ? [1, 0.8, 0.6, 0.4, 0.6, 0.8, 1] : undefined; // Placeholder waveform
         
         return {
-          id: item.id?.toString() || '',
-          title: track.Title || 'Untitled Track', // Changed from track.title
-          bpm: track.BPM || 120, // Changed from track.bpm
-          duration: track.Duration || 0, // Changed from track.duration
-          imageUrl: track.Cover?.url || '', // Changed structure to match actual response
-          thumbnailImage: track.Cover?.formats?.small?.url || track.Cover?.url || '',
-          audioUrl: track.Audio?.url || '', // Changed structure to match actual response
-          hasStems: Boolean(track.stems?.length), // Changed from track.stems?.data?.length
-          tags: [], // First create with empty tags
-          stems: [], // First create with empty stems
-        };
-      } catch (error) {
-        console.error('Error transforming track:', error);
+          id: item.id.toString(),
+          title: data.title || 'Untitled Track',
+          bpm: data.bpm ? parseFloat(data.bpm) : 120,
+          duration: data.duration ? parseFloat(data.duration) : 180,
+          tags: tags,
+          stems: stems,
+          hasStems: hasStems,
+          audioUrl: data.audio?.data?.attributes?.url || data.audio?.url || '',
+          waveform: waveform,
+          imageUrl: data.image?.data?.attributes?.url || data.image?.url || '',
+        } as Track;
+      } catch (e) {
+        console.error(`Error processing track data:`, e);
         return null;
       }
-    })
-    .filter(Boolean)
-    .map((track: any) => {
-      try {
-        // Now find the original item to process tags and stems separately
-        const originalItem = data.data.find((i: any) => i.id.toString() === track.id);
-        if (!originalItem) return track;
-        
-        // Process tags directly from the item
-        if (Array.isArray(originalItem.tags)) {
-          track.tags = originalItem.tags
-            .filter((tag: any) => tag && tag.Name)
-            .map((tag: any) => ({
-              id: tag.id?.toString() || '',
-              name: tag.Name || 'Unknown Tag', // Changed from tag.attributes.name
-              type: ensureValidType(tag.Category), // Changed from tag.attributes.category
-            }));
-        }
-        
-        // Process stems directly from the item
-        if (Array.isArray(originalItem.stems)) {
-          track.stems = originalItem.stems
-            .filter((stem: any) => stem)
-            .map((stem: any) => ({
-              id: stem.id?.toString() || '',
-              name: stem.Title || 'Untitled Stem', // Changed from stem.attributes.title
-              url: stem.Audio?.url || '', // Changed to match actual response
-              price: Number(stem.Price) || 0, // Changed from stem.attributes.price
-              duration: Number(stem.Duration) || 0, // Changed from stem.attributes.duration
-            }));
-        }
-        
-        return track;
-      } catch (error) {
-        console.error('Error processing track relations:', error);
-        return track; // Return track even if relations failed
-      }
-    });
+    }).filter(Boolean) as Track[];
+
+    // If no valid tracks were processed, return mock data
+    if (tracks.length === 0) {
+      console.log("No valid tracks after transformation, using mock data");
+      return mockTracks;
+    }
+
+    return tracks;
   } catch (error) {
-    console.error('Error fetching tracks:', error);
-    console.log('Returning mock data due to error');
-    return getMockTracks();
+    console.log('Falling back to mock track data');
+    return mockTracks;
   }
 }
 
@@ -181,8 +190,7 @@ export async function getTags(): Promise<Tag[]> {
         };
       });
   } catch (error) {
-    console.error('Error fetching tags:', error);
-    console.log('Returning mock data due to error');
+    console.log('Falling back to mock tag data');
     return getMockTags();
   }
 }
@@ -379,6 +387,26 @@ export async function printStrapiAPIStructure() {
       }
     }
   } catch (error) {
-    console.error('Error fetching API structure:', error);
+    console.log('API not available, using mock data instead');
+    return null;
+  }
+}
+// Add this function to load the waveform mapping
+export async function getWaveformMap() {
+  try {
+    // Try to fetch the waveform mapping file
+    const response = await fetch('/waveforms/waveform-map.json');
+    
+    if (response.ok) {
+      // If successful, parse and return the mapping
+      const waveformMap = await response.json();
+      return waveformMap;
+    }
+    
+    // If file doesn't exist, return empty object
+    return {};
+  } catch (error) {
+    console.error('Error loading waveform map:', error);
+    return {};
   }
 }

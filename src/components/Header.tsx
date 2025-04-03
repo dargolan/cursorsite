@@ -57,31 +57,34 @@ export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart
         isSticky ? 'sticky top-0 z-50 shadow-md' : ''
       } transition-all duration-200`}
     >
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center font-bold text-white">
-            <div className="w-10 h-10 mr-2">
-              <Image 
-                src="/logo.svg" 
-                alt="Dar Golan" 
-                width={40} 
-                height={40}
-                onError={(e) => {
-                  e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40' fill='none'%3E%3Crect width='40' height='40' rx='4' fill='%23252525'/%3E%3Cpath d='M12 14c0-1.657 1.343-3 3-3s3 1.343 3 3v8c0 1.657-1.343 3-3 3s-3-1.343-3-3v-8z' fill='white'/%3E%3Cpath d='M22 19c0-1.657 1.343-3 3-3s3 1.343 3 3v3c0 1.657-1.343 3-3 3s-3-1.343-3-3v-3z' fill='white'/%3E%3C/svg%3E";
-                }}
-              />
-            </div>
-            <span className="text-xl">Dar Golan</span>
-          </Link>
+      <div className="w-full relative px-0">
+        <div className="flex h-16 relative">
+          {/* Left sidebar area - contains logo */}
+          <div className="w-[210px] flex items-center justify-center">
+            {/* Logo */}
+            <Link href="/" className="flex items-center font-bold text-white">
+              <div className="w-10 h-10 mr-2">
+                <Image 
+                  src="/logo.svg" 
+                  alt="Dar Golan" 
+                  width={40} 
+                  height={40}
+                  onError={(e) => {
+                    e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40' fill='none'%3E%3Crect width='40' height='40' rx='4' fill='%23252525'/%3E%3Cpath d='M12 14c0-1.657 1.343-3 3-3s3 1.343 3 3v8c0 1.657-1.343 3-3 3s-3-1.343-3-3v-8z' fill='white'/%3E%3Cpath d='M22 19c0-1.657 1.343-3 3-3s3 1.343 3 3v3c0 1.657-1.343 3-3 3s-3-1.343-3-3v-3z' fill='white'/%3E%3C/svg%3E";
+                  }}
+                />
+              </div>
+              <span className="text-xl">Dar Golan</span>
+            </Link>
+          </div>
           
-          {/* Main navigation */}
-          <nav className="hidden md:block ml-16">
+          {/* Main navigation - positioned absolutely */}
+          <nav className="hidden md:block absolute left-[260px] top-1/2 transform -translate-y-1/2">
             <ul className="flex space-x-8">
               <li>
                 <Link 
                   href="/" 
-                  className="text-[#1DF7CE] border-b-2 border-[#1DF7CE] pb-1 font-medium"
+                  className="text-[#1DF7CE] font-normal"
                 >
                   Music
                 </Link>
@@ -89,7 +92,7 @@ export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart
               <li>
                 <Link 
                   href="/sound-effects" 
-                  className="text-white hover:text-[#1DF7CE] transition-colors font-medium"
+                  className="text-[#CDCDCD] hover:text-[#1DF7CE] transition-colors font-normal"
                 >
                   Sound Effects
                 </Link>
@@ -97,7 +100,7 @@ export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart
               <li>
                 <Link 
                   href="/video" 
-                  className="text-white hover:text-[#1DF7CE] transition-colors font-medium"
+                  className="text-[#CDCDCD] hover:text-[#1DF7CE] transition-colors font-normal"
                 >
                   Video
                 </Link>
@@ -105,15 +108,15 @@ export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart
               <li>
                 <Link 
                   href="/about" 
-                  className="text-white hover:text-[#1DF7CE] transition-colors font-medium"
+                  className="text-[#CDCDCD] hover:text-[#1DF7CE] transition-colors font-normal"
                 >
                   About
                 </Link>
               </li>
               <li>
                 <Link 
-                  href="/contact" 
-                  className="text-white hover:text-[#1DF7CE] transition-colors font-medium"
+                  href="/contact"
+                  className="text-[#CDCDCD] hover:text-[#1DF7CE] transition-colors font-normal"
                 >
                   Contact
                 </Link>
@@ -121,11 +124,11 @@ export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart
             </ul>
           </nav>
           
-          {/* Right side navigation and cart */}
-          <div className="flex items-center space-x-6">
+          {/* Right side content area - sign in and cart */}
+          <div className="flex items-center space-x-6 absolute right-[60px] top-1/2 transform -translate-y-1/2">
             <Link 
-              href="/signin" 
-              className="text-white hover:text-[#1DF7CE] transition-colors font-medium hidden md:block"
+              href="/signin"
+              className="text-[#CDCDCD] hover:text-[#1DF7CE] transition-colors font-normal hidden md:block" 
             >
               Sign In
             </Link>

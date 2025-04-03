@@ -6,19 +6,38 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "generate-waveforms": "node scripts/generate-waveform-data.js",
+    "sample-waveforms": "node scripts/generate-sample-waveforms.js",
+    "real-waveforms": "node scripts/generate-real-waveforms.js",
+    "extract-waveforms": "node scripts/extract-real-waveforms.js",
+    "download-audio": "node scripts/download-audio-files.js",
+    "create-sample-audio": "node scripts/create-sample-audio.js",
+    "extract-real-waveforms": "node scripts/extract-waveforms-with-audiodecoder.js",
+    "extract-real-waveforms2": "node scripts/extract-waveforms-with-wavefile.js"
   },
   "dependencies": {
+    "@heroicons/react": "^2.0.18",
+    "audio-decode": "^2.2.2",
+    "audiobuffer-to-wav": "^1.0.0",
     "next": "^14.0.0",
+    "peaks.js": "^3.4.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "wavesurfer.js": "^7.9.4"
+    "uuid": "^11.1.0",
+    "wavefile": "^11.0.0",
+    "waveform-data": "^4.5.1",
+    "wavesurfer.js": "^7.9.4",
+    "web-audio-api": "^0.2.2",
+    "web-audio-engine": "^0.13.4"
   },
   "devDependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
     "@types/node": "^20.8.9",
     "@types/react": "^18.2.33",
     "@types/react-dom": "^18.2.14",
     "autoprefixer": "^10.4.16",
+    "node-fetch": "^2.7.0",
     "postcss": "^8.4.31",
     "tailwindcss": "^3.3.5",
     "typescript": "^5.2.2"
