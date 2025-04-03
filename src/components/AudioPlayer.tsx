@@ -23,12 +23,14 @@ export default function AudioPlayer({
 }: AudioPlayerProps): React.ReactElement {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const thumbRef = useRef<HTMLDivElement>(null);
   
   const [currentTime, setCurrentTime] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
   const [isStemsOpen, setIsStemsOpen] = useState(false);
   const [stemAddedToCart, setStemAddedToCart] = useState<Record<string, boolean>>({});
   const [progress, setProgress] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   
   // Group tags by type for display
   const tagsByType = track.tags.reduce<Record<string, Tag[]>>((acc, tag) => {
@@ -97,14 +99,25 @@ export default function AudioPlayer({
   const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!progressBarRef.current || !audioRef.current) return;
     
+    // Don't handle clicks on the thumb (it has its own handlers)
+    if (e.target === thumbRef.current) return;
+    
     const rect = progressBarRef.current.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const percentageClicked = clickX / rect.width;
     
     // Set new time based on click position
-    const newTime = percentageClicked * (audioRef.current.duration || track.duration);
+    updateProgress(percentageClicked);
+  };
+  
+  // Update progress and time based on percentage
+  const updateProgress = (percentage: number) => {
+    // Clamp percentage between 0 and 1
+    const clampedPercentage = Math.max(0, Math.min(percentage, 1));
+    
+    const newTime = clampedPercentage * (audioRef.current?.duration || track.duration);
     setCurrentTime(newTime);
-    setProgress(percentageClicked * 100);
+    setProgress(clampedPercentage * 100);
     
     if (audioRef.current) {
       audioRef.current.currentTime = newTime;
@@ -115,6 +128,52 @@ export default function AudioPlayer({
       onPlay();
     }
   };
+  
+  // Handle thumb drag start
+  const handleThumbMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    
+    // Add event listeners for drag and drop
+    document.addEventListener('mousemove', handleThumbDrag);
+    document.addEventListener('mouseup', handleThumbRelease);
+  };
+  
+  // Handle thumb drag
+  const handleThumbDrag = useCallback((e: MouseEvent) => {
+    if (!isDragging || !progressBarRef.current || !audioRef.current) return;
+    
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const posX = e.clientX - rect.left;
+    const percentage = posX / rect.width;
+    
+    updateProgress(percentage);
+  }, [isDragging, track.duration, isPlaying, onPlay]);
+  
+  // Handle thumb release
+  const handleThumbRelease = useCallback(() => {
+    setIsDragging(false);
+    
+    // Remove event listeners
+    document.removeEventListener('mousemove', handleThumbDrag);
+    document.removeEventListener('mouseup', handleThumbRelease);
+  }, [handleThumbDrag]);
+  
+  // Add/remove document event listeners when dragging state changes
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleThumbDrag);
+      document.addEventListener('mouseup', handleThumbRelease);
+    } else {
+      document.removeEventListener('mousemove', handleThumbDrag);
+      document.removeEventListener('mouseup', handleThumbRelease);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleThumbDrag);
+      document.removeEventListener('mouseup', handleThumbRelease);
+    };
+  }, [isDragging, handleThumbDrag, handleThumbRelease]);
   
   // Format time for display (mm:ss)
   const formatTime = (time: number) => {
@@ -245,11 +304,13 @@ export default function AudioPlayer({
             
             {/* Teal dot at the edge of progress */}
             <div 
-              className="absolute top-1/2 w-3.5 h-3.5 rounded-full bg-[#1DF7CE]"
+              ref={thumbRef}
+              onMouseDown={handleThumbMouseDown}
+              className="absolute top-1/2 w-3.5 h-3.5 rounded-full bg-[#1DF7CE] cursor-pointer"
               style={{ 
-                left: `${progress}%`, 
+                left: `calc(${progress}% - 2px)`, 
                 zIndex: 3,
-                transform: 'translateY(-50%)' 
+                transform: 'translateY(-50%)'
               }}
             />
           </div>
