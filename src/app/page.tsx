@@ -7,7 +7,7 @@ import TagFilter from '../components/TagFilter';
 import { Tag, Stem, Track, CartItem } from '../types';
 import Header from '../components/Header';
 import Image from 'next/image';
-import { getTracks, getTags, printStrapiAPIStructure } from '../services/api';
+import { getTracks, getTags, getTracksByTags, searchTracks } from '../services/strapi';
 import { getCart, addToCart, removeFromCart, getCartTotal } from '../services/cart';
 
 // Lazy load the AudioPlayer component to improve performance
@@ -28,7 +28,7 @@ export default function MusicLibrary() {
   // State for filters
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchTerms, setSearchTerms] = useState<string[]>([]);
+  const [searchTermTags, setSearchTermTags] = useState<{id: string, term: string}[]>([]);
   const [bpmRange, setBpmRange] = useState<[number, number]>([0, 200]);
   const [durationRange, setDurationRange] = useState<[number, number]>([0, 600]);
   
@@ -44,69 +44,100 @@ export default function MusicLibrary() {
   const [moods, setMoods] = useState<Tag[]>([]);
   const [instruments, setInstruments] = useState<Tag[]>([]);
 
+  // Define fetchData function for reuse
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      console.log('Fetching tracks and tags...');
+      
+      // Test direct fetch to check API connection - with more detailed debug info
+      try {
+        const testUrl = 'http://localhost:1337/api/tracks?populate=*';
+        console.log('Testing API connection directly to:', testUrl);
+        
+        // Test if we can reach the Strapi server at all
+        try {
+          const pingResponse = await fetch('http://localhost:1337/admin/ping');
+          const pingText = await pingResponse.text();
+          console.log('Ping response from Strapi server:', pingText);
+        } catch (e) {
+          console.error('Failed to ping Strapi server:', e);
+        }
+        
+        const testResponse = await fetch(testUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+        });
+        
+        if (!testResponse.ok) {
+          console.error(`API test failed with status: ${testResponse.status} ${testResponse.statusText}`);
+          throw new Error(`API returned ${testResponse.status}`);
+        }
+        
+        const testData = await testResponse.json();
+        console.log('Direct API test successful. Response:', testData);
+      } catch (e) {
+        console.error('Direct API test failed:', e);
+      }
+      
+      // Fetch tracks
+      const tracksData = await getTracks();
+      console.log('Tracks fetched:', tracksData.length);
+      setTracks(tracksData);
+      setFilteredTracks(tracksData);
+      
+      // Fetch tags
+      const tagsData = await getTags();
+      console.log('Tags fetched:', tagsData.length);
+      
+      // Categorize tags
+      const genresList = tagsData.filter(tag => tag.type === 'genre');
+      const moodsList = tagsData.filter(tag => tag.type === 'mood');
+      const instrumentsList = tagsData.filter(tag => tag.type === 'instrument');
+      
+      console.log('Genres:', genresList.length);
+      console.log('Moods:', moodsList.length);
+      console.log('Instruments:', instrumentsList.length);
+      
+      // Count tag occurrences in tracks
+      const tagCounts = new Map<string, number>();
+      tracksData.forEach(track => {
+        track.tags.forEach(tag => {
+          const count = tagCounts.get(tag.id) || 0;
+          tagCounts.set(tag.id, count + 1);
+        });
+      });
+      
+      // Add count property to tags
+      genresList.forEach(tag => tag.count = tagCounts.get(tag.id) || 0);
+      moodsList.forEach(tag => tag.count = tagCounts.get(tag.id) || 0);
+      instrumentsList.forEach(tag => tag.count = tagCounts.get(tag.id) || 0);
+      
+      setGenres(genresList);
+      setMoods(moodsList);
+      setInstruments(instrumentsList);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      // If API fails, use an empty state
+      setTracks([]);
+      setFilteredTracks([]);
+      setGenres([]);
+      setMoods([]);
+      setInstruments([]);
+    } finally {
+      setLoading(false);
+      // Mark that we've completed a fetch to prevent duplicate fetches
+      dataFetchedRef.current = true;
+    }
+  };
+
   // Fetch data from Strapi
   useEffect(() => {
     // Skip if we've already fetched data (prevents double fetch in StrictMode)
     if (dataFetchedRef.current) return;
-    
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        console.log('Fetching tracks and tags...');
-        
-        // Debug the Strapi API structure
-        await printStrapiAPIStructure();
-        
-        // Fetch tracks
-        const tracksData = await getTracks();
-        console.log('Tracks fetched:', tracksData.length);
-        setTracks(tracksData);
-        setFilteredTracks(tracksData);
-        
-        // Fetch tags
-        const tagsData = await getTags();
-        console.log('Tags fetched:', tagsData.length);
-        
-        // Categorize tags
-        const genresList = tagsData.filter(tag => tag.type === 'genre');
-        const moodsList = tagsData.filter(tag => tag.type === 'mood');
-        const instrumentsList = tagsData.filter(tag => tag.type === 'instrument');
-        
-        console.log('Genres:', genresList.length);
-        console.log('Moods:', moodsList.length);
-        console.log('Instruments:', instrumentsList.length);
-        
-        // Count tag occurrences in tracks
-        const tagCounts = new Map<string, number>();
-        tracksData.forEach(track => {
-          track.tags.forEach(tag => {
-            const count = tagCounts.get(tag.id) || 0;
-            tagCounts.set(tag.id, count + 1);
-          });
-        });
-        
-        // Add count property to tags
-        genresList.forEach(tag => tag.count = tagCounts.get(tag.id) || 0);
-        moodsList.forEach(tag => tag.count = tagCounts.get(tag.id) || 0);
-        instrumentsList.forEach(tag => tag.count = tagCounts.get(tag.id) || 0);
-        
-        setGenres(genresList);
-        setMoods(moodsList);
-        setInstruments(instrumentsList);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        // If API fails, use an empty state
-        setTracks([]);
-        setFilteredTracks([]);
-        setGenres([]);
-        setMoods([]);
-        setInstruments([]);
-      } finally {
-        setLoading(false);
-        // Mark that we've completed a fetch to prevent duplicate fetches
-        dataFetchedRef.current = true;
-      }
-    };
     
     fetchData();
   }, []);
@@ -138,13 +169,9 @@ export default function MusicLibrary() {
     if (selectedTags.length > 0) {
       console.log('Filtering by tags:', selectedTags.map(t => `${t.name} (${t.id})`));
       filtered = filtered.filter(track => {
-        // Track must have ALL selected tags - match by ID or name for mock data
+        // Track must have ALL selected tags
         const matches = selectedTags.every(selectedTag => 
-          track.tags.some(tag => {
-            // Try matching by ID first, then fall back to matching by name (for mock data)
-            return (tag.id === selectedTag.id) || 
-                   (tag.name.toLowerCase() === selectedTag.name.toLowerCase());
-          })
+          track.tags.some(tag => tag.id === selectedTag.id)
         );
         console.log('Track', track.title, 'has tags:', track.tags.map(t => t.name), 'matches?', matches);
         return matches;
@@ -152,15 +179,23 @@ export default function MusicLibrary() {
     }
     
     // Filter by search terms
-    if (searchTerms.length > 0) {
-      filtered = filtered.filter(track => {
-        // Track must match ANY of the search terms
-        return searchTerms.some(term => {
-          const lowerTerm = term.toLowerCase();
-          return track.title.toLowerCase().includes(lowerTerm) ||
-                 track.tags.some(tag => tag.name.toLowerCase().includes(lowerTerm));
+    if (searchTermTags.length > 0 || searchQuery) {
+      // Combine current search query and all search term tags
+      const searchTerms = [
+        ...searchTermTags.map(tag => tag.term.toLowerCase()),
+        searchQuery.toLowerCase()
+      ].filter(Boolean);
+      
+      if (searchTerms.length > 0) {
+        filtered = filtered.filter(track => {
+          // Track title must include ANY of the search terms
+          // OR any of its tags must include ANY of the search terms
+          return searchTerms.some(term => 
+            track.title.toLowerCase().includes(term) ||
+            track.tags.some(tag => tag.name.toLowerCase().includes(term))
+          );
         });
-      });
+      }
     }
     
     // Filter by BPM range
@@ -174,60 +209,53 @@ export default function MusicLibrary() {
     );
     
     setFilteredTracks(filtered);
-  }, [tracks, selectedTags, searchTerms, bpmRange, durationRange]);
+  }, [tracks, selectedTags, searchQuery, searchTermTags, bpmRange, durationRange]);
 
-  // Handler for toggling a tag - use this same handler for both components
+  // Handler for toggling a tag
   const handleTagToggle = useCallback((tag: Tag) => {
-    if (!tag || !tag.id) {
-      console.error('Invalid tag object received:', tag);
-      return;
-    }
-    
-    console.log('Toggle tag:', tag.name, 'ID:', tag.id);
-    
-    // Update selectedTags state
     setSelectedTags(prevTags => {
       const isSelected = prevTags.some(t => t.id === tag.id);
-      console.log('Tag already selected?', isSelected);
-      
       if (isSelected) {
-        // Remove tag if already selected
         return prevTags.filter(t => t.id !== tag.id);
       } else {
-        // Add tag if not selected - create fresh tag object to avoid reference issues
-        const newTag: Tag = {
-          id: tag.id,
-          name: tag.name,
-          type: tag.type,
-          count: tag.count || 0,
-          ...(tag.parent ? { parent: tag.parent } : {})
-        };
-        return [...prevTags, newTag];
+        return [...prevTags, tag];
       }
     });
   }, []);
 
-  // Use the same handler for both components
-  const handleTagClick = handleTagToggle;
+  // Handler for clearing all tags
+  const handleClearTags = useCallback(() => {
+    setSelectedTags([]);
+  }, []);
 
-  // Handler for search input - updated to add search terms
+  // Handler for search input
   const handleSearch = useCallback((query: string) => {
     if (query.trim()) {
-      setSearchTerms(prev => [...prev, query.trim()]);
+      // Generate a unique ID for this search term
+      const newSearchTermId = `search-${Date.now()}`;
+      
+      // Add to search term tags if it doesn't already exist
+      setSearchTermTags(prev => {
+        // Don't add duplicate search terms
+        if (!prev.some(tag => tag.term.toLowerCase() === query.toLowerCase())) {
+          return [...prev, { id: newSearchTermId, term: query }];
+        }
+        return prev;
+      });
     }
-    setSearchQuery('');
+    
+    setSearchQuery(query);
   }, []);
 
-  // Handler for removing a specific search term
-  const handleRemoveSearchTerm = useCallback((termToRemove: string) => {
-    setSearchTerms(prev => prev.filter(term => term !== termToRemove));
-  }, []);
-
-  // Handler for clearing all filters (tags and search terms)
-  const handleClearAll = useCallback(() => {
-    setSelectedTags([]);
-    setSearchTerms([]);
-  }, []);
+  // Handler for removing a search term tag
+  const handleRemoveSearchTerm = useCallback((termId: string) => {
+    setSearchTermTags(prev => prev.filter(tag => tag.id !== termId));
+    
+    // If we're removing the last search term, clear the search query
+    if (searchTermTags.length <= 1) {
+      setSearchQuery('');
+    }
+  }, [searchTermTags.length]);
 
   // Handler for BPM range change
   const handleBpmChange = useCallback((range: [number, number]) => {
@@ -251,6 +279,18 @@ export default function MusicLibrary() {
     removeFromCart(itemId);
     setCartItems(getCart());
     setCartTotal(getCartTotal());
+  }, []);
+
+  // Handler for tag click
+  const handleTagClick = useCallback((tag: Tag) => {
+    setSelectedTags(prevTags => {
+      const isSelected = prevTags.some(t => t.id === tag.id);
+      if (isSelected) {
+        return prevTags.filter(t => t.id !== tag.id);
+      } else {
+        return [...prevTags, tag];
+      }
+    });
   }, []);
 
   // Function to format duration from seconds to mm:ss
@@ -278,6 +318,37 @@ export default function MusicLibrary() {
           <p className="text-sm text-gray-500 max-w-md">
             Try adjusting your filters or search query
           </p>
+          {tracks.length === 0 && (
+            <div className="mt-4 p-4 bg-red-900/20 rounded-md text-left w-full max-w-md">
+              <h4 className="text-red-300 mb-2">API Connection Issue</h4>
+              <p className="text-sm text-gray-400 mb-2">
+                No tracks were loaded from the API. This might be due to:
+              </p>
+              <ul className="list-disc pl-5 text-sm text-gray-400">
+                <li>Strapi server not running at http://localhost:1337</li>
+                <li>API permissions not set correctly in Strapi</li>
+                <li>CORS issues preventing API access</li>
+                <li>Data schema mismatch between frontend and API</li>
+              </ul>
+              <p className="text-sm text-gray-400 mt-2">
+                Check the browser console for detailed error messages.
+              </p>
+              <button
+                onClick={() => {
+                  console.log('Retrying connection to API...');
+                  // Reset the fetched flag so we can try again
+                  dataFetchedRef.current = false;
+                  // Show loading state
+                  setLoading(true);
+                  // Re-fetch data
+                  fetchData();
+                }}
+                className="mt-4 px-4 py-2 bg-[#1DF7CE]/20 hover:bg-[#1DF7CE]/30 text-[#1DF7CE] rounded transition-colors text-sm"
+              >
+                Retry Connection
+              </button>
+          </div>
+          )}
         </div>
       );
     }
@@ -325,31 +396,27 @@ export default function MusicLibrary() {
             <h1 className="text-5xl font-bold">Music list</h1>
           </div>
           
-          {/* DEBUG: Display of current tag selection state */}
-          <div className="mb-2 text-xs text-gray-500">
-            Debug - Selected Tags: {selectedTags.map(t => t.name).join(', ') || 'None'} | 
-            Search Terms: {searchTerms.join(', ') || 'None'}
-        </div>
-        
           {/* Selected tags and search terms display with clear button */}
-          {(selectedTags.length > 0 || searchTerms.length > 0) && (
+          {(selectedTags.length > 0 || searchTermTags.length > 0) && (
             <div className="mb-6 flex flex-wrap items-center gap-2">
+              {/* Display regular tags */}
               {selectedTags.map(tag => (
                 <TagFilter 
                   key={tag.id}
                   tag={tag} 
                   selected={true} 
                   onClick={() => handleTagToggle(tag)}
-                        />
-                      ))}
+                />
+              ))}
               
-              {searchTerms.map((term, index) => (
+              {/* Display search term tags */}
+              {searchTermTags.map(termTag => (
                 <button
-                  key={`search-${index}-${term}`}
-                  onClick={() => handleRemoveSearchTerm(term)}
+                  key={termTag.id}
+                  onClick={() => handleRemoveSearchTerm(termTag.id)}
                   className="flex items-center space-x-1 text-xs font-normal px-3 py-1 rounded-full transition-colors bg-[#303030] text-[#1DF7CE] border border-[#1DF7CE]"
                 >
-                  <span>{term}</span>
+                  <span>Search: {termTag.term}</span>
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -357,11 +424,15 @@ export default function MusicLibrary() {
               ))}
               
               <button 
-                onClick={handleClearAll}
+                onClick={() => {
+                  handleClearTags();
+                  setSearchTermTags([]);
+                  setSearchQuery('');
+                }}
                 className="text-sm text-white bg-transparent hover:text-[#1DF7CE] transition-colors ml-2 flex items-center"
               >
                 Clear All <span className="ml-1">×</span>
-                </button>
+              </button>
             </div>
           )}
           

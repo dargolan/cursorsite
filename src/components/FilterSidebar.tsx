@@ -135,7 +135,7 @@ export default function FilterSidebar({
           onClick={() => setGenreExpanded(!genreExpanded)}
           type="button"
         >
-          <h3 className="text-white font-normal text-xs mb-2">Genre</h3>
+          <h3 className="text-white font-normal text-sm mb-2">Genre</h3>
           <span className="text-sm text-gray-400">
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
@@ -183,7 +183,7 @@ export default function FilterSidebar({
           onClick={() => setMoodExpanded(!moodExpanded)}
           type="button"
         >
-          <h3 className="text-white font-normal text-xs mb-2">Mood</h3>
+          <h3 className="text-white font-normal text-sm mb-2">Mood</h3>
           <span className="text-sm text-gray-400">
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
@@ -231,7 +231,7 @@ export default function FilterSidebar({
           onClick={() => setInstrumentsExpanded(!instrumentsExpanded)}
           type="button"
         >
-          <h3 className="text-white font-normal text-xs mb-2">Instruments</h3>
+          <h3 className="text-white font-normal text-sm mb-2">Instruments</h3>
           <span className="text-sm text-gray-400">
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
@@ -274,9 +274,10 @@ export default function FilterSidebar({
 
       {/* BPM Range Slider */}
       <div className="mb-8">
+        <h3 className="text-white text-sm mb-1">BPM Range</h3>
         <div className="flex justify-between items-center mb-2">
-          <h3 className="text-white text-sm">BPM Range</h3>
-          <span className="text-white text-sm">{localBpmMin} - {localBpmMax === 200 ? "200+" : localBpmMax} BPM</span>
+          <span className="text-white text-sm">{localBpmMin}</span>
+          <span className="text-white text-sm">{localBpmMax === 200 ? "200+" : localBpmMax}</span>
         </div>
         
         <div className="relative h-0.5 pt-3 pb-3 mt-3">
@@ -383,9 +384,10 @@ export default function FilterSidebar({
 
       {/* Duration Range Slider */}
       <div className="mb-8">
+        <h3 className="text-white text-sm mb-1">Duration</h3>
         <div className="flex justify-between items-center mb-2">
-          <h3 className="text-white text-sm">Duration</h3>
-          <span className="text-white text-sm">{formatDurationForDisplay(localDurationMin)} - {localDurationMax === 600 ? "10:00+" : formatDurationForDisplay(localDurationMax)}</span>
+          <span className="text-white text-sm">{formatDurationForDisplay(localDurationMin)}</span>
+          <span className="text-white text-sm">{localDurationMax === 600 ? "10:00+" : formatDurationForDisplay(localDurationMax)}</span>
         </div>
         
         <div className="relative h-0.5 pt-3 pb-3 mt-3">

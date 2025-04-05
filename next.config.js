@@ -13,6 +13,12 @@ const nextConfig = {
         hostname: 'dargo-strapi-media.s3.eu-north-1.amazonaws.com',
         pathname: '**',
       },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '1337',
+        pathname: '**',
+      },
     ],
   },
 };
