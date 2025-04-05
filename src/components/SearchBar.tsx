@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
 interface SearchBarProps {
   onSearch?: (query: string) => void;
@@ -8,16 +8,28 @@ interface SearchBarProps {
 
 export default function SearchBar({ onSearch }: SearchBarProps) {
   const [query, setQuery] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (onSearch) {
-      onSearch(query);
+    if (onSearch && query.trim()) {
+      onSearch(query.trim());
+      setQuery(''); // Clear the input after submitting
+      
+      // Focus the input again to allow for quick multiple searches
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
     }
   };
 
   const handleClear = () => {
     setQuery('');
+    
+    // Focus the input after clearing
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
   };
 
   return (
@@ -41,6 +53,7 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
             </svg>
           </div>
           <input
+            ref={inputRef}
             type="search"
             id="search"
             className="block w-full py-3 pl-12 pr-4 text-base rounded-full bg-[#1E1E1E] border border-[#CDCDCD] text-white focus:outline-none focus:ring-1 focus:ring-[#1DF7CE]"

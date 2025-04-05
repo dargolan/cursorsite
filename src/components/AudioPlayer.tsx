@@ -31,6 +31,7 @@ export default function AudioPlayer({
   const [stemAddedToCart, setStemAddedToCart] = useState<Record<string, boolean>>({});
   const [progress, setProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [isInteracting, setIsInteracting] = useState(false);
   
   // Group tags by type for display
   const tagsByType = track.tags.reduce<Record<string, Tag[]>>((acc, tag) => {
@@ -95,7 +96,7 @@ export default function AudioPlayer({
     }
   }, [isPlaying, onStop]);
   
-  // Handle click on progress bar
+  // Handle progress bar click
   const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!progressBarRef.current || !audioRef.current) return;
     
@@ -105,6 +106,8 @@ export default function AudioPlayer({
     const rect = progressBarRef.current.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const percentageClicked = clickX / rect.width;
+    
+    setIsInteracting(true);
     
     // Set new time based on click position
     updateProgress(percentageClicked);
@@ -133,6 +136,7 @@ export default function AudioPlayer({
   const handleThumbMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
+    setIsInteracting(true);
     
     // Add event listeners for drag and drop
     document.addEventListener('mousemove', handleThumbDrag);
@@ -154,10 +158,15 @@ export default function AudioPlayer({
   const handleThumbRelease = useCallback(() => {
     setIsDragging(false);
     
+    // Keep interaction state if we're still playing
+    if (!isPlaying) {
+      setIsInteracting(false);
+    }
+    
     // Remove event listeners
     document.removeEventListener('mousemove', handleThumbDrag);
     document.removeEventListener('mouseup', handleThumbRelease);
-  }, [handleThumbDrag]);
+  }, [handleThumbDrag, isPlaying]);
   
   // Add/remove document event listeners when dragging state changes
   useEffect(() => {
@@ -185,8 +194,10 @@ export default function AudioPlayer({
   const handlePlayPause = () => {
     if (isPlaying) {
       onStop();
+      setIsInteracting(false);
     } else {
       onPlay();
+      setIsInteracting(true);
     }
   };
   
@@ -215,9 +226,18 @@ export default function AudioPlayer({
   const totalStemsPrice = track.stems?.reduce((sum, stem) => sum + stem.price, 0) || 0;
   const discountedStemsPrice = Math.floor(totalStemsPrice * 0.75 * 100) / 100;
 
+  // Update interaction state when playing state changes
+  useEffect(() => {
+    if (isPlaying) {
+      setIsInteracting(true);
+    } else {
+      setIsInteracting(false);
+    }
+  }, [isPlaying]);
+
   return (
     <div 
-      className={`relative mx-[30px] border-b border-[#1A1A1A] ${isHovering ? 'bg-[#232323]' : 'bg-[#1E1E1E]'}`}
+      className={`relative mx-[30px] border-b border-[#1A1A1A] ${isHovering || isInteracting || isStemsOpen ? 'bg-[#232323]' : 'bg-[#121212]'}`}
       style={{ marginBottom: "-1px" }}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
@@ -360,7 +380,7 @@ export default function AudioPlayer({
       
       {/* Stems dropdown - modify this if needed */}
       {isStemsOpen && track.stems && (
-        <div className="bg-[#252525] rounded-b p-4 pt-2">
+        <div className="bg-[#232323] rounded-b p-4 pt-2">
           <div className="flex justify-between items-center mb-3">
             <h4 className="text-[#1DF7CE] font-bold text-[15px]">Stems</h4>
             <button 
