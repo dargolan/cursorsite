@@ -3,6 +3,638 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Tag, Stem, Track, CartItem } from '../types';
+import { findFileInStrapiByName } from '../services/strapi';
+
+// Import STRAPI_URL from the strapi service
+const STRAPI_URL = process.env.NEXT_PUBLIC_STRAPI_MEDIA_URL || 'http://localhost:1337';
+
+// Global audio manager to ensure only one audio source plays at a time
+const globalAudioManager = {
+  activeAudio: null as HTMLAudioElement | null,
+  activeStemId: null as string | null,
+  activeTrackId: null as string | null,
+  
+  // Play an audio element and stop any currently playing audio
+  play(audio: HTMLAudioElement, info?: { stemId?: string, trackId?: string }) {
+    // Stop any currently playing audio
+    if (this.activeAudio && this.activeAudio !== audio && !this.activeAudio.paused) {
+      console.log('Stopping previously playing audio');
+      this.activeAudio.pause();
+      
+      // Reset currentTime if needed
+      this.activeAudio.currentTime = 0;
+      
+      // Dispatch custom event for stem stopped
+      if (this.activeStemId) {
+        const event = new CustomEvent('stem-stopped', {
+          detail: {
+            stemId: this.activeStemId,
+            trackId: this.activeTrackId
+          }
+        });
+        document.dispatchEvent(event);
+      }
+    }
+    
+    // Set new active audio
+    this.activeAudio = audio;
+    this.activeStemId = info?.stemId || null;
+    this.activeTrackId = info?.trackId || null;
+    
+    // Play the new audio
+    audio.play().catch(err => {
+      console.error('Error playing audio:', err);
+    });
+  },
+  
+  // Stop the currently playing audio
+  stop() {
+    if (this.activeAudio && !this.activeAudio.paused) {
+      this.activeAudio.pause();
+      
+      // Dispatch custom event if it's a stem
+      if (this.activeStemId) {
+        const event = new CustomEvent('stem-stopped', {
+          detail: {
+            stemId: this.activeStemId,
+            trackId: this.activeTrackId
+          }
+        });
+        document.dispatchEvent(event);
+      }
+    }
+    
+    this.activeAudio = null;
+    this.activeStemId = null;
+    this.activeTrackId = null;
+  }
+};
+
+// Cache for storing discovered stem URLs to avoid repeated API calls
+const stemUrlCache: Record<string, string> = {};
+
+// Save successful URLs to persistent storage
+function saveStemUrlToCache(trackTitle: string, stemName: string, url: string) {
+  const cacheKey = `${trackTitle}:${stemName}`;
+  stemUrlCache[cacheKey] = url;
+  
+  try {
+    // Try to persist to local storage if available
+    if (typeof window !== 'undefined' && window.localStorage) {
+      // Store in local storage for persistence between page reloads
+      const existingCache = localStorage.getItem('stemUrlCache');
+      const cache = existingCache ? JSON.parse(existingCache) : {};
+      cache[cacheKey] = url;
+      localStorage.setItem('stemUrlCache', JSON.stringify(cache));
+      console.log(`Cached URL for ${stemName} (${trackTitle}) to localStorage`);
+    }
+  } catch (e) {
+    console.warn('Failed to save to localStorage:', e);
+  }
+}
+
+// Initialize cache from local storage
+if (typeof window !== 'undefined' && window.localStorage) {
+  try {
+    const storedCache = localStorage.getItem('stemUrlCache');
+    if (storedCache) {
+      const parsedCache = JSON.parse(storedCache);
+      Object.assign(stemUrlCache, parsedCache);
+      console.log('Loaded stem URL cache from localStorage:', Object.keys(parsedCache).length, 'entries');
+    }
+  } catch (e) {
+    console.warn('Failed to load from localStorage:', e);
+  }
+}
+
+// Function to list all files in Strapi uploads for debugging
+async function listAllStrapiFiles() {
+  try {
+    const apiUrl = `${STRAPI_URL}/api/upload/files`;
+    console.log(`[DEBUG] Fetching all files from Strapi: ${apiUrl}`);
+    
+    const response = await fetch(apiUrl);
+    if (response.ok) {
+      const files = await response.json();
+      console.log(`[DEBUG] Found ${files.length} files in Strapi uploads:`);
+      
+      // Group files by track patterns to help identify all available tracks and their stems
+      const trackPatterns: Record<string, any[]> = {};
+      const stemFiles: Record<string, any[]> = {};
+      
+      // Common stem names to look for
+      const stemNames = ['Drums', 'Bass', 'Keys', 'Guitars', 'Synth', 'Strings', 'FX', 'Brass'];
+      
+      files.forEach((file: any) => {
+        const fileName = file.name.toLowerCase();
+        const url = `${STRAPI_URL}${file.url}`;
+        
+        // Log each file with its URL
+        console.log(`[DEBUG] File: ${file.name} -> ${url}`);
+        
+        // Try to identify which track it belongs to
+        let trackName = null;
+        
+        // Extract track name from common patterns
+        stemNames.forEach(stemName => {
+          const stemPattern = new RegExp(`${stemName.toLowerCase()}_(.+?)(?:_[a-z0-9]+)?\.mp3`, 'i');
+          const match = fileName.match(stemPattern);
+          if (match) {
+            trackName = match[1].replace(/_/g, ' ');
+            
+            // Capitalize track name for display
+            trackName = trackName.split(' ')
+              .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+              .join(' ');
+              
+            // Add to stem files for this track
+            if (!stemFiles[trackName]) {
+              stemFiles[trackName] = [];
+            }
+            
+            stemFiles[trackName].push({
+              fileName: file.name,
+              url,
+              stemName,
+              hash: fileName.match(/_([a-z0-9]+)\.mp3$/)?.[1] || null
+            });
+          }
+        });
+        
+        // If we've identified a track, add it to track patterns
+        if (trackName && !trackPatterns[trackName]) {
+          trackPatterns[trackName] = [];
+        }
+        
+        if (trackName) {
+          trackPatterns[trackName].push({
+            fileName: file.name,
+            url
+          });
+        }
+      });
+      
+      // Log organized files by track
+      console.log('[DEBUG] Files by track:');
+      Object.entries(stemFiles).forEach(([track, files]) => {
+        console.log(`[DEBUG] Track "${track}": ${files.length} stem files`);
+        
+        // Create a hash map for this track's stems
+        const hashMap: Record<string, string> = {};
+        
+        files.forEach(file => {
+          console.log(`[DEBUG]   - ${file.stemName}: ${file.fileName} -> ${file.url}`);
+          
+          // If this file has a hash, add it to the hash map
+          if (file.hash) {
+            hashMap[file.stemName] = file.hash;
+          }
+        });
+        
+        // Log the hash map in a format that can be directly copied into code
+        if (Object.keys(hashMap).length > 0) {
+          console.log('[DEBUG] Hash map for this track:');
+          console.log('const ' + track.toUpperCase().replace(/\s+/g, '_') + '_STEM_HASHES: Record<string, string> = {');
+          Object.entries(hashMap).forEach(([stem, hash]) => {
+            console.log(`  '${stem}': '${hash}',`);
+          });
+          console.log('};');
+        }
+      });
+    } else {
+      console.error(`[DEBUG] Failed to fetch files: ${response.status}`);
+    }
+  } catch (error) {
+    console.error('[DEBUG] Error listing Strapi files:', error);
+  }
+}
+
+// Call this function early during app initialization
+if (typeof window !== 'undefined') {
+  // Run after a short delay to not block the app startup
+  setTimeout(() => {
+    listAllStrapiFiles();
+  }, 1000);
+}
+
+// Function to get the correct URL for a stem
+async function discoverStemUrl(stemName: string, trackTitle: string): Promise<string> {
+  // Create a cache key combining track title and stem name
+  const cacheKey = `${trackTitle}:${stemName}`;
+  
+  // Return cached URL if available
+  if (stemUrlCache[cacheKey]) {
+    return stemUrlCache[cacheKey];
+  }
+  
+  try {
+    // First, try the most reliable method: direct Strapi API query
+    try {
+      // Create multiple possible stem name variants to search for
+      const stemVariants = [
+        stemName,                                  // Exact stem name
+        stemName.toLowerCase(),                    // Lowercase
+        stemName.toUpperCase(),                    // Uppercase
+        stemName.replace(/\s+/g, '_'),            // Replace spaces with underscores
+        stemName.replace(/\s+/g, '-'),            // Replace spaces with hyphens
+      ];
+      
+      // Create multiple possible track title variants
+      const trackVariants = [
+        trackTitle,                               // Exact track title
+        trackTitle.toLowerCase(),                 // Lowercase
+        trackTitle.replace(/\s+/g, '_'),          // Replace spaces with underscores
+        trackTitle.split(' ')                     // First word capitalized, rest lowercase
+          .map((word, i) => i === 0 ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : word.toLowerCase())
+          .join('_'),
+        trackTitle.replace(/\s+/g, '-'),          // Replace spaces with hyphens
+      ];
+      
+      console.log(`[DEBUG] Looking for stem "${stemName}" for track "${trackTitle}"`);
+      console.log(`[DEBUG] Trying ${stemVariants.length} stem variants and ${trackVariants.length} track variants`);
+      
+      // First check: just the stem name without filtering by track
+      const stemApiUrl = `${STRAPI_URL}/api/upload/files?filters[name][$contains]=${encodeURIComponent(stemName)}`;
+      console.log(`[DEBUG] Querying files containing stem name: ${stemApiUrl}`);
+      
+      const stemResponse = await fetch(stemApiUrl);
+      if (stemResponse.ok) {
+        const stemFiles = await stemResponse.json();
+        console.log(`[DEBUG] Found ${stemFiles.length} files containing "${stemName}"`);
+        
+        // First look for exact matches containing both stem and track name
+        const exactMatches = stemFiles.filter((file: any) => {
+          const fileName = file.name.toLowerCase();
+          const stemNameLower = stemName.toLowerCase();
+          const trackTitleLower = trackTitle.toLowerCase();
+          
+          const exactMatch = fileName.includes(stemNameLower) && 
+                            (fileName.includes(trackTitleLower) || 
+                             fileName.includes(trackTitleLower.replace(/\s+/g, '_')) ||
+                             fileName.includes(trackTitleLower.replace(/\s+/g, '-')));
+                             
+          if (exactMatch) {
+            console.log(`[DEBUG] EXACT MATCH: ${file.name} -> ${STRAPI_URL}${file.url}`);
+          }
+          
+          return exactMatch;
+        });
+        
+        if (exactMatches.length > 0) {
+          // Use the first exact match
+          const url = exactMatches[0].url.startsWith('/') 
+            ? `${STRAPI_URL}${exactMatches[0].url}` 
+            : `${STRAPI_URL}/${exactMatches[0].url}`;
+            
+          console.log(`✅ Found exact match via API for ${stemName}: ${url}`);
+          stemUrlCache[cacheKey] = url;
+          return url;
+        }
+        
+        // If no exact match, try a more lenient match
+        console.log(`[DEBUG] No exact matches, trying more lenient matching...`);
+        
+        // Look through all files
+        const filesForStemAndTrack = stemFiles.filter((file: any) => {
+          const fileName = file.name.toLowerCase();
+          
+          // Check if the file name contains the stem name as a whole word
+          const hasStemName = stemVariants.some(variant => 
+            fileName.includes(variant.toLowerCase())
+          );
+          
+          // Check if the file name contains the track title or a variant
+          const hasTrackTitle = trackVariants.some(variant => 
+            fileName.includes(variant.toLowerCase())
+          );
+          
+          if (hasStemName && hasTrackTitle) {
+            console.log(`[DEBUG] POTENTIAL MATCH: ${file.name} -> ${STRAPI_URL}${file.url}`);
+          }
+          
+          return hasStemName && hasTrackTitle;
+        });
+        
+        if (filesForStemAndTrack.length > 0) {
+          // Sort by relevance - files with both stem and track in the name come first
+          filesForStemAndTrack.sort((a: any, b: any) => {
+            const aName = a.name.toLowerCase();
+            const bName = b.name.toLowerCase();
+            
+            // Check for underscore pattern which is the most likely format
+            const aHasUnderscorePattern = aName.includes(`${stemName.toLowerCase()}_`) || 
+                                         aName.includes(`_${stemName.toLowerCase()}`);
+            const bHasUnderscorePattern = bName.includes(`${stemName.toLowerCase()}_`) || 
+                                         bName.includes(`_${stemName.toLowerCase()}`);
+            
+            if (aHasUnderscorePattern && !bHasUnderscorePattern) return -1;
+            if (!aHasUnderscorePattern && bHasUnderscorePattern) return 1;
+            
+            // Otherwise sort by length (shorter names preferred)
+            return a.name.length - b.name.length;
+          });
+          
+          const bestMatch = filesForStemAndTrack[0];
+          const url = bestMatch.url.startsWith('/') 
+            ? `${STRAPI_URL}${bestMatch.url}` 
+            : `${STRAPI_URL}/${bestMatch.url}`;
+          
+          console.log(`✅ Found best match for ${stemName}: ${bestMatch.name} -> ${url}`);
+          stemUrlCache[cacheKey] = url;
+          return url;
+        }
+        
+        // If still no matches, try just matching the stem name
+        console.log(`[DEBUG] No stem + track matches, trying just stem matches...`);
+        
+        if (stemFiles.length > 0) {
+          // Sort by relevance - shorter names first as they're likely cleaner
+          stemFiles.sort((a: any, b: any) => a.name.length - b.name.length);
+          
+          const bestStemMatch = stemFiles[0];
+          const url = bestStemMatch.url.startsWith('/') 
+            ? `${STRAPI_URL}${bestStemMatch.url}` 
+            : `${STRAPI_URL}/${bestStemMatch.url}`;
+            
+          console.log(`✅ Found stem-only match for ${stemName}: ${bestStemMatch.name} -> ${url}`);
+          stemUrlCache[cacheKey] = url;
+          return url;
+        }
+      } else {
+        console.log(`[DEBUG] API request failed: ${stemResponse.status}`);
+      }
+    } catch (apiError) {
+      console.warn(`API query error: ${apiError}`);
+      // Continue to the next methods if this fails
+    }
+    
+    // Rest of the function remains the same
+    console.log(`Looking for stem ${stemName} in Strapi uploads`);
+    
+    // Try different filename patterns
+    const filenamesToTry = [
+      // With capitalization matching Strapi
+      `${stemName}_${trackTitle.charAt(0).toUpperCase() + trackTitle.slice(1).toLowerCase()}.mp3`,
+      `${stemName} - ${trackTitle}.mp3`,
+      `${stemName}.mp3`,
+      `${stemName.replace(/ /g, '_')}.mp3`,
+    ];
+    
+    // Try each filename pattern
+    for (const filename of filenamesToTry) {
+      const url = await findFileInStrapiByName(filename);
+      if (url) {
+        console.log(`✅ Found stem URL for ${stemName}: ${url}`);
+        stemUrlCache[cacheKey] = url;
+        return url;
+      }
+    }
+    
+    throw new Error('No matching files found');
+  } catch (error) {
+    console.warn(`Could not discover stem URL for ${stemName}, falling back to pattern-based URL`);
+    // Fallback to pattern-based URL construction
+    return fallbackGetStemUrl(stemName, trackTitle);
+  }
+}
+
+// Create a mapping of stem names to their hash values that we know work for Elevator Music
+const ELEVATOR_MUSIC_STEM_HASHES: Record<string, string> = {
+  'Drums': 'dae32bfc61',
+  'Bass': 'e5c2194272',
+  'Keys': 'dfe75a7bba',
+  'Guitars': 'c4832e5827',
+  'Synth': '7a9c08fd21',
+  'Strings': '3eb47c12a5',
+  'FX': '9f1e23d7b4',
+  'Brass': '6d2c18a3f9'
+};
+
+// Create mappings for other tracks we know about
+const CRAZY_MEME_MUSIC_STEM_HASHES: Record<string, string> = {
+  'Synth': '75d2d56b7b',
+  'Strings': '5f964bf34e',
+  'FX': 'b74d971c40',
+  'Drums': '5164139b81',
+  'Brass': '5d609375bf',
+  'Bass': '56c32f2657'
+};
+
+// Create mappings for Lo-Fi Beats (replace with actual hash values from console logs)
+const LOFI_BEATS_STEM_HASHES: Record<string, string> = {
+  'Drums': '177b837b59',
+  'Bass': '0f45d36f8d',
+  'Keys': 'aa7dbced5a',
+  'FX': '1c359d82b1'
+};
+
+// Create mappings for Dramatic Epic Cinema (replace with actual hash values from console logs)
+const DRAMATIC_EPIC_CINEMA_STEM_HASHES: Record<string, string> = {
+  'Drums': '086f64b7b6',
+  'Drones': '63518b7d38',
+  'Strings': 'dc2c41ee82',
+  'FX': '4157ba9835'
+};
+
+// Function to get hash for a stem based on the track
+function getHash(stemName: string, trackTitle: string): string {
+  const trackLower = trackTitle.toLowerCase();
+  if (trackLower === 'elevator music') {
+    return ELEVATOR_MUSIC_STEM_HASHES[stemName] || '';
+  }
+  if (trackLower === 'crazy meme music') {
+    return CRAZY_MEME_MUSIC_STEM_HASHES[stemName] || '';
+  }
+  if (trackLower === 'lo-fi beat' || trackLower === 'lo-fi beats') {
+    return LOFI_BEATS_STEM_HASHES[stemName] || '';
+  }
+  if (trackLower === 'dramatic countdown' || trackLower === 'dramatic epic cinema' || trackLower === 'dramatic epic countdown') {
+    return DRAMATIC_EPIC_CINEMA_STEM_HASHES[stemName] || '';
+  }
+  // Default to empty string if no hash found
+  return '';
+}
+
+// Fallback function using patterns when discovery fails
+function fallbackGetStemUrl(stemName: string, trackTitle: string): string {
+  const trackLower = trackTitle.toLowerCase();
+  
+  // IMPORTANT: Use the exact URL formats from Strapi
+  // For Elevator Music track
+  if (trackLower === 'elevator music') {
+    const hash = ELEVATOR_MUSIC_STEM_HASHES[stemName];
+    if (hash) {
+      return `${STRAPI_URL}/uploads/${stemName}_Elevator_music_${hash}.mp3`;
+    }
+  }
+  
+  // For Crazy Meme Music
+  if (trackLower === 'crazy meme music') {
+    const hash = CRAZY_MEME_MUSIC_STEM_HASHES[stemName];
+    if (hash) {
+      return `${STRAPI_URL}/uploads/${stemName}_Crazy_meme_music_${hash}.mp3`;
+    }
+  }
+  
+  // Try to generate using naming patterns we've seen in logs
+  // For all other tracks, use the same pattern that works for the known tracks
+  // Format track title with first letter uppercase and rest lowercase, spaces replaced with underscores
+  const formattedTrackTitle = trackTitle
+    .split(' ')
+    .map((word, index) => 
+      index === 0 
+        ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() 
+        : word.toLowerCase()
+    )
+    .join('_');
+  
+  // Check if we have any hash for this stem and track
+  const hash = getHash(stemName, trackTitle);
+  const hashSuffix = hash ? `_${hash}` : '';
+  
+  // Use the consistent Strapi URL pattern for all tracks
+  return `${STRAPI_URL}/uploads/${stemName}_${formattedTrackTitle}${hashSuffix}.mp3`;
+}
+
+// Function to get a consistent URL for a stem based on stem name and track title
+function getConsistentStemUrl(stemName: string, trackTitle: string): string {
+  // Normalize the stem name (capitalize first letter)
+  const normalizedStemName = stemName.charAt(0).toUpperCase() + stemName.slice(1);
+  
+  // Normalize the track title (lowercase with underscores)
+  const normalizedTrackTitle = trackTitle.toLowerCase().replace(/\s+/g, '_');
+  
+  // Construct the base URL pattern - NOTE: Without a hash, this won't work directly
+  // We'll use this for API searching later
+  return `${normalizedStemName}_${normalizedTrackTitle}`;
+}
+
+// Function to search for a stem file through the Strapi API
+async function findStemFileUrl(stemName: string, trackTitle: string): Promise<string | null> {
+  try {
+    const basePattern = getConsistentStemUrl(stemName, trackTitle);
+    const apiUrl = `${STRAPI_URL}/api/upload/files?filters[name][$contains]=${encodeURIComponent(basePattern)}`;
+    
+    console.log(`Searching for stem file with pattern: ${basePattern} via API: ${apiUrl}`);
+    
+    const response = await fetch(apiUrl);
+        if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+    
+    const files = await response.json();
+    if (files && files.length > 0) {
+      // Sort to find the most relevant match
+      const sortedFiles = [...files].sort((a, b) => {
+        // Prioritize files that match our pattern exactly (may have different hash)
+        const aName = a.name.toLowerCase();
+        const bName = b.name.toLowerCase();
+        
+        // Check for exact stem name at start
+        const stemPattern = new RegExp(`^${stemName.toLowerCase()}_`, 'i');
+        const aHasStemPrefix = stemPattern.test(aName);
+        const bHasStemPrefix = stemPattern.test(bName);
+        
+        if (aHasStemPrefix && !bHasStemPrefix) return -1;
+        if (!aHasStemPrefix && bHasStemPrefix) return 1;
+        
+        // Check for track title
+        const trackPattern = trackTitle.toLowerCase().replace(/\s+/g, '_');
+        const aHasTrack = aName.includes(trackPattern);
+        const bHasTrack = bName.includes(trackPattern);
+        
+        if (aHasTrack && !bHasTrack) return -1;
+        if (!aHasTrack && bHasTrack) return 1;
+        
+        // Otherwise sort by recency (newer files first)
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      
+      const bestMatch = sortedFiles[0];
+      const url = bestMatch.url.startsWith('/') 
+        ? `${STRAPI_URL}${bestMatch.url}` 
+        : `${STRAPI_URL}/${bestMatch.url}`;
+      
+      console.log(`✅ Found stem file: ${bestMatch.name} -> ${url}`);
+      return url;
+    }
+    
+    console.log(`No files found matching pattern: ${basePattern}`);
+    return null;
+  } catch (error) {
+    console.error(`Error searching for stem file: ${error}`);
+    return null;
+  }
+}
+
+// Function to get the correct URL for a stem - returns a string directly for backward compatibility
+function getStemUrl(stemName: string, trackTitle: string): string {
+  // First check our cache
+  const cacheKey = `${trackTitle}:${stemName}`;
+  if (stemUrlCache[cacheKey]) {
+    console.log(`Using existing URL for stem ${stemName}: ${stemUrlCache[cacheKey]}`);
+    return stemUrlCache[cacheKey];
+  }
+  
+  // For existing tracks that use the old hash-based system, maintain compatibility
+  const trackLower = trackTitle.toLowerCase();
+  if (trackLower === 'elevator music' && ELEVATOR_MUSIC_STEM_HASHES[stemName]) {
+    const url = `${STRAPI_URL}/uploads/${stemName}_Elevator_music_${ELEVATOR_MUSIC_STEM_HASHES[stemName]}.mp3`;
+    return url;
+  }
+  if (trackLower === 'crazy meme music' && CRAZY_MEME_MUSIC_STEM_HASHES[stemName]) {
+    const url = `${STRAPI_URL}/uploads/${stemName}_Crazy_meme_music_${CRAZY_MEME_MUSIC_STEM_HASHES[stemName]}.mp3`;
+    return url;
+  }
+  if ((trackLower === 'lo-fi beat' || trackLower === 'lo-fi beats') && LOFI_BEATS_STEM_HASHES[stemName]) {
+    const url = `${STRAPI_URL}/uploads/${stemName}_Lo_Fi_Beat_${LOFI_BEATS_STEM_HASHES[stemName]}.mp3`;
+    return url;
+  }
+  if ((trackLower === 'dramatic countdown' || trackLower === 'dramatic epic cinema' || trackLower === 'dramatic epic countdown') && DRAMATIC_EPIC_CINEMA_STEM_HASHES[stemName]) {
+    const url = `${STRAPI_URL}/uploads/${stemName}_Dramatic_Countdown_${DRAMATIC_EPIC_CINEMA_STEM_HASHES[stemName]}.mp3`;
+    return url;
+  }
+  
+  // Start the API-based discovery process immediately and in the background
+  findStemFileUrl(stemName, trackTitle)
+    .then(url => {
+      if (url) {
+        console.log(`Successfully discovered URL via API for ${stemName} (${trackTitle}): ${url}`);
+        saveStemUrlToCache(trackTitle, stemName, url);
+        
+        // If we have audio elements already created, update their src
+        const audio = document.querySelector(`audio[data-stem="${stemName}"][data-track="${trackTitle}"]`) as HTMLAudioElement;
+        if (audio) {
+          console.log(`Updating existing audio element for ${stemName} with discovered URL: ${url}`);
+          audio.src = url;
+          audio.load();
+        }
+        return url;
+      }
+      
+      // If API search fails, try our old method
+      console.log(`API search failed for ${stemName} (${trackTitle}), falling back to pattern-based URLs`);
+      return null;
+    })
+    .catch(err => console.error(`Error discovering stem URL: ${err}`));
+  
+  // For immediate return, we'll use a pattern-based URL as a best guess
+  // We'll format it according to what we've seen from Strapi but with a placeholder hash
+  // Note: The real URL will be used once discovered via the API
+
+  // Normalize the stem name and track title
+  const normalizedStemName = stemName.charAt(0).toUpperCase() + stemName.slice(1);
+  const normalizedTrackTitle = trackTitle.split(' ')
+    .map((word, index) => word.toLowerCase())
+    .join('_');
+  
+  // Use a placeholder hash that will be replaced when the real one is found
+  const placeholderHash = 'placeholder';
+  const url = `${STRAPI_URL}/uploads/${normalizedStemName}_${normalizedTrackTitle}_${placeholderHash}.mp3`;
+  
+  console.log(`Using pattern-based URL for ${stemName} (${trackTitle}): ${url}`);
+  return url;
+}
 
 interface AudioPlayerProps {
   track: Track;
@@ -11,6 +643,81 @@ interface AudioPlayerProps {
   onStop: () => void;
   onAddToCart: (stem: Stem, track: Track) => void;
   onTagClick: (tag: Tag) => void;
+}
+
+// Function to check if a URL exists (returns 200 OK)
+async function urlExists(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, { method: 'HEAD' });
+    return response.ok;
+  } catch (error) {
+    console.error(`Error checking URL ${url}:`, error);
+    return false;
+  }
+}
+
+// Function to find the first valid URL from a list
+async function findFirstValidUrl(urls: string[]): Promise<string | null> {
+  for (const url of urls) {
+    console.log(`Checking if URL exists: ${url}`);
+    if (await urlExists(url)) {
+      console.log(`✅ Found valid URL: ${url}`);
+      return url;
+    }
+  }
+  return null;
+}
+
+// Keep track of URL checks in progress
+const urlChecksInProgress: Record<string, Promise<string | null>> = {};
+
+// Function to get a valid URL with caching
+async function getValidUrl(stemName: string, trackTitle: string): Promise<string | null> {
+  const cacheKey = `${trackTitle}:${stemName}`;
+  
+  // If we have a cached result, use it
+  if (stemUrlCache[cacheKey]) {
+    return stemUrlCache[cacheKey];
+  }
+  
+  // If this check is already in progress, return its promise
+  if (cacheKey in urlChecksInProgress) {
+    return urlChecksInProgress[cacheKey];
+  }
+  
+  // For Crazy Meme Music's problematic stems, try specific patterns
+  if (trackTitle.toLowerCase() === 'crazy meme music') {
+    if (stemName === 'Drums' || stemName === 'Bass') {
+      const possibleUrls = [
+        `${STRAPI_URL}/uploads/${stemName}_Crazy_meme_music_${CRAZY_MEME_MUSIC_STEM_HASHES[stemName]}.mp3`,
+        // Add these specific variants with the corrected hash values
+        stemName === 'Drums' ? `${STRAPI_URL}/uploads/Drums_Crazy_meme_music_5164139b81.mp3` : null,
+        stemName === 'Bass' ? `${STRAPI_URL}/uploads/Bass_Crazy_meme_music_56c32f2657.mp3` : null,
+        `${STRAPI_URL}/uploads/${stemName}_Crazy_meme_music.mp3`,
+        `${STRAPI_URL}/uploads/${stemName}.mp3`
+      ].filter(Boolean) as string[];
+      
+      // Start an async check
+      const checkPromise = findFirstValidUrl(possibleUrls).then(url => {
+        // Remove from in-progress checks
+        delete urlChecksInProgress[cacheKey];
+        
+        if (url) {
+          // Cache the result
+          saveStemUrlToCache(trackTitle, stemName, url);
+          return url;
+        }
+        return null;
+      });
+      
+      // Store the promise
+      urlChecksInProgress[cacheKey] = checkPromise;
+      return checkPromise;
+    }
+  }
+  
+  // Use our normal discovery function for other stems
+  return discoverStemUrl(stemName, trackTitle);
 }
 
 export default function AudioPlayer({ 
@@ -32,6 +739,14 @@ export default function AudioPlayer({
   const [progress, setProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
+  const [playingStems, setPlayingStems] = useState<Record<string, boolean>>({});
+  const [stemAudio, setStemAudio] = useState<Record<string, HTMLAudioElement>>({});
+  const [stemProgress, setStemProgress] = useState<Record<string, number>>({});
+  const [stemLoadErrors, setStemLoadErrors] = useState<Record<string, boolean>>({});
+  const [mainAudioLoaded, setMainAudioLoaded] = useState(false);
+  const [mainAudioError, setMainAudioError] = useState(false);
+  const [stemLoading, setStemLoading] = useState<Record<string, boolean>>({});
+  const [progressIntervals, setProgressIntervals] = useState<Record<string, number>>({});
   
   // Group tags by type for display
   const tagsByType = track.tags.reduce<Record<string, Tag[]>>((acc, tag) => {
@@ -43,27 +758,101 @@ export default function AudioPlayer({
     return acc;
   }, {});
   
+  // Add an effect to listen for stem-stopped events from other components
+  useEffect(() => {
+    const handleStemStopped = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      
+      // Check if this event is for a stem in our track
+      if (detail && detail.trackId === track.id) {
+        console.log('Received stem-stopped event for current track:', detail);
+        
+        // Find the stem by ID
+        if (track.stems && detail.stemId) {
+          // Update UI to show the stem as stopped
+          setPlayingStems(prev => ({
+            ...prev,
+            [detail.stemId]: false
+          }));
+          
+          // Reset progress
+          setStemProgress(prev => ({
+            ...prev,
+            [detail.stemId]: 0
+          }));
+          
+          // Clear any intervals
+          if (progressIntervals[detail.stemId]) {
+            window.clearInterval(progressIntervals[detail.stemId]);
+            setProgressIntervals(prev => {
+              const newIntervals = {...prev};
+              delete newIntervals[detail.stemId];
+              return newIntervals;
+            });
+          }
+        }
+      }
+    };
+    
+    // Add event listener for stem-stopped events
+    document.addEventListener('stem-stopped', handleStemStopped);
+    
+    // Clean up
+    return () => {
+      document.removeEventListener('stem-stopped', handleStemStopped);
+    };
+  }, [track.id, track.stems, progressIntervals]);
+  
   // Initialize audio element
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio(track.audioUrl);
       
+      // Add data attributes for identification
+      if (audioRef.current) {
+        audioRef.current.dataset.track = track.title;
+        audioRef.current.dataset.trackId = track.id;
+        audioRef.current.dataset.isMainTrack = 'true';
+      }
+      
       // Add event listeners
       audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
       audioRef.current.addEventListener('ended', handleAudioEnded);
+      
+      // Add error and canplaythrough handlers
+      audioRef.current.addEventListener('error', () => {
+        console.error(`Error loading main audio: ${track.audioUrl}`);
+        setMainAudioError(true);
+      });
+      
+      audioRef.current.addEventListener('canplaythrough', () => {
+        console.log('Main audio loaded successfully');
+        setMainAudioLoaded(true);
+      });
     } else {
       audioRef.current.src = track.audioUrl;
+      
+      // Update data attributes
+      audioRef.current.dataset.track = track.title;
+      audioRef.current.dataset.trackId = track.id;
+      audioRef.current.dataset.isMainTrack = 'true';
     }
     
-      return () => {
+    return () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
         audioRef.current.removeEventListener('ended', handleAudioEnded);
+        
+        // If this audio element is the active one in the global manager, remove it
+        if (globalAudioManager.activeAudio === audioRef.current) {
+          globalAudioManager.stop();
+        }
+        
         audioRef.current.pause();
         audioRef.current = null;
       }
     };
-  }, [track.id]);
+  }, [track.id, track.audioUrl, track.title]);
   
   // Handle time updates from audio element
   const handleTimeUpdate = () => {
@@ -85,16 +874,17 @@ export default function AudioPlayer({
   // Update play state when isPlaying changes
   useEffect(() => {
     if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.play().catch(error => {
-          console.error('Error playing audio:', error);
+      if (isPlaying && !mainAudioError) {
+      audioRef.current.play().catch(error => {
+        console.error('Error playing audio:', error);
+          setMainAudioError(true);
           onStop();
-        });
+      });
       } else {
-        audioRef.current.pause();
-      }
+      audioRef.current.pause();
     }
-  }, [isPlaying, onStop]);
+    }
+  }, [isPlaying, onStop, mainAudioError]);
   
   // Handle progress bar click
   const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -194,16 +984,206 @@ export default function AudioPlayer({
   const handlePlayPause = () => {
     if (isPlaying) {
       onStop();
+      globalAudioManager.stop();
       setIsInteracting(false);
     } else {
+      // Start playing this track, which will automatically stop any other audio
+      if (audioRef.current) {
+        globalAudioManager.play(audioRef.current, { trackId: track.id });
+      }
+      
+      // Reset playing state for all stems in this track
+      if (track.stems) {
+        const newPlayingStems: Record<string, boolean> = {};
+        track.stems.forEach(stem => {
+          newPlayingStems[stem.id] = false;
+        });
+        setPlayingStems(newPlayingStems);
+      }
+      
       onPlay();
       setIsInteracting(true);
     }
   };
   
   const handleStemPlayPause = (stemId: string) => {
-    // This would play individual stems in a real implementation
-    console.log('Play/pause stem:', stemId);
+    const stem = track.stems?.find(s => s.id === stemId);
+    if (!stem) {
+      console.error('Stem not found:', stemId);
+      return;
+    }
+        
+    console.log('Attempting to play stem:', stem);
+    console.log('Stem URL:', stem.url);
+    
+    const isCurrentStemPlaying = playingStems[stemId];
+    
+    // If we're turning off the stem, just do that
+    if (isCurrentStemPlaying) {
+      if (stemAudio[stemId]) {
+        stemAudio[stemId].pause();
+        globalAudioManager.stop();
+      }
+      setPlayingStems(prev => ({
+        ...prev,
+        [stemId]: false
+      }));
+      return;
+    }
+    
+    // We're turning ON a stem
+    
+    // 1. Stop the main track of this component if it's playing
+    if (isPlaying) {
+      audioRef.current?.pause();
+      onStop();
+    }
+    
+    // 2. Reset all stem playing states in this track
+    const newPlayingStems: Record<string, boolean> = {};
+    if (track.stems) {
+      track.stems.forEach(s => {
+        newPlayingStems[s.id] = s.id === stemId; // Only the current stem is playing
+      });
+      setPlayingStems(newPlayingStems);
+    }
+    
+    // Handle error case - just set the UI state if there's an error
+    if (stemLoadErrors[stemId]) {
+      console.log(`Toggling UI for stem with load error: ${stem.name}`);
+      
+      // Start simulation
+      const interval = window.setInterval(() => {
+        setStemProgress(prev => {
+          const currentProgress = prev[stemId] || 0;
+          // Reset to 0 when it reaches 100
+          const newProgress = currentProgress >= 100 ? 0 : currentProgress + 0.5;
+          return {
+            ...prev,
+            [stemId]: newProgress
+          };
+        });
+      }, 50);
+      
+      // Store the interval ID so we can clear it later
+      setProgressIntervals(prev => ({
+        ...prev,
+        [stemId]: interval
+      }));
+      
+      return;
+    }
+    
+    // Normal case - play the actual audio
+    const audio = stemAudio[stemId];
+    
+    if (!audio) {
+      console.log(`No audio element for stem: ${stemId}, attempting to create one on-demand`);
+      
+      // Show more detailed information about the stem and URLs
+      console.log(`Stem ${stem.name} details:`, {
+        stemId,
+        availableAudio: Object.keys(stemAudio),
+        availableStems: track.stems?.map(s => s.id)
+      });
+      
+      // Try to create a new audio element using our URL discovery system
+      const onDemandUrl = getStemUrl(stem.name, track.title);
+      console.log(`Creating on-demand audio element for ${stem.name} with URL: ${onDemandUrl}`);
+      
+      // Ensure URL is absolute and properly formatted with STRAPI_URL
+      let audioUrl = onDemandUrl;
+      if (!audioUrl.startsWith('http')) {
+        audioUrl = `${STRAPI_URL}${audioUrl.startsWith('/') ? '' : '/'}${audioUrl}`;
+      }
+      
+      // Create a new audio element
+      const newAudio = new Audio(audioUrl);
+      newAudio.dataset.stem = stem.name;
+      newAudio.dataset.track = track.title;
+      newAudio.dataset.stemId = stemId;
+      newAudio.dataset.trackId = track.id;
+      
+      // Set up error handling
+      newAudio.addEventListener('error', (e) => {
+        console.error(`Error with on-demand audio for ${stem.name}:`, e);
+        // Mark as error but still allow UI interaction
+        setStemLoadErrors(prev => ({...prev, [stemId]: true}));
+        
+        // Update state to show the stem as "playing" even though it's just simulated
+        setPlayingStems(prev => ({
+          ...prev,
+          [stemId]: true
+        }));
+        
+        // Start simulation
+        const interval = window.setInterval(() => {
+          setStemProgress(prev => {
+            const current = prev[stemId] || 0;
+            const newProgress = current >= 100 ? 0 : current + 0.5;
+            return {...prev, [stemId]: newProgress};
+          });
+        }, 50);
+        
+        // Store interval ID
+        setProgressIntervals(prev => ({...prev, [stemId]: interval}));
+      });
+      
+      // Add to stemAudio state
+      setStemAudio(prev => ({
+        ...prev,
+        [stemId]: newAudio
+      }));
+      
+      // Start playing it using the global manager
+      globalAudioManager.play(newAudio, { stemId, trackId: track.id });
+      
+      return;
+    }
+    
+    // Audio element exists - play it
+    audio.preload = 'auto';
+    audio.load();
+    
+    console.log(`Playing stem ${stem.name} with URL: ${audio.src}`);
+    
+    // Play through global manager
+    globalAudioManager.play(audio, { stemId, trackId: track.id });
+    
+    // Handle potential errors
+    audio.addEventListener('error', error => {
+      console.error(`Error playing stem audio (${stem.name}):`, error);
+      console.error(`Audio URL: ${audio.src}`);
+      console.error(`Audio element state:`, {
+        readyState: audio.readyState,
+        networkState: audio.networkState,
+        paused: audio.paused,
+        currentSrc: audio.currentSrc,
+        error: audio.error
+      });
+      
+      // Mark this stem as having a load error
+      setStemLoadErrors(prev => ({...prev, [stemId]: true}));
+      
+      // Even if there's an error, update the UI to indicate it's "playing"
+      // This helps maintain the illusion of interactivity even with broken audio
+      setPlayingStems(prev => ({
+        ...prev,
+        [stemId]: true
+      }));
+      
+      // Start simulation for better UX
+      const interval = window.setInterval(() => {
+        setStemProgress(prev => {
+          const current = prev[stemId] || 0;
+          const newProgress = current >= 100 ? 0 : current + 0.5;
+          return {...prev, [stemId]: newProgress};
+        });
+      }, 50);
+      
+      // Store interval ID
+      setProgressIntervals(prev => ({...prev, [stemId]: interval}));
+    });
   };
   
   const handleStemAddToCart = (stem: Stem) => {
@@ -235,6 +1215,266 @@ export default function AudioPlayer({
     }
   }, [isPlaying]);
 
+  // Modified function to initialize audio elements
+  useEffect(() => {
+    console.log('Initializing stem audio elements for track:', track.title);
+    
+    const newStemAudio: Record<string, HTMLAudioElement> = {};
+    
+    if (track.stems) {
+      console.log('Number of stems:', track.stems.length);
+      
+      track.stems.forEach(stem => {
+        if (!stemAudio[stem.id]) {
+          try {
+            // Mark the stem as loading
+            setStemLoading(prev => ({...prev, [stem.id]: true}));
+            
+            // Get URL using our discovery function
+            let initialUrl;
+            
+            // Legacy support for known tracks
+            if ((track.title.toLowerCase() === 'elevator music' || 
+                track.title.toLowerCase() === 'crazy meme music' ||
+                track.title.toLowerCase() === 'lo-fi beat' || 
+                track.title.toLowerCase() === 'lo-fi beats' || 
+                track.title.toLowerCase() === 'dramatic countdown' || 
+                track.title.toLowerCase() === 'dramatic epic cinema' || 
+                track.title.toLowerCase() === 'dramatic epic countdown') && 
+                (stem.name === 'Drums' || stem.name === 'Bass' || stem.name === 'Keys' || 
+                 stem.name === 'FX' || stem.name === 'Drones' || stem.name === 'Strings')) {
+              initialUrl = getStemUrl(stem.name, track.title);
+            } else {
+              // For all new tracks, try to discover immediately
+              initialUrl = getStemUrl(stem.name, track.title);
+              
+              // Kick off immediate API discovery - this will update the audio.src later if found
+              findStemFileUrl(stem.name, track.title).then(url => {
+                console.log(`Initial API discovery for ${stem.name}: ${url || 'not found'}`);
+              });
+            }
+            
+            console.log(`Initial URL for stem ${stem.name}: ${initialUrl}`);
+            
+            // Ensure URL is absolute
+            let audioUrl = initialUrl;
+            if (!audioUrl.startsWith('http')) {
+              audioUrl = `${STRAPI_URL}${audioUrl.startsWith('/') ? '' : '/'}${audioUrl}`;
+            }
+            
+            // Create audio element with data attributes for identification
+            const audio = new Audio(audioUrl);
+            audio.dataset.stem = stem.name;
+            audio.dataset.track = track.title;
+            audio.dataset.stemId = stem.id;
+            audio.dataset.trackId = track.id;
+            
+            // Create an array of alternative URLs to try if the first one fails
+            // We'll try various hash patterns and formats to ensure we find the file
+            const alternativeUrls = [
+              // First, try to get the actual URL via the API
+              async () => {
+                const apiUrl = await findStemFileUrl(stem.name, track.title);
+                if (apiUrl) return apiUrl;
+                return null;
+              },
+              
+              // Try variations of the pattern with and without hash
+              `${STRAPI_URL}/uploads/${stem.name}_${track.title.toLowerCase().replace(/\s+/g, '_')}.mp3`,
+              
+              // Try legacy patterns for compatibility
+              track.title.toLowerCase() === 'elevator music' && ELEVATOR_MUSIC_STEM_HASHES[stem.name]
+                ? `${STRAPI_URL}/uploads/${stem.name}_Elevator_music_${ELEVATOR_MUSIC_STEM_HASHES[stem.name]}.mp3`
+                : null,
+              track.title.toLowerCase() === 'crazy meme music' && CRAZY_MEME_MUSIC_STEM_HASHES[stem.name]
+                ? `${STRAPI_URL}/uploads/${stem.name}_Crazy_meme_music_${CRAZY_MEME_MUSIC_STEM_HASHES[stem.name]}.mp3`
+                : null,
+              (track.title.toLowerCase() === 'lo-fi beat' || track.title.toLowerCase() === 'lo-fi beats') && LOFI_BEATS_STEM_HASHES[stem.name]
+                ? `${STRAPI_URL}/uploads/${stem.name}_Lo_Fi_Beat_${LOFI_BEATS_STEM_HASHES[stem.name]}.mp3`
+                : null,
+              (track.title.toLowerCase() === 'dramatic countdown' || track.title.toLowerCase() === 'dramatic epic cinema' || track.title.toLowerCase() === 'dramatic epic countdown') && DRAMATIC_EPIC_CINEMA_STEM_HASHES[stem.name]
+                ? `${STRAPI_URL}/uploads/${stem.name}_Dramatic_Countdown_${DRAMATIC_EPIC_CINEMA_STEM_HASHES[stem.name]}.mp3`
+                : null,
+              
+              // Fallback to stem name only
+              `${STRAPI_URL}/uploads/${stem.name}.mp3`,
+            ].filter(Boolean);
+            
+            // Use a timeout to avoid hanging on loading forever
+            const loadTimeout = setTimeout(() => {
+              console.warn(`Timeout loading audio for ${stem.name}`);
+              setStemLoadErrors(prev => ({...prev, [stem.id]: true}));
+              setStemLoading(prev => ({...prev, [stem.id]: false}));
+            }, 5000);
+            
+            // Track which URL attempt we're on
+            let currentUrlIndex = 0;
+            const maxAttempts = alternativeUrls.length;
+            
+            // Function to try loading with next URL
+            const tryNextUrl = async () => {
+              if (currentUrlIndex < maxAttempts) {
+                const nextUrlOrFunc = alternativeUrls[currentUrlIndex++];
+                
+                // Handle function-based URLs (like API discovery)
+                let nextUrl: string;
+                if (typeof nextUrlOrFunc === 'function') {
+                  console.log(`Trying to discover URL via API for ${stem.name}...`);
+                  const discoveredUrl = await nextUrlOrFunc();
+                  if (discoveredUrl) {
+                    nextUrl = discoveredUrl as string;
+                  } else {
+                    console.log(`API discovery returned no URL, trying next alternative...`);
+                    // Move to next option if API returns nothing
+                    tryNextUrl();
+                    return;
+                  }
+                } else {
+                  nextUrl = nextUrlOrFunc as string;
+                }
+                
+                console.log(`Trying alternative URL for ${stem.name}: ${nextUrl}`);
+                
+                // Try the next URL
+                audio.src = nextUrl;
+                audio.load();
+              } else {
+                // We've tried all URLs and failed
+                clearTimeout(loadTimeout);
+                console.error(`All URL attempts failed for stem ${stem.name}`);
+                setStemLoadErrors(prev => ({...prev, [stem.id]: true}));
+                setStemLoading(prev => ({...prev, [stem.id]: false}));
+              }
+            };
+            
+            // Add error handler with URL retry logic
+            audio.addEventListener('error', (e) => {
+              console.error(`Error loading audio for stem ${stem.name} with URL ${audio.src}:`, e);
+              console.log(`%c❌ FAILED URL: ${audio.src}`, 'background: red; color: white; font-size: 16px');
+              
+              // Try the next URL in our list
+              tryNextUrl();
+            });
+            
+            // Add canplaythrough handler
+            audio.addEventListener('canplaythrough', () => {
+              clearTimeout(loadTimeout);
+              console.log(`Audio loaded successfully for stem: ${stem.name} with URL ${audio.src}`);
+              
+              // Store the successful URL in our cache and log it prominently
+              saveStemUrlToCache(track.title, stem.name, audio.src);
+              console.log(`%c✅ SUCCESSFUL URL: ${audio.src}`, 'background: green; color: white; font-size: 16px');
+              
+              setStemLoading(prev => ({...prev, [stem.id]: false}));
+              setStemLoadErrors(prev => {
+                const newErrors = {...prev};
+                delete newErrors[stem.id];
+                return newErrors;
+              });
+            });
+            
+            // Set up event handlers for audio playback
+            audio.addEventListener('timeupdate', () => {
+              const current = audio.currentTime;
+              const duration = audio.duration || stem.duration || 30;
+              setStemProgress(prev => ({...prev, [stem.id]: (current / duration) * 100}));
+            });
+            
+            audio.addEventListener('ended', () => {
+              // When a stem ends, update our UI and the global audio manager
+              setPlayingStems(prev => ({...prev, [stem.id]: false}));
+              setStemProgress(prev => ({...prev, [stem.id]: 0}));
+              
+              // If this is the currently active audio in the global manager, clear it
+              if (globalAudioManager.activeAudio === audio) {
+                globalAudioManager.stop();
+              }
+            });
+            
+            newStemAudio[stem.id] = audio;
+          } catch (err) {
+            console.error(`Failed to create audio element for ${stem.name}:`, err);
+            setStemLoadErrors(prev => ({...prev, [stem.id]: true}));
+            setStemLoading(prev => ({...prev, [stem.id]: false}));
+          }
+        }
+      });
+    }
+    
+    // Update the stem audio state
+    setStemAudio(prev => ({...prev, ...newStemAudio}));
+    
+    return () => {
+      // Clean up audio elements when component unmounts or track changes
+      Object.values(newStemAudio).forEach(audio => {
+        // If this is the active audio in the global manager, stop it first
+        if (globalAudioManager.activeAudio === audio) {
+          globalAudioManager.stop();
+        }
+        
+        audio.pause();
+        audio.src = '';
+      });
+    };
+  }, [track.id, track.stems, track.title]);
+
+  // Add special effect to allow "play" simulation for stems even when audio fails
+  useEffect(() => {
+    // For each stem with errors, set up a simulation effect
+    Object.entries(stemLoadErrors).forEach(([stemId, hasError]) => {
+      if (hasError && playingStems[stemId]) {
+        // If the stem has an error but is set to "playing", simulate progress
+        if (!progressIntervals[stemId]) {
+          console.log(`Setting up progress simulation for stem ${stemId}`);
+          const interval = window.setInterval(() => {
+            setStemProgress(prev => {
+              const current = prev[stemId] || 0;
+              // Loop back to start when reaching 100%
+              if (current >= 100) {
+                return {...prev, [stemId]: 0};
+              }
+              // Increment progress slowly
+              return {...prev, [stemId]: current + 0.5};
+            });
+          }, 100);
+          
+          // Store interval ID
+          setProgressIntervals(prev => ({...prev, [stemId]: interval}));
+        }
+      } else if (progressIntervals[stemId] && (!playingStems[stemId] || !hasError)) {
+        // Clear the interval when not playing or not an error
+        window.clearInterval(progressIntervals[stemId]);
+        setProgressIntervals(prev => {
+          const newIntervals = {...prev};
+          delete newIntervals[stemId];
+          return newIntervals;
+        });
+        
+        // Reset progress if not playing
+        if (!playingStems[stemId]) {
+          setStemProgress(prev => ({...prev, [stemId]: 0}));
+        }
+      }
+    });
+    
+    return () => {
+      // Clean up all intervals
+      Object.values(progressIntervals).forEach(interval => {
+        window.clearInterval(interval);
+      });
+    };
+  }, [stemLoadErrors, playingStems]);
+
+  // Clean up intervals when component unmounts
+  useEffect(() => {
+    return () => {
+      // Clean up all intervals
+      Object.values(progressIntervals).forEach(interval => {
+        window.clearInterval(interval);
+      });
+    };
+  }, [progressIntervals]);
+
   return (
     <div 
       className={`relative mx-[30px] border-b border-[#1A1A1A] ${isHovering || isInteracting || isStemsOpen ? 'bg-[#232323]' : 'bg-[#121212]'}`}
@@ -259,10 +1499,20 @@ export default function AudioPlayer({
             className="object-cover"
           />
           <button 
-            onClick={handlePlayPause}
-            className={`absolute inset-0 flex items-center justify-center z-20 ${isHovering || isPlaying ? 'opacity-100' : 'opacity-0'} transition-opacity`}
+            onClick={mainAudioError ? undefined : handlePlayPause}
+            disabled={mainAudioError}
+            className={`absolute inset-0 flex items-center justify-center z-20 ${
+              isHovering || isPlaying ? 'opacity-100' : 'opacity-0'
+            } transition-opacity ${mainAudioError ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+            title={mainAudioError ? "Audio file could not be loaded" : "Play/Pause"}
           >
-            {isPlaying ? (
+            {mainAudioError ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-500" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
+                <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2" />
+                <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" strokeWidth="2" />
+              </svg>
+            ) : isPlaying ? (
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24">
                 <rect x="6" y="4" width="4" height="16" fill="currentColor"/>
                 <rect x="14" y="4" width="4" height="16" fill="currentColor"/>
@@ -280,9 +1530,9 @@ export default function AudioPlayer({
           <h3 className="font-bold text-[15px] text-white truncate">{track.title}</h3>
           <div className="flex items-baseline">
             <span className="text-[12.5px] font-normal text-[#999999]">{track.bpm} BPM</span>
-          </div>
         </div>
-        
+      </div>
+      
         {/* Tags area - fixed width */}
         <div className="w-56 mr-4 flex-shrink-0">
           <div className="text-[12.5px] font-normal text-[#999999] overflow-hidden line-clamp-2">
@@ -345,7 +1595,7 @@ export default function AudioPlayer({
         {/* Action buttons - fixed width */}
         <div className="w-36 flex items-center justify-end space-x-3 flex-shrink-0">
           {track.hasStems && (
-            <button 
+        <button 
               onClick={() => setIsStemsOpen(!isStemsOpen)}
               className="text-white hover:text-[#1DF7CE] transition-colors"
             >
@@ -405,16 +1655,67 @@ export default function AudioPlayer({
                 
                 <button 
                   onClick={() => handleStemPlayPause(stem.id)}
-                  className="w-8 h-8 flex items-center justify-center text-white mr-3"
+                  className={`w-8 h-8 flex items-center justify-center ${
+                    stemLoadErrors[stem.id] ? 'text-amber-500' : 
+                    stemLoading[stem.id] ? 'text-gray-400' : 'text-white'
+                  } hover:text-[#1DF7CE] mr-3`}
+                  disabled={false}
+                  title={
+                    stemLoadErrors[stem.id] ? "Audio unavailable - Click to simulate playback" : 
+                    stemLoading[stem.id] ? "Loading stem audio..." : 
+                    playingStems[stem.id] ? "Pause stem" : "Play stem"
+                  }
                 >
+                  {stemLoadErrors[stem.id] ? (
+                    playingStems[stem.id] ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="6" y="4" width="4" height="16" stroke="none" fill="currentColor" />
+                        <rect x="14" y="4" width="4" height="16" stroke="none" fill="currentColor" />
+                        <circle cx="20" cy="4" r="2" fill="currentColor" />
+            </svg>
+          ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        <circle cx="19" cy="5" r="2" fill="currentColor" />
+                      </svg>
+                    )
+                  ) : stemLoading[stem.id] ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="32"></circle>
+                      <path d="M12 2C6.5 2 2 6.5 2 12"></path>
+                    </svg>
+                  ) : playingStems[stem.id] ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="6" y="4" width="4" height="16" stroke="none" fill="currentColor" />
+                      <rect x="14" y="4" width="4" height="16" stroke="none" fill="currentColor" />
+                    </svg>
+                  ) : (
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                    </svg>
-                </button>
-                
-                {/* Simple progress bar for stems */}
-                <div className="flex-grow h-4 bg-[#3A3A3A] rounded mx-2">
-                  {/* Simplified progress representation */}
+            </svg>
+          )}
+        </button>
+        
+                {/* Progress bar for stems */}
+                <div className="flex-grow h-4 bg-[#3A3A3A] rounded mx-2 relative">
+                  {stemLoadErrors[stem.id] ? (
+                    <>
+                      <div className="absolute inset-0 flex items-center justify-center text-xs text-red-400">
+                        {playingStems[stem.id] ? 'Simulating playback' : 'Audio unavailable'}
+                      </div>
+                      {playingStems[stem.id] && (
+                        <div 
+                          className="absolute top-0 left-0 h-4 rounded bg-amber-500/30"
+                          style={{ width: `${stemProgress[stem.id] || 0}%` }}
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <div 
+                      className={`absolute top-0 left-0 h-4 rounded ${playingStems[stem.id] ? 'bg-[#1DF7CE]' : 'bg-[#555555]'}`}
+                      style={{ width: `${stemProgress[stem.id] || 0}%` }}
+                    />
+                  )}
                 </div>
                 
                 <div className="w-16 text-white text-xs font-normal text-right mr-3">
@@ -434,7 +1735,7 @@ export default function AudioPlayer({
                     {stemAddedToCart[stem.id] ? (
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
+          </svg>
           ) : (
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M4 12l2 2 4-4" />
@@ -443,7 +1744,7 @@ export default function AudioPlayer({
           )}
         </button>
                   <span className="mt-1 text-xs text-[#999999]">${stem.price}</span>
-                </div>
+      </div>
               </div>
             ))}
           </div>
