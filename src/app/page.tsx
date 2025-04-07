@@ -342,13 +342,13 @@ export default function MusicLibrary() {
       
       <main className="flex flex-1">
         {/* Sidebar with filter controls */}
-        <FilterSidebar
+      <FilterSidebar
           selectedTags={selectedTags}
-          genres={genres}
-          moods={moods}
-          instruments={instruments}
-          bpmRange={bpmRange}
-          durationRange={durationRange}
+        genres={genres}
+        moods={moods}
+        instruments={instruments}
+        bpmRange={bpmRange}
+        durationRange={durationRange}
           onTagToggle={handleTagToggle}
           onBpmChange={handleBpmChange}
           onDurationChange={handleDurationChange}
@@ -359,30 +359,32 @@ export default function MusicLibrary() {
         <div className="ml-[271px] flex-1">
           <div className="p-8 pt-28">
             
-            
-            {/* Selected tags display with clear button */}
-            {selectedTags.length > 0 && (
-              <div className="mb-6 flex flex-wrap items-center gap-2">
-                {selectedTags.map(tag => (
-                  <TagFilter 
-                    key={tag.id}
-                    tag={tag} 
-                    selected={true} 
-                    onClick={() => handleTagToggle(tag)}
-                        />
-                      ))}
-                <button 
-                  onClick={handleClearTags}
-                  className="text-sm text-white bg-transparent hover:text-[#1DF7CE] transition-colors ml-2 flex items-center"
-                >
-                  Clear All <span className="ml-1">×</span>
-                </button>
-              </div>
-            )}
+            {/* Fixed height container for selected tags */}
+            <div className="h-[40px] mb-4">
+              {/* Selected tags display with clear button */}
+              {selectedTags.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {selectedTags.map(tag => (
+                    <TagFilter
+                      key={tag.id}
+                      tag={tag} 
+                      selected={true} 
+                      onClick={() => handleTagToggle(tag)}
+                    />
+                  ))}
+                  <button 
+                    onClick={handleClearTags}
+                    className="text-sm text-white bg-transparent hover:text-[#1DF7CE] transition-colors ml-2 flex items-center"
+                  >
+                    Clear All <span className="ml-1">×</span>
+                  </button>
+                </div>
+              )}
+            </div>
             
             {/* Tracks list */}
             {renderContent()}
-            </div>
+          </div>
         </div>
       </main>
     </div>
