@@ -1646,14 +1646,14 @@ export default function AudioPlayer({
           {track.hasStems && (
             <button 
               onClick={() => setIsStemsOpen(!isStemsOpen)}
-              className="text-white hover:text-[#1DF7CE] transition-colors text-sm px-3 py-1 border border-[#444444] rounded-md"
+              className="text-white hover:text-[#1E1E1E] transition-colors text-sm px-4 py-1.5 border-2 border-[#1DF7CE] rounded-full bg-transparent hover:bg-[#1DF7CE] focus:bg-[#1DF7CE] focus:text-[#1E1E1E]"
             >
               Stems
             </button>
           )}
           
           <button 
-            className="text-[#1DF7CE] hover:text-[#19d9b6] transition-colors text-sm px-3 py-1 border border-[#1DF7CE] rounded-md"
+            className="text-[#1E1E1E] hover:text-[#1DF7CE] transition-colors text-sm px-4 py-1.5 border-2 border-[#1DF7CE] rounded-full bg-[#1DF7CE] hover:bg-transparent focus:bg-transparent focus:text-[#1DF7CE]"
             onClick={() => window.open(track.audioUrl, '_blank')}
           >
             Download
