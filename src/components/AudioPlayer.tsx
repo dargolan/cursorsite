@@ -1641,30 +1641,22 @@ export default function AudioPlayer({
           {formatTime(currentTime)} / {formatTime(track.duration)}
         </div>
         
-        {/* Action buttons - fixed width */}
-        <div className="w-28 flex items-center justify-end space-x-3 flex-shrink-0"> {/* Changed width from w-36 to w-28 since we removed one icon */}
+        {/* Action buttons - fixed width with text instead of icons */}
+        <div className="flex items-center justify-end space-x-3 flex-shrink-0">
           {track.hasStems && (
             <button 
               onClick={() => setIsStemsOpen(!isStemsOpen)}
-              className="text-white hover:text-[#1DF7CE] transition-colors"
+              className="text-white hover:text-[#1DF7CE] transition-colors text-sm px-3 py-1 border border-[#444444] rounded-md"
             >
-              <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>
-                clear_all
-              </span>
+              Stems
             </button>
           )}
           
-          {/* Removed Similar Tracks icon from here and moved it above */}
-          
-          {/* Removed Favorite icon completely */}
-          
           <button 
-            className="text-[#1DF7CE] hover:text-[#19d9b6] transition-colors"
+            className="text-[#1DF7CE] hover:text-[#19d9b6] transition-colors text-sm px-3 py-1 border border-[#1DF7CE] rounded-md"
             onClick={() => window.open(track.audioUrl, '_blank')}
           >
-            <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>
-              download
-            </span>
+            Download
           </button>
         </div>
       </div>
