@@ -1572,9 +1572,9 @@ export default function AudioPlayer({
           <h3 className="font-bold text-[15px] text-white break-words leading-tight">{track.title}</h3>
           <div className="mt-0"> {/* Reduced from mt-0.5 to mt-0 to make space smaller */}
             <span className="text-[12.5px] font-normal text-[#999999]">{track.bpm} BPM</span>
+          </div>
         </div>
-      </div>
-      
+        
         {/* Tags area - fixed width, filtered to only show Genre and Mood tags */}
         <div className="w-56 mr-4 flex-shrink-0">
           <div className="text-[12.5px] font-normal text-[#999999] overflow-hidden line-clamp-2">
@@ -1598,6 +1598,13 @@ export default function AudioPlayer({
             ))}
           </div>
         </div>
+        
+        {/* Similar Tracks button - moved here */}
+        <button className="text-white hover:text-[#1DF7CE] transition-colors mr-4 flex-shrink-0">
+          <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>
+            fiber_smart_record
+          </span>
+        </button>
         
         {/* Progress bar - using all remaining space */}
         <div className="flex-1 ml-2 mr-4 flex items-center">
@@ -1635,9 +1642,9 @@ export default function AudioPlayer({
         </div>
         
         {/* Action buttons - fixed width */}
-        <div className="w-36 flex items-center justify-end space-x-3 flex-shrink-0">
+        <div className="w-28 flex items-center justify-end space-x-3 flex-shrink-0"> {/* Changed width from w-36 to w-28 since we removed one icon */}
           {track.hasStems && (
-        <button 
+            <button 
               onClick={() => setIsStemsOpen(!isStemsOpen)}
               className="text-white hover:text-[#1DF7CE] transition-colors"
             >
@@ -1647,17 +1654,9 @@ export default function AudioPlayer({
             </button>
           )}
           
-          <button className="text-white hover:text-[#1DF7CE] transition-colors">
-            <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>
-              fiber_smart_record
-            </span>
-          </button>
+          {/* Removed Similar Tracks icon from here and moved it above */}
           
-          <button className="text-white hover:text-[#1DF7CE] transition-colors">
-            <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>
-              favorite
-            </span>
-          </button>
+          {/* Removed Favorite icon completely */}
           
           <button 
             className="text-[#1DF7CE] hover:text-[#19d9b6] transition-colors"
@@ -1734,10 +1733,10 @@ export default function AudioPlayer({
                   ) : (
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polygon points="5 3 19 12 5 21 5 3"></polygon>
-            </svg>
-          )}
-        </button>
-        
+                    </svg>
+                  )}
+                </button>
+                
                 {/* Progress bar for stems */}
                 <div className="flex-grow h-4 bg-[#3A3A3A] rounded mx-2 relative">
                   {stemLoadErrors[stem.id] ? (
@@ -1779,7 +1778,7 @@ export default function AudioPlayer({
                         <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
                         <line x1="15" y1="8" x2="9" y2="14" />
                         <line x1="9" y1="8" x2="15" y2="14" />
-          </svg>
+            </svg>
         </button>
                   ) : (
                     <button 
@@ -1794,7 +1793,7 @@ export default function AudioPlayer({
         </button>
                   )}
                   <span className="mt-1 text-xs text-[#999999]">€{stem.price}</span>
-      </div>
+                </div>
               </div>
             ))}
           </div>
