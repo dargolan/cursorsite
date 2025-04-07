@@ -125,13 +125,13 @@ export default function FilterSidebar({
   return (
     <div className="w-[271px] bg-[#1B1B1B] fixed top-0 left-0 h-screen overflow-y-auto z-0">
       {/* Logo */}
-      <Link href="/" className="flex items-center justify-center pt-5 pb-[22px]">
-        <div className="w-[68px] h-[68px] relative">
+      <Link href="/" className="flex items-center justify-center pt-[30px] pb-[32px]">
+        <div className="w-[78px] h-[78px] relative">
           <Image 
             src="/wave_cave_logo.png" 
             alt="Wave Cave" 
-            width={68} 
-            height={68}
+            width={78} 
+            height={78}
             priority
             className="object-contain"
             quality={100}
