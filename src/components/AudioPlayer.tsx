@@ -643,6 +643,7 @@ interface AudioPlayerProps {
   onStop: () => void;
   onAddToCart: (stem: Stem, track: Track) => void;
   onTagClick: (tag: Tag) => void;
+  onRemoveFromCart: (itemId: string) => void;
 }
 
 // Function to check if a URL exists (returns 200 OK)
@@ -726,7 +727,8 @@ export default function AudioPlayer({
   onPlay,
   onStop,
   onAddToCart,
-  onTagClick
+  onTagClick,
+  onRemoveFromCart
 }: AudioPlayerProps): React.ReactElement {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -747,14 +749,19 @@ export default function AudioPlayer({
   const [mainAudioError, setMainAudioError] = useState(false);
   const [stemLoading, setStemLoading] = useState<Record<string, boolean>>({});
   const [progressIntervals, setProgressIntervals] = useState<Record<string, number>>({});
+  const [showToast, setShowToast] = useState<{stemId: string, stemName: string, price: number, action: 'add' | 'remove'} | null>(null);
   
-  // Group tags by type for display
+  // Group tags by type for display, filtering out Instrument tags
   const tagsByType = track.tags.reduce<Record<string, Tag[]>>((acc, tag) => {
-    const type = tag.type;
-    if (!acc[type]) {
-      acc[type] = [];
+    // Only include Genre and Mood tags (case insensitive comparison)
+    const tagTypeLower = tag.type.toLowerCase();
+    if (tagTypeLower === 'genre' || tagTypeLower === 'mood') {
+      const type = tag.type;
+      if (!acc[type]) {
+        acc[type] = [];
+      }
+      acc[type].push(tag);
     }
-    acc[type].push(tag);
     return acc;
   }, {});
   
@@ -838,7 +845,7 @@ export default function AudioPlayer({
       audioRef.current.dataset.isMainTrack = 'true';
     }
     
-    return () => {
+      return () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
         audioRef.current.removeEventListener('ended', handleAudioEnded);
@@ -1028,17 +1035,17 @@ export default function AudioPlayer({
         ...prev,
         [stemId]: false
       }));
-      return;
-    }
-    
+        return;
+      }
+      
     // We're turning ON a stem
     
     // 1. Stop the main track of this component if it's playing
-    if (isPlaying) {
+      if (isPlaying) {
       audioRef.current?.pause();
-      onStop();
-    }
-    
+        onStop();
+      }
+      
     // 2. Reset all stem playing states in this track
     const newPlayingStems: Record<string, boolean> = {};
     if (track.stems) {
@@ -1187,8 +1194,43 @@ export default function AudioPlayer({
   };
   
   const handleStemAddToCart = (stem: Stem) => {
+    // Show toast notification
+    setShowToast({
+      stemId: stem.id,
+      stemName: stem.name,
+      price: stem.price,
+      action: 'add'
+    });
+    
+    // Hide toast after 3 seconds
+    setTimeout(() => {
+      setShowToast(null);
+    }, 3000);
+    
     setStemAddedToCart(prev => ({ ...prev, [stem.id]: true }));
     onAddToCart(stem, track);
+  };
+
+  const handleStemRemoveFromCart = (stem: Stem) => {
+    // Show toast notification for removal
+    setShowToast({
+      stemId: stem.id,
+      stemName: stem.name,
+      price: stem.price,
+      action: 'remove'
+    });
+    
+    // Hide toast after 3 seconds
+    setTimeout(() => {
+      setShowToast(null);
+    }, 3000);
+    
+    setStemAddedToCart(prev => ({ ...prev, [stem.id]: false }));
+    if (onRemoveFromCart) {
+      // Create a cart item ID using track and stem IDs
+      const itemId = `${track.id}_${stem.id}`;
+      onRemoveFromCart(itemId);
+    }
   };
   
   const handleDownloadAllStems = () => {
@@ -1477,26 +1519,26 @@ export default function AudioPlayer({
 
   return (
     <div 
-      className={`relative mx-[30px] border-b border-[#1A1A1A] ${isHovering || isInteracting || isStemsOpen ? 'bg-[#232323]' : 'bg-[#121212]'}`}
-      style={{ marginBottom: "-1px" }}
+      className={`relative border-b border-[#1A1A1A] ${isHovering || isInteracting || isStemsOpen ? 'bg-[#232323]' : 'bg-[#121212]'}`}
+      style={{ marginBottom: "0" }} /* Change from -1px to 0 to remove gap */
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
       <div 
-        className="flex items-center px-4 py-[2px] rounded"
-        style={{ minHeight: '70px' }}
+        className="flex items-center px-4 py-[6px] rounded"
+        style={{ minHeight: '84px' }} // Increased from 80px to 84px
       >
-        {/* Track image with fixed width */}
-        <div className="w-12 h-12 rounded overflow-hidden relative mr-4 flex-shrink-0">
+        {/* Track image with fixed width - increased size */}
+        <div className="w-14 h-14 rounded overflow-hidden relative mr-4 flex-shrink-0">
           <div 
             className={`absolute inset-0 bg-black ${isHovering || isPlaying ? 'opacity-50' : 'opacity-0'} transition-opacity z-10`}
           />
           <Image 
-            src={"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18V5l12-2v13'%3E%3C/path%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Ccircle cx='18' cy='16' r='3'%3E%3C/circle%3E%3C/svg%3E"} 
+            src={track.imageUrl || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18V5l12-2v13'%3E%3C/path%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Ccircle cx='18' cy='16' r='3'%3E%3C/circle%3E%3C/svg%3E"} 
             alt={track.title}
-            width={48}
-            height={48}
-            className="object-cover"
+            width={56}
+            height={56}
+            className="object-cover w-14 h-14"
           />
           <button 
             onClick={mainAudioError ? undefined : handlePlayPause}
@@ -1525,15 +1567,15 @@ export default function AudioPlayer({
           </button>
         </div>
         
-        {/* Title and BPM area - fixed width */}
-        <div className="w-32 mr-6 flex-shrink-0">
-          <h3 className="font-bold text-[15px] text-white truncate">{track.title}</h3>
-          <div className="flex items-baseline">
+        {/* Title and BPM area - centered vertically and aligned as a group */}
+        <div className="w-32 mr-6 flex-shrink-0 flex flex-col justify-center">
+          <h3 className="font-bold text-[15px] text-white break-words leading-tight">{track.title}</h3>
+          <div className="mt-0"> {/* Reduced from mt-0.5 to mt-0 to make space smaller */}
             <span className="text-[12.5px] font-normal text-[#999999]">{track.bpm} BPM</span>
         </div>
       </div>
       
-        {/* Tags area - fixed width */}
+        {/* Tags area - fixed width, filtered to only show Genre and Mood tags */}
         <div className="w-56 mr-4 flex-shrink-0">
           <div className="text-[12.5px] font-normal text-[#999999] overflow-hidden line-clamp-2">
             {Object.entries(tagsByType).flatMap(([type, tags], typeIndex, array) => (
@@ -1723,27 +1765,35 @@ export default function AudioPlayer({
                 </div>
                 
                 <div className="flex flex-col items-center">
+                  {/* New add/remove button design with + or Cart with X */}
+                  {stemAddedToCart[stem.id] ? (
         <button 
-                    onClick={() => handleStemAddToCart(stem)}
-                    disabled={stemAddedToCart[stem.id]}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      stemAddedToCart[stem.id] 
-                        ? 'bg-[#19d9b6] text-[#1E1E1E]' 
-                        : 'bg-[#1DF7CE] hover:bg-[#19d9b6] text-[#1E1E1E]'
-                    } transition-colors`}
-                  >
-                    {stemAddedToCart[stem.id] ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12"></polyline>
+                      onClick={() => handleStemRemoveFromCart(stem)}
+                      className="w-8 h-8 rounded-full flex items-center justify-center border-2 border-red-500 text-red-500 hover:bg-red-500/10 transition-colors"
+                      title="Remove from cart"
+                    >
+                      {/* Cart with X icon */}
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="8" cy="21" r="1" />
+                        <circle cx="19" cy="21" r="1" />
+                        <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
+                        <line x1="15" y1="8" x2="9" y2="14" />
+                        <line x1="9" y1="8" x2="15" y2="14" />
           </svg>
-          ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M4 12l2 2 4-4" />
-                        <path d="M17 9v6h3" />
-            </svg>
-          )}
         </button>
-                  <span className="mt-1 text-xs text-[#999999]">${stem.price}</span>
+                  ) : (
+                    <button 
+                      onClick={() => handleStemAddToCart(stem)}
+                      className="w-8 h-8 rounded-full flex items-center justify-center border-2 border-[#1DF7CE] text-[#1DF7CE] hover:bg-[#1DF7CE]/10 transition-colors"
+                      title="Add to cart"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+        </button>
+                  )}
+                  <span className="mt-1 text-xs text-[#999999]">€{stem.price}</span>
       </div>
               </div>
             ))}
@@ -1753,7 +1803,7 @@ export default function AudioPlayer({
           <div className="flex justify-between items-center mt-4">
             <div>
               <p className="text-xs text-[#999999]">Buy all stems:</p>
-              <p className="text-[#1DF7CE] font-bold">${discountedStemsPrice} <span className="line-through text-[#999999] text-xs font-normal">${totalStemsPrice}</span></p>
+              <p className="text-[#1DF7CE] font-bold">€{discountedStemsPrice} <span className="line-through text-[#999999] text-xs font-normal">€{totalStemsPrice}</span></p>
             </div>
             <button
               onClick={handleDownloadAllStems}
@@ -1764,6 +1814,56 @@ export default function AudioPlayer({
       </div>
         </div>
       )}
+      
+      {/* Toast notification for stem added/removed from cart */}
+      {showToast && (
+        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 bg-[#232323] border border-[#1DF7CE] text-white px-4 py-3 rounded shadow-lg flex items-center animate-slide-up">
+          {showToast.action === 'add' ? (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#1DF7CE] mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12l5 5l10 -10"></path>
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="8" cy="21" r="1" />
+              <circle cx="19" cy="21" r="1" />
+              <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
+              <line x1="15" y1="8" x2="9" y2="14" />
+              <line x1="9" y1="8" x2="15" y2="14" />
+            </svg>
+          )}
+          <span>
+            <strong>{showToast.stemName}</strong> 
+            {showToast.action === 'add' ? ' added to cart • ' : ' removed from cart • '}
+            €{showToast.price}
+          </span>
+          <button 
+            onClick={() => setShowToast(null)}
+            className="ml-4 text-gray-400 hover:text-white"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 } 
+
+// Add animation for the toast notification
+const existingStyle = document.getElementById('toast-animation');
+if (!existingStyle) {
+  const style = document.createElement('style');
+  style.id = 'toast-animation';
+  style.textContent = `
+    @keyframes slide-up {
+      from { transform: translate(-50%, 100%); opacity: 0; }
+      to { transform: translate(-50%, 0); opacity: 1; }
+    }
+    .animate-slide-up {
+      animation: slide-up 0.3s ease forwards;
+    }
+  `;
+  document.head.appendChild(style);
+}

@@ -28,7 +28,6 @@ export default function MusicLibrary() {
   // State for filters
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchTermTags, setSearchTermTags] = useState<{id: string, term: string}[]>([]);
   const [bpmRange, setBpmRange] = useState<[number, number]>([0, 200]);
   const [durationRange, setDurationRange] = useState<[number, number]>([0, 600]);
   
@@ -178,24 +177,13 @@ export default function MusicLibrary() {
       });
     }
     
-    // Filter by search terms
-    if (searchTermTags.length > 0 || searchQuery) {
-      // Combine current search query and all search term tags
-      const searchTerms = [
-        ...searchTermTags.map(tag => tag.term.toLowerCase()),
-        searchQuery.toLowerCase()
-      ].filter(Boolean);
-      
-      if (searchTerms.length > 0) {
-        filtered = filtered.filter(track => {
-          // Track title must include ANY of the search terms
-          // OR any of its tags must include ANY of the search terms
-          return searchTerms.some(term => 
-            track.title.toLowerCase().includes(term) ||
-            track.tags.some(tag => tag.name.toLowerCase().includes(term))
-          );
-        });
-      }
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(track => 
+        track.title.toLowerCase().includes(query) ||
+        track.tags.some(tag => tag.name.toLowerCase().includes(query))
+      );
     }
     
     // Filter by BPM range
@@ -209,7 +197,7 @@ export default function MusicLibrary() {
     );
     
     setFilteredTracks(filtered);
-  }, [tracks, selectedTags, searchQuery, searchTermTags, bpmRange, durationRange]);
+  }, [tracks, selectedTags, searchQuery, bpmRange, durationRange]);
 
   // Handler for toggling a tag
   const handleTagToggle = useCallback((tag: Tag) => {
@@ -230,32 +218,8 @@ export default function MusicLibrary() {
 
   // Handler for search input
   const handleSearch = useCallback((query: string) => {
-    if (query.trim()) {
-      // Generate a unique ID for this search term
-      const newSearchTermId = `search-${Date.now()}`;
-      
-      // Add to search term tags if it doesn't already exist
-      setSearchTermTags(prev => {
-        // Don't add duplicate search terms
-        if (!prev.some(tag => tag.term.toLowerCase() === query.toLowerCase())) {
-          return [...prev, { id: newSearchTermId, term: query }];
-        }
-        return prev;
-      });
-    }
-    
     setSearchQuery(query);
   }, []);
-
-  // Handler for removing a search term tag
-  const handleRemoveSearchTerm = useCallback((termId: string) => {
-    setSearchTermTags(prev => prev.filter(tag => tag.id !== termId));
-    
-    // If we're removing the last search term, clear the search query
-    if (searchTermTags.length <= 1) {
-      setSearchQuery('');
-    }
-  }, [searchTermTags.length]);
 
   // Handler for BPM range change
   const handleBpmChange = useCallback((range: [number, number]) => {
@@ -303,7 +267,7 @@ export default function MusicLibrary() {
   // Display loading state or no results message
   const renderContent = () => {
     if (loading) {
-  return (
+      return (
         <div className="flex flex-col items-center justify-center h-64">
           <div className="w-12 h-12 border-4 border-[#1DF7CE] border-t-transparent rounded-full animate-spin mb-4"></div>
           <p className="text-gray-400">Loading tracks...</p>
@@ -354,9 +318,9 @@ export default function MusicLibrary() {
     }
 
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col w-full">
         {filteredTracks.map(track => (
-          <div key={track.id} className="relative">
+          <div key={track.id} className="relative w-full">
             <AudioPlayer
               track={track}
               isPlaying={playingTrackId === track.id}
@@ -364,82 +328,64 @@ export default function MusicLibrary() {
               onStop={() => setPlayingTrackId(null)}
               onAddToCart={handleAddToCart}
               onTagClick={handleTagClick}
+              onRemoveFromCart={handleRemoveFromCart}
             />
           </div>
-            ))}
-          </div>
+        ))}
+      </div>
     );
   };
 
   return (
     <div className="flex flex-col min-h-screen bg-[#121212] text-white">
-      <Header cartItems={cartItems} cartTotal={cartTotal} onRemoveFromCart={handleRemoveFromCart} />
+      <Header cartTotal={cartTotal} cartItems={cartItems} onRemoveFromCart={handleRemoveFromCart} />
       
       <main className="flex flex-1">
         {/* Sidebar with filter controls */}
-        <FilterSidebar 
+        <FilterSidebar
+          selectedTags={selectedTags}
           genres={genres}
           moods={moods}
           instruments={instruments}
-          selectedTags={selectedTags}
-          onTagToggle={handleTagToggle}
           bpmRange={bpmRange}
-          onBpmChange={handleBpmChange}
           durationRange={durationRange}
+          onTagToggle={handleTagToggle}
+          onBpmChange={handleBpmChange}
           onDurationChange={handleDurationChange}
           onSearch={handleSearch}
         />
         
-        {/* Main content area */}
-        <div className="flex-1 p-8">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-5xl font-bold">Music list</h1>
-          </div>
-          
-          {/* Selected tags and search terms display with clear button */}
-          {(selectedTags.length > 0 || searchTermTags.length > 0) && (
-            <div className="mb-6 flex flex-wrap items-center gap-2">
-              {/* Display regular tags */}
-              {selectedTags.map(tag => (
-                <TagFilter 
-                  key={tag.id}
-                  tag={tag} 
-                  selected={true} 
-                  onClick={() => handleTagToggle(tag)}
-                />
-              ))}
-              
-              {/* Display search term tags */}
-              {searchTermTags.map(termTag => (
-                <button
-                  key={termTag.id}
-                  onClick={() => handleRemoveSearchTerm(termTag.id)}
-                  className="flex items-center space-x-1 text-xs font-normal px-3 py-1 rounded-full transition-colors bg-[#303030] text-[#1DF7CE] border border-[#1DF7CE]"
+        {/* Main content area with tracks list */}
+        <div className="ml-[271px] flex-1">
+          <div className="p-8 pt-28">
+            
+            
+            {/* Selected tags display with clear button */}
+            {selectedTags.length > 0 && (
+              <div className="mb-6 flex flex-wrap items-center gap-2">
+                {selectedTags.map(tag => (
+                  <TagFilter 
+                    key={tag.id}
+                    tag={tag} 
+                    selected={true} 
+                    onClick={() => handleTagToggle(tag)}
+                        />
+                      ))}
+                <button 
+                  onClick={handleClearTags}
+                  className="text-sm text-white bg-transparent hover:text-[#1DF7CE] transition-colors ml-2 flex items-center"
                 >
-                  <span>Search: {termTag.term}</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  Clear All <span className="ml-1">×</span>
                 </button>
-              ))}
-              
-              <button 
-                onClick={() => {
-                  handleClearTags();
-                  setSearchTermTags([]);
-                  setSearchQuery('');
-                }}
-                className="text-sm text-white bg-transparent hover:text-[#1DF7CE] transition-colors ml-2 flex items-center"
-              >
-                Clear All <span className="ml-1">×</span>
-              </button>
+              </div>
+            )}
+            
+            {/* Tracks list */}
+            {renderContent()}
             </div>
-          )}
-          
-          {/* Tracks list */}
-          {renderContent()}
         </div>
       </main>
     </div>
   );
 } 
+
