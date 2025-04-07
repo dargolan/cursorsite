@@ -1649,14 +1649,22 @@ export default function AudioPlayer({
               className="text-white hover:text-[#1E1E1E] transition-colors text-sm px-4 py-1.5 border-2 border-[#1DF7CE] rounded-full bg-transparent hover:bg-[#1DF7CE] focus:outline-none"
             >
               Stems
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points={isStemsOpen ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}></polyline>
+              </svg>
             </button>
           )}
           
           <button 
-            className="text-[#1E1E1E] hover:text-[#1DF7CE] transition-colors text-sm px-4 py-1.5 border-2 border-[#1DF7CE] rounded-full bg-[#1DF7CE] hover:bg-transparent focus:outline-none"
+            className="w-10 h-10 flex items-center justify-center text-[#1E1E1E] hover:text-[#1DF7CE] transition-colors border-2 border-[#1DF7CE] rounded-full bg-[#1DF7CE] hover:bg-transparent focus:outline-none"
             onClick={() => window.open(track.audioUrl, '_blank')}
+            title="Download track"
           >
-            Download
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
           </button>
         </div>
       </div>
