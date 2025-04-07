@@ -357,7 +357,7 @@ export default function MusicLibrary() {
         
         {/* Main content area with tracks list */}
         <div className="ml-[271px] flex-1">
-          <div className="p-8 pt-28">
+          <div className="p-8 pt-20">
             
             {/* Fixed height container for selected tags */}
             <div className="h-[40px] mb-4">
