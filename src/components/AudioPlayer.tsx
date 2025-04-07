@@ -1576,7 +1576,7 @@ export default function AudioPlayer({
         </div>
         
         {/* Tags area - fixed width, filtered to only show Genre and Mood tags */}
-        <div className="w-56 mr-4 flex-shrink-0">
+        <div className="w-52 mr-2 flex-shrink-0">
           <div className="text-[12.5px] font-normal text-[#999999] overflow-hidden line-clamp-2">
             {Object.entries(tagsByType).flatMap(([type, tags], typeIndex, array) => (
               tags.map((tag, tagIndex, tagArray) => (
@@ -1599,8 +1599,8 @@ export default function AudioPlayer({
           </div>
         </div>
         
-        {/* Similar Tracks button - moved here */}
-        <button className="text-white hover:text-[#1DF7CE] transition-colors mr-4 flex-shrink-0">
+        {/* Similar Tracks button - positioned more centrally */}
+        <button className="text-white hover:text-[#1DF7CE] transition-colors mx-4 flex-shrink-0">
           <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>
             fiber_smart_record
           </span>
