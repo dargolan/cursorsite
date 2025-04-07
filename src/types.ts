@@ -10,6 +10,7 @@ export interface Stem {
   id: string;
   name: string;
   url: string;
+  alternativeUrl?: string;
   price: number;
   duration: number;
   waveform?: number[];

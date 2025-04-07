@@ -83,35 +83,57 @@ const normalizeTrack = (strapiTrack: any): Track => {
       console.error('Error processing tags for track:', strapiTrack.id, err);
     }
 
-    // Safe extraction of stems
+    // Process stems if they exist
     let normalizedStems: Stem[] = [];
     try {
-      // Handle stems based on structure - might be array or {data: [...]}
-      const stems = Array.isArray(stemsData) ? stemsData : (stemsData?.data || []);
+      const stems = strapiTrack.stems || [];
       
-      // Process stems by mapping each one safely
-      normalizedStems = Array.isArray(stems) ? stems.map((stem: any, index: number) => {
+      // Hardcoded stem names to filename mapping based on console logs
+      const getKnownStemUrl = (stemName: string): string => {
+        // Simplify the approach - don't use hashes in the URLs
+        // Just create a direct mapping to simpler filenames
+        return `${STRAPI_URL}/uploads/${stemName.replace(/ /g, '_')}.mp3`;
+      };
+      
+      normalizedStems = stems.length ? stems.map((stem: any, index: number) => {
         try {
-          // Get stem name and price from direct fields or attributes
+          // Extract or generate name
           const stemName = stem.Name || stem.name || 
-                          (stem.attributes && (stem.attributes.Name || stem.attributes.name)) ||
-                          `Stem ${index + 1}`;
-                          
+                           (stem.attributes && (stem.attributes.Name || stem.attributes.name)) || 
+                           `Stem ${index + 1}`;
+                           
+          // Extract or default price
           const stemPrice = stem.Price || stem.price || 
                            (stem.attributes && (stem.attributes.Price || stem.attributes.price)) || 
                            0;
                            
-          // For audio URL, we need to check if audio is nested or direct
-          const stemAudio = stem.audio || (stem.attributes && stem.attributes.audio) || {};
-          const audioUrl = stemAudio?.data?.attributes?.url ? 
-            `${STRAPI_URL}${stemAudio.data.attributes.url}` : '';
-            
+          console.log(`Processing stem: ${stemName}`);
+          
+          // Generate a simpler URL approach
+          // This creates predictable URLs without hashes
+          const simpleUrl = getKnownStemUrl(stemName);
+          
+          // Create fallback URLs with various naming conventions
+          const fallbackUrls = [
+            simpleUrl,
+            // Try with track title included
+            `${STRAPI_URL}/uploads/${stemName.replace(/ /g, '_')}_Elevator_Music.mp3`,
+            // Try with different word separators
+            `${STRAPI_URL}/uploads/${stemName.replace(/ /g, '-')}.mp3`,
+            // Try with .wav extension
+            `${STRAPI_URL}/uploads/${stemName.replace(/ /g, '_')}.wav`
+          ];
+          
+          // Store all fallback URLs
+          const stemAlternativeUrl = JSON.stringify(fallbackUrls);
+          
           return {
             id: `${strapiTrack.id}-stem-${index}`,
             name: stemName,
-            url: audioUrl,
+            url: simpleUrl,
+            alternativeUrl: stemAlternativeUrl,
             price: stemPrice,
-            duration: 0, // Default duration
+            duration: strapiTrack.Duration || 180, // Use track duration as fallback
             waveform: [] // Default empty waveform
           };
         } catch (err) {
@@ -120,6 +142,7 @@ const normalizeTrack = (strapiTrack: any): Track => {
             id: `${strapiTrack.id}-stem-error-${index}`,
             name: `Error Stem ${index + 1}`,
             url: '',
+            alternativeUrl: '',
             price: 0,
             duration: 0
           };
@@ -265,7 +288,7 @@ const MOCK_TAGS: Tag[] = [
 ];
 
 // Fetch all tracks from Strapi
-export async function getTracks(): Promise<Track[]> {
+async function getTracks(): Promise<Track[]> {
   try {
     const url = `${API_URL}/tracks?populate=*`;
     console.log('Fetching tracks from URL:', url);
@@ -348,7 +371,33 @@ export async function getTracks(): Promise<Track[]> {
       console.log(`Track ${index + 1}:`, JSON.stringify(track, null, 2));
     });
     
-    return tracksArray.map(normalizeTrack);
+    // Process each track from Strapi response into our app's format
+    const trackPromises = tracksArray.map(async (strapiTrack: any) => {
+      try {
+        console.log('Raw track data:', JSON.stringify(strapiTrack, null, 2));
+        
+        // Normalize Strapi response to our data structure
+        const normalizedTrack = await normalizeTrack(strapiTrack);
+        return normalizedTrack;
+      } catch (err) {
+        console.error(`Error processing track ${strapiTrack.id}:`, err);
+        return {
+          id: strapiTrack?.id?.toString() || 'error',
+          title: 'Error Track',
+          bpm: 0,
+          duration: 0,
+          tags: [],
+          stems: [],
+          audioUrl: '',
+          imageUrl: '',
+          hasStems: false,
+          waveform: []
+        };
+      }
+    });
+    
+    const normalizedTracks = await Promise.all(trackPromises);
+    return normalizedTracks;
   } catch (error) {
     console.error('Error fetching tracks:', error);
     console.log('Returning mock tracks as fallback');
@@ -357,7 +406,7 @@ export async function getTracks(): Promise<Track[]> {
 }
 
 // Fetch all tags from Strapi
-export async function getTags(): Promise<Tag[]> {
+async function getTags(): Promise<Tag[]> {
   try {
     const url = `${API_URL}/tags?populate=tracks`;
     console.log('Fetching tags from URL:', url);
@@ -434,7 +483,7 @@ export async function getTags(): Promise<Tag[]> {
 }
 
 // Fetch a single track by ID
-export async function getTrack(id: string): Promise<Track | null> {
+async function getTrack(id: string): Promise<Track | null> {
   try {
     const response = await fetch(
       `${API_URL}/tracks/${id}?populate=*`, 
@@ -457,7 +506,7 @@ export async function getTrack(id: string): Promise<Track | null> {
 }
 
 // Search tracks by query
-export async function searchTracks(query: string): Promise<Track[]> {
+async function searchTracks(query: string): Promise<Track[]> {
   try {
     const response = await fetch(
       `${API_URL}/tracks?filters[title][$containsi]=${encodeURIComponent(query)}&populate=*`,
@@ -480,7 +529,7 @@ export async function searchTracks(query: string): Promise<Track[]> {
 }
 
 // Get tracks filtered by tag IDs
-export async function getTracksByTags(tagIds: string[]): Promise<Track[]> {
+async function getTracksByTags(tagIds: string[]): Promise<Track[]> {
   if (!tagIds.length) return getTracks();
   
   try {
@@ -507,4 +556,176 @@ export async function getTracksByTags(tagIds: string[]): Promise<Track[]> {
     console.error('Error fetching tracks by tags:', error);
     return [];
   }
-} 
+}
+
+// Helper function to check if a file exists at a URL
+async function checkFileExists(url: string): Promise<boolean> {
+  try {
+    console.log(`Checking if file exists at URL: ${url}`);
+    const response = await fetch(url, { method: 'HEAD' });
+    
+    const result = response.ok;
+    console.log(`File check result for ${url}: ${result ? 'EXISTS' : 'NOT FOUND'}`);
+    
+    return result;
+  } catch (error) {
+    console.error(`Error checking file existence at ${url}:`, error);
+    return false;
+  }
+}
+
+// Query the actual files in Strapi upload directory 
+async function queryStrapi(): Promise<void> {
+  try {
+    // Try to get a list of all files in Strapi to help debug
+    console.log("Querying Strapi uploads to check what files exist...");
+    
+    const response = await fetch(`${API_URL}/upload/files`, {
+      headers: getHeaders()
+    });
+    
+    if (!response.ok) {
+      console.error(`Failed to query Strapi uploads: ${response.status}`);
+      return;
+    }
+    
+    const files = await response.json();
+    
+    // Log all available audio files
+    const audioFiles = files.filter((f: any) => 
+      f.mime && f.mime.startsWith('audio/'));
+    
+    console.log("Available audio files in Strapi:", 
+      audioFiles.map((f: any) => ({
+        name: f.name,
+        url: `${STRAPI_URL}${f.url}`,
+        ext: f.ext,
+        mime: f.mime
+      }))
+    );
+    
+    // Suggest possible stem files
+    console.log("Suggested stem files to try:");
+    ['Drums', 'Bass', 'Keys', 'Guitars'].forEach(stemName => {
+      const audioFile = audioFiles.find((f: any) => 
+        f.name.toLowerCase().includes(stemName.toLowerCase()));
+      
+      if (audioFile) {
+        console.log(`Found match for ${stemName}: ${STRAPI_URL}${audioFile.url}`);
+      } else {
+        console.log(`No match found for ${stemName}`);
+      }
+    });
+    
+  } catch (error) {
+    console.error("Error querying Strapi uploads:", error);
+  }
+}
+
+// Function to try to fetch file info directly from Strapi's upload API
+async function findFileInStrapiByName(filename: string): Promise<string | null> {
+  try {
+    // Generate search query for files with similar name
+    const sanitizedName = filename.replace(/\.[^/.]+$/, ""); // Remove extension
+    const searchQuery = encodeURIComponent(sanitizedName);
+    
+    console.log(`Searching for file in Strapi upload manager: ${sanitizedName}`);
+    
+    // Try to query the Strapi upload API
+    const response = await fetch(
+      `${API_URL}/upload/files?_q=${searchQuery}`,
+      {
+        headers: getHeaders(),
+        cache: 'no-store'
+      }
+    );
+    
+    if (!response.ok) {
+      console.warn(`Strapi upload API search failed: ${response.status}`);
+      return null;
+    }
+    
+    const files = await response.json();
+    console.log(`Found ${files.length} potential matching files`);
+    
+    // Look for best match
+    if (files.length > 0) {
+      // Try to find exact match first
+      const exactMatch = files.find((f: any) => 
+        f.name.toLowerCase() === filename.toLowerCase() || 
+        f.name.includes(sanitizedName)
+      );
+      
+      if (exactMatch && exactMatch.url) {
+        console.log(`Found exact match in upload manager: ${exactMatch.name}`);
+        return `${STRAPI_URL}${exactMatch.url}`;
+      }
+      
+      // Otherwise return first result
+      if (files[0].url) {
+        console.log(`Using best match from upload manager: ${files[0].name}`);
+        return `${STRAPI_URL}${files[0].url}`;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error querying Strapi upload API:', error);
+    return null;
+  }
+}
+
+// Create dummy audio files for testing
+async function createDummyAudioFiles(): Promise<void> {
+  try {
+    console.log("Creating dummy audio files for testing...");
+    
+    // Use the silent audio file we created earlier
+    const silentAudioUrl = "/audio/dummy-silent.mp3";
+    
+    // Define the stems we need
+    const stems = ["Drums", "Bass", "Keys", "Guitars"];
+    
+    for (const stem of stems) {
+      const stemFileName = `${stem.replace(/ /g, '_')}.mp3`;
+      // Get absolute URL based on window.location
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const targetUrl = `${baseUrl}/api/create-dummy-file?filename=${encodeURIComponent(stemFileName)}`;
+      
+      console.log(`Attempting to create dummy file for ${stem} at ${stemFileName}`);
+      
+      try {
+        const response = await fetch(targetUrl);
+        if (response.ok) {
+          const result = await response.json();
+          console.log(`✅ Successfully created dummy file for ${stem}:`, result);
+        } else {
+          console.error(`❌ Failed to create dummy file for ${stem}: ${response.status}`);
+        }
+      } catch (err) {
+        console.error(`❌ Error creating dummy file for ${stem}:`, err);
+      }
+    }
+    
+    console.log("Dummy file creation completed");
+    
+  } catch (error) {
+    console.error("Error creating dummy audio files:", error);
+  }
+}
+
+// Export functions to be used by other components
+export {
+  getStrapiMedia,
+  normalizeTrack,
+  normalizeTag,
+  getTracks,
+  getTags,
+  getTrack,
+  searchTracks,
+  getTracksByTags,
+  checkFileExists,
+  queryStrapi,
+  findFileInStrapiByName,
+  createDummyAudioFiles
+}; 

@@ -56,7 +56,7 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
             ref={inputRef}
             type="search"
             id="search"
-            className="block w-full py-3 pl-12 pr-4 text-base rounded-full bg-[#1E1E1E] border border-[#CDCDCD] text-white focus:outline-none focus:ring-1 focus:ring-[#1DF7CE]"
+            className="block w-full py-2 pl-12 pr-4 text-base rounded-full bg-[#1E1E1E] border border-[#CDCDCD] text-white focus:outline-none focus:ring-1 focus:ring-[#1DF7CE]"
             placeholder="Search Tracks..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
