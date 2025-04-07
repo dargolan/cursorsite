@@ -1646,7 +1646,7 @@ export default function AudioPlayer({
           {track.hasStems && (
             <button 
               onClick={() => setIsStemsOpen(!isStemsOpen)}
-              className="text-white hover:text-[#1E1E1E] transition-colors text-sm px-4 py-1.5 border-2 border-[#1DF7CE] rounded-full bg-transparent hover:bg-[#1DF7CE] focus:outline-none"
+              className="text-white hover:text-[#1DF7CE] transition-colors text-sm px-2 focus:outline-none flex items-center"
             >
               Stems
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
