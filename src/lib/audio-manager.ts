@@ -8,7 +8,6 @@ export const globalAudioManager = {
   play(audio: HTMLAudioElement, info?: { stemId?: string, trackId?: string }) {
     // Stop any currently playing audio
     if (this.activeAudio && this.activeAudio !== audio && !this.activeAudio.paused) {
-      console.log('Stopping previously playing audio');
       this.activeAudio.pause();
       
       // Reset currentTime if needed

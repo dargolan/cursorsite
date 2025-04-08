@@ -14,7 +14,6 @@ export function saveStemUrlToCache(trackTitle: string, stemName: string, url: st
       const cache = existingCache ? JSON.parse(existingCache) : {};
       cache[cacheKey] = url;
       localStorage.setItem('stemUrlCache', JSON.stringify(cache));
-      console.log(`Cached URL for ${stemName} (${trackTitle}) to localStorage`);
     }
   } catch (e) {
     console.warn('Failed to save to localStorage:', e);
@@ -29,7 +28,6 @@ export function initStemUrlCache() {
       if (storedCache) {
         const parsedCache = JSON.parse(storedCache);
         Object.assign(stemUrlCache, parsedCache);
-        console.log('Loaded stem URL cache from localStorage:', Object.keys(parsedCache).length, 'entries');
       }
     } catch (e) {
       console.warn('Failed to load from localStorage:', e);

@@ -48,15 +48,12 @@ export async function findStemFileUrl(stemName: string, trackTitle: string): Pro
     // First try to use the utility function from strapi.ts that was made for this purpose
     const strapiStemUrl = await findStemFile(stemName, trackTitle);
     if (strapiStemUrl) {
-      console.log(`✅ Found stem file via strapi.ts findStemFile: ${strapiStemUrl}`);
       return strapiStemUrl;
     }
     
     // If the utility function doesn't find it, fall back to our own implementation
     const basePattern = getConsistentStemUrl(stemName, trackTitle);
     const apiUrl = `${STRAPI_URL}/api/upload/files?filters[name][$contains]=${encodeURIComponent(basePattern)}`;
-    
-    console.log(`Searching for stem file with pattern: ${basePattern} via API: ${apiUrl}`);
     
     const response = await fetch(apiUrl);
     if (!response.ok) {
@@ -96,11 +93,9 @@ export async function findStemFileUrl(stemName: string, trackTitle: string): Pro
         ? `${STRAPI_URL}${bestMatch.url}` 
         : `${STRAPI_URL}/${bestMatch.url}`;
       
-      console.log(`✅ Found stem file: ${bestMatch.name} -> ${url}`);
       return url;
     }
     
-    console.log(`No files found matching pattern: ${basePattern}`);
     return null;
   } catch (error) {
     console.error(`Error searching for stem file: ${error}`);
@@ -140,7 +135,6 @@ export function getStemUrl(stemName: string, trackTitle: string): string {
   const placeholderHash = 'placeholder';
   const url = `${STRAPI_URL}/uploads/${normalizedStemName}_${normalizedTrackTitle}_${placeholderHash}.mp3`;
   
-  console.log(`Using pattern-based URL for ${stemName} (${trackTitle}): ${url}`);
   return url;
 }
 
@@ -158,9 +152,7 @@ export async function urlExists(url: string): Promise<boolean> {
 // Function to find the first valid URL from a list
 export async function findFirstValidUrl(urls: string[]): Promise<string | null> {
   for (const url of urls) {
-    console.log(`Checking if URL exists: ${url}`);
     if (await urlExists(url)) {
-      console.log(`✅ Found valid URL: ${url}`);
       return url;
     }
   }

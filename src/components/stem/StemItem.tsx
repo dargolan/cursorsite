@@ -53,7 +53,6 @@ export const StemItem = ({ stem, track, onAddToCart, isPlaying, isOpen }: StemIt
         // Try to find the stem file
         const stemUrl = await findStemFile(stem.name, track.title);
         if (!stemUrl) {
-          console.error(`Could not find URL for stem ${stem.name}`);
           setLoadError(true);
           setLoading(false);
           return;
@@ -90,14 +89,13 @@ export const StemItem = ({ stem, track, onAddToCart, isPlaying, isOpen }: StemIt
         });
 
         newAudio.addEventListener('error', () => {
-          console.error(`Error loading audio for stem ${stem.name}`);
           setLoadError(true);
           setLoading(false);
         });
 
         setAudio(newAudio);
       } catch (err) {
-        console.error(`Failed to create audio element for ${stem.name}:`, err);
+        console.error(`Failed to create audio element for ${stem.name}`);
         setLoadError(true);
         setLoading(false);
       }
