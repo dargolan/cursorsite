@@ -1,7 +1,13 @@
 import path from 'path';
 
-export default ({ env }) => {
-  const client = env('DATABASE_CLIENT', 'sqlite');
+interface StrapiEnv {
+  (key: string, defaultValue?: string): string;
+  bool(key: string, defaultValue?: boolean): boolean;
+  int(key: string, defaultValue?: number): number;
+}
+
+export default ({ env }: { env: StrapiEnv }) => {
+  const client = env('DATABASE_CLIENT', 'sqlite') as 'sqlite' | 'mysql' | 'postgres';
 
   const connections = {
     mysql: {

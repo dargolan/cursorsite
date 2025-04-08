@@ -647,30 +647,52 @@ async function queryStrapi(): Promise<void> {
 // Function to try to fetch file info directly from Strapi's upload API
 async function findFileInStrapiByName(filename: string): Promise<string | null> {
   try {
-    // Use the API to search for files
-    const apiUrl = `${STRAPI_URL}/api/upload/files?filters[name][$contains]=${encodeURIComponent(filename)}`;
-    console.log(`Searching for file in Strapi: ${filename}`);
+    // Generate search query for files with similar name
+    const sanitizedName = filename.replace(/\.[^/.]+$/, ""); // Remove extension
+    const searchQuery = encodeURIComponent(sanitizedName);
     
-    const response = await fetch(apiUrl);
+    console.log(`Searching for file in Strapi upload manager: ${sanitizedName}`);
+    
+    // Try to query the Strapi upload API
+    const response = await fetch(
+      `${API_URL}/upload/files?_q=${searchQuery}`,
+      {
+        headers: getHeaders(),
+        cache: 'no-store'
+      }
+    );
+    
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
+      console.warn(`Strapi upload API search failed: ${response.status}`);
+      return null;
     }
     
     const files = await response.json();
-    if (files && files.length > 0) {
-      // Get the URL from the first matching file
-      const url = files[0].url.startsWith('/') 
-        ? `${STRAPI_URL}${files[0].url}` 
-        : `${STRAPI_URL}/${files[0].url}`;
+    console.log(`Found ${files.length} potential matching files`);
+    
+    // Look for best match
+    if (files.length > 0) {
+      // Try to find exact match first
+      const exactMatch = files.find((f: any) => 
+        f.name.toLowerCase() === filename.toLowerCase() || 
+        f.name.includes(sanitizedName)
+      );
       
-      console.log(`Found file: ${filename} -> ${url}`);
-      return url;
+      if (exactMatch && exactMatch.url) {
+        console.log(`Found exact match in upload manager: ${exactMatch.name}`);
+        return `${STRAPI_URL}${exactMatch.url}`;
+      }
+      
+      // Otherwise return first result
+      if (files[0].url) {
+        console.log(`Using best match from upload manager: ${files[0].name}`);
+        return `${STRAPI_URL}${files[0].url}`;
+      }
     }
     
-    console.log(`No file found with name: ${filename}`);
     return null;
   } catch (error) {
-    console.error(`Error searching for file "${filename}":`, error);
+    console.error('Error querying Strapi upload API:', error);
     return null;
   }
 }
@@ -718,10 +740,11 @@ export async function findStemFile(stemName: string, trackTitle: string): Promis
     const cleanStemName = stemName.replace(/ /g, '_');
     const cleanTrackTitle = trackTitle.replace(/ /g, '_');
     
-    // Build URL patterns to try (based on the file naming patterns we observed)
+    // Build URL patterns to try
     const patterns = [
-      `${cleanStemName}_${cleanTrackTitle}`, // Example: Drums_Elevator_music
-      `${cleanStemName}`,                    // Example: Drums
+      `${cleanStemName}_${cleanTrackTitle}`, // Stem_Track pattern
+      `${cleanTrackTitle}_${cleanStemName}`, // Track_Stem pattern
+      cleanStemName // Just the stem name
     ];
     
     console.log('Attempting to find stem file with patterns:', patterns);
@@ -776,5 +799,5 @@ export {
   queryStrapi,
   findFileInStrapiByName,
   createDummyAudioFiles,
-  STRAPI_URL
+  findStemFile
 }; 

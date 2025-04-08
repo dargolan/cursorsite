@@ -274,7 +274,7 @@ export default function MusicLibrary() {
   // Display loading state or no results message
   const renderContent = () => {
     if (loading) {
-      return (
+  return (
         <div className="flex flex-col items-center justify-center h-64">
           <div className="w-12 h-12 border-4 border-[#1DF7CE] border-t-transparent rounded-full animate-spin mb-4"></div>
           <p className="text-gray-400">Loading tracks...</p>
@@ -341,8 +341,8 @@ export default function MusicLibrary() {
               setOpenStemsTrackId={setOpenStemsTrackId}
             />
           </div>
-        ))}
-      </div>
+            ))}
+          </div>
     );
   };
 
@@ -393,9 +393,9 @@ export default function MusicLibrary() {
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
+              </svg>
+            </button>
+          </div>
                   )}
                   
                   <button 
@@ -409,8 +409,8 @@ export default function MusicLibrary() {
                   </button>
                 </div>
               )}
-            </div>
-            
+              </div>
+              
             {/* Tracks list */}
             {renderContent()}
             </div>

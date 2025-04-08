@@ -711,57 +711,6 @@ async function createDummyAudioFiles(): Promise<void> {
   }
 }
 
-// Export a utility function to help find stem files
-export async function findStemFile(stemName: string, trackTitle: string): Promise<string | null> {
-  try {
-    // Clean up names for filename matching
-    const cleanStemName = stemName.replace(/ /g, '_');
-    const cleanTrackTitle = trackTitle.replace(/ /g, '_');
-    
-    // Build URL patterns to try (based on the file naming patterns we observed)
-    const patterns = [
-      `${cleanStemName}_${cleanTrackTitle}`, // Example: Drums_Elevator_music
-      `${cleanStemName}`,                    // Example: Drums
-    ];
-    
-    console.log('Attempting to find stem file with patterns:', patterns);
-    
-    // Try to find the file on the server
-    const apiUrl = `${STRAPI_URL}/api/upload/files`;
-    const response = await fetch(apiUrl);
-    
-    if (!response.ok) {
-      throw new Error(`Error fetching files: ${response.status}`);
-    }
-    
-    const files = await response.json();
-    console.log(`Found ${files.length} total files on server`);
-    
-    // Filter to just MP3 files
-    const audioFiles = files.filter((f: any) => f.mime === 'audio/mpeg');
-    console.log(`Found ${audioFiles.length} audio files`);
-    
-    // Try to find a match using our patterns
-    for (const pattern of patterns) {
-      const match = audioFiles.find((f: any) => 
-        f.name.includes(pattern) || f.hash.includes(pattern.toLowerCase())
-      );
-      
-      if (match) {
-        const url = `${STRAPI_URL}${match.url}`;
-        console.log(`Found matching file for ${stemName} in ${trackTitle}: ${url}`);
-        return url;
-      }
-    }
-    
-    console.log(`No matching file found for ${stemName} in ${trackTitle}`);
-    return null;
-  } catch (error) {
-    console.error('Error finding stem file:', error);
-    return null;
-  }
-}
-
 // Export functions to be used by other components
 export {
   getStrapiMedia,
@@ -775,6 +724,5 @@ export {
   checkFileExists,
   queryStrapi,
   findFileInStrapiByName,
-  createDummyAudioFiles,
-  STRAPI_URL
+  createDummyAudioFiles
 }; 

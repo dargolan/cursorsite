@@ -1,4 +1,9 @@
-export default ({ env }) => ({
+interface StrapiEnv {
+  (key: string): string;
+  bool(key: string, defaultValue?: boolean): boolean;
+}
+
+export default ({ env }: { env: StrapiEnv }) => ({
   auth: {
     secret: env('ADMIN_JWT_SECRET'),
   },

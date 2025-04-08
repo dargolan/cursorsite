@@ -3,10 +3,8 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Tag, Stem, Track, CartItem } from '../types';
-import { findFileInStrapiByName } from '../services/strapi';
-
-// Import STRAPI_URL from the strapi service
-const STRAPI_URL = process.env.NEXT_PUBLIC_STRAPI_MEDIA_URL || 'http://localhost:1337';
+import { findFileInStrapiByName, STRAPI_URL } from '../services/strapi';
+import { findStemFile } from '../services/strapi';
 
 // Global audio manager to ensure only one audio source plays at a time
 const globalAudioManager = {
@@ -512,13 +510,21 @@ function getConsistentStemUrl(stemName: string, trackTitle: string): string {
 // Function to search for a stem file through the Strapi API
 async function findStemFileUrl(stemName: string, trackTitle: string): Promise<string | null> {
   try {
+    // First try to use the utility function from strapi.ts that was made for this purpose
+    const strapiStemUrl = await findStemFile(stemName, trackTitle);
+    if (strapiStemUrl) {
+      console.log(`✅ Found stem file via strapi.ts findStemFile: ${strapiStemUrl}`);
+      return strapiStemUrl;
+    }
+    
+    // If the utility function doesn't find it, fall back to our own implementation
     const basePattern = getConsistentStemUrl(stemName, trackTitle);
     const apiUrl = `${STRAPI_URL}/api/upload/files?filters[name][$contains]=${encodeURIComponent(basePattern)}`;
     
     console.log(`Searching for stem file with pattern: ${basePattern} via API: ${apiUrl}`);
     
     const response = await fetch(apiUrl);
-        if (!response.ok) {
+    if (!response.ok) {
       throw new Error(`API request failed: ${response.status}`);
     }
     
@@ -1687,7 +1693,7 @@ export default function AudioPlayer({
         {/* Action buttons - fixed width with text instead of icons */}
         <div className="flex items-center justify-end space-x-3 flex-shrink-0">
           {track.hasStems && (
-            <button 
+        <button 
               onClick={() => setOpenStemsTrackId(isStemsOpen ? null : track.id)}
               className="ml-10 text-white hover:text-[#1DF7CE] px-3 py-1 text-sm flex items-center transition-colors"
             >
