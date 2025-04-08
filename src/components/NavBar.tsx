@@ -1,4 +1,4 @@
-<nav className="bg-[#232323] p-4 flex justify-between items-center sticky top-0 z-50 shadow-md">
+<nav className="bg-[#232323] p-4 flex justify-between items-center z-50">
   <div className="flex items-center space-x-8">
     <div className="text-white font-bold text-xl">CURSOR BEATS</div>
     

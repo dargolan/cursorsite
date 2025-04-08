@@ -644,6 +644,8 @@ interface AudioPlayerProps {
   onAddToCart: (stem: Stem, track: Track) => void;
   onTagClick: (tag: Tag) => void;
   onRemoveFromCart: (itemId: string) => void;
+  openStemsTrackId: string | null;
+  setOpenStemsTrackId: (id: string | null) => void;
 }
 
 // Function to check if a URL exists (returns 200 OK)
@@ -728,7 +730,9 @@ export default function AudioPlayer({
   onStop,
   onAddToCart,
   onTagClick,
-  onRemoveFromCart
+  onRemoveFromCart,
+  openStemsTrackId,
+  setOpenStemsTrackId
 }: AudioPlayerProps): React.ReactElement {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -736,7 +740,6 @@ export default function AudioPlayer({
   
   const [currentTime, setCurrentTime] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
-  const [isStemsOpen, setIsStemsOpen] = useState(false);
   const [stemAddedToCart, setStemAddedToCart] = useState<Record<string, boolean>>({});
   const [progress, setProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -750,6 +753,9 @@ export default function AudioPlayer({
   const [stemLoading, setStemLoading] = useState<Record<string, boolean>>({});
   const [progressIntervals, setProgressIntervals] = useState<Record<string, number>>({});
   const [showToast, setShowToast] = useState<{stemId: string, stemName: string, price: number, action: 'add' | 'remove'} | null>(null);
+  
+  // Calculate if stems should be open for this track
+  const isStemsOpen = openStemsTrackId === track.id;
   
   // Group tags by type for display, filtering out Instrument tags
   const tagsByType = track.tags.reduce<Record<string, Tag[]>>((acc, tag) => {
@@ -1202,10 +1208,10 @@ export default function AudioPlayer({
       action: 'add'
     });
     
-    // Hide toast after 3 seconds
+    // Hide toast after 4 seconds
     setTimeout(() => {
       setShowToast(null);
-    }, 3000);
+    }, 4000);
     
     setStemAddedToCart(prev => ({ ...prev, [stem.id]: true }));
     onAddToCart(stem, track);
@@ -1220,10 +1226,10 @@ export default function AudioPlayer({
       action: 'remove'
     });
     
-    // Hide toast after 3 seconds
+    // Hide toast after 4 seconds
     setTimeout(() => {
       setShowToast(null);
-    }, 3000);
+    }, 4000);
     
     setStemAddedToCart(prev => ({ ...prev, [stem.id]: false }));
     if (onRemoveFromCart) {
@@ -1517,6 +1523,45 @@ export default function AudioPlayer({
     };
   }, [progressIntervals]);
 
+  // Effect to stop playing stems when the stems dropdown is closed or another track's stems are opened
+  useEffect(() => {
+    // If this track's stems are closed or another track's stems are opened
+    if (!isStemsOpen && Object.values(playingStems).some(isPlaying => isPlaying)) {
+      // Stop all playing stems
+      Object.keys(playingStems).forEach(stemId => {
+        if (playingStems[stemId]) {
+          // Stop the stem audio
+          if (stemAudio[stemId]) {
+            stemAudio[stemId].pause();
+            stemAudio[stemId].currentTime = 0;
+          }
+          
+          // Update playing state
+          setPlayingStems(prev => ({
+            ...prev,
+            [stemId]: false
+          }));
+          
+          // Reset progress
+          setStemProgress(prev => ({
+            ...prev,
+            [stemId]: 0
+          }));
+          
+          // Clear any intervals
+          if (progressIntervals[stemId]) {
+            window.clearInterval(progressIntervals[stemId]);
+            setProgressIntervals(prev => {
+              const newIntervals = {...prev};
+              delete newIntervals[stemId];
+              return newIntervals;
+            });
+          }
+        }
+      });
+    }
+  }, [isStemsOpen, openStemsTrackId]);
+
   return (
     <div 
       className={`relative border-b border-[#1A1A1A] ${isHovering || isInteracting || isStemsOpen ? 'bg-[#232323]' : 'bg-[#121212]'}`}
@@ -1568,11 +1613,9 @@ export default function AudioPlayer({
         </div>
         
         {/* Title and BPM area - centered vertically and aligned as a group */}
-        <div className="w-32 mr-6 flex-shrink-0 flex flex-col justify-center">
-          <h3 className="font-bold text-[15px] text-white break-words leading-tight">{track.title}</h3>
-          <div className="mt-0"> {/* Reduced from mt-0.5 to mt-0 to make space smaller */}
-            <span className="text-[12.5px] font-normal text-[#999999]">{track.bpm} BPM</span>
-          </div>
+        <div className="w-32 mr-6 flex-shrink-0">
+          <h3 className="font-bold text-[15px] text-white break-words leading-tight mb-0 line-clamp-2">{track.title}</h3>
+          <span className="text-[12.5px] font-normal text-[#999999] block">{track.bpm} BPM</span>
         </div>
         
         {/* Tags area - fixed width, filtered to only show Genre and Mood tags */}
@@ -1596,9 +1639,9 @@ export default function AudioPlayer({
                 </React.Fragment>
               ))
             ))}
-          </div>
         </div>
-        
+      </div>
+      
         {/* Similar Tracks button - positioned more centrally */}
         <button className="text-white hover:text-[#1DF7CE] transition-colors mx-4 flex-shrink-0">
           <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>
@@ -1645,12 +1688,21 @@ export default function AudioPlayer({
         <div className="flex items-center justify-end space-x-3 flex-shrink-0">
           {track.hasStems && (
             <button 
-              onClick={() => setIsStemsOpen(!isStemsOpen)}
-              className="text-white hover:text-[#1DF7CE] transition-colors text-sm px-2 focus:outline-none flex items-center"
+              onClick={() => setOpenStemsTrackId(isStemsOpen ? null : track.id)}
+              className="ml-10 text-white hover:text-[#1DF7CE] px-3 py-1 text-sm flex items-center transition-colors"
             >
-              Stems
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points={isStemsOpen ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}></polyline>
+              <span>Stems</span>
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                className={`h-4 w-4 ml-1 transition-transform ${isStemsOpen ? 'transform rotate-180' : ''}`} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
             </button>
           )}
@@ -1672,10 +1724,9 @@ export default function AudioPlayer({
       {/* Stems dropdown - modify this if needed */}
       {isStemsOpen && track.stems && (
         <div className="bg-[#232323] rounded-b p-4 pt-2">
-          <div className="flex justify-between items-center mb-3">
-            <h4 className="text-[#1DF7CE] font-bold text-[15px]">Stems</h4>
+          <div className="flex justify-end items-center mb-3">
             <button 
-              onClick={() => setIsStemsOpen(false)}
+              onClick={() => setOpenStemsTrackId(null)}
               className="text-white hover:text-[#1DF7CE]"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1688,10 +1739,10 @@ export default function AudioPlayer({
             {track.stems.map(stem => (
               <div 
                 key={stem.id} 
-                className="border border-[#3C3C3C] rounded p-3 flex items-center"
+                className="rounded p-3 flex items-center hover:bg-[#2A2A2A] transition-colors"
               >
-                <div className="w-24 mr-3">
-                  <p className="font-bold text-xs text-white truncate">{stem.name}</p>
+                <div className="w-14 mr-2">
+                  <p className="font-bold text-xs text-white break-words leading-tight">{stem.name}</p>
                 </div>
                 
                 <button 
@@ -1699,7 +1750,7 @@ export default function AudioPlayer({
                   className={`w-8 h-8 flex items-center justify-center ${
                     stemLoadErrors[stem.id] ? 'text-amber-500' : 
                     stemLoading[stem.id] ? 'text-gray-400' : 'text-white'
-                  } hover:text-[#1DF7CE] mr-3`}
+                  } hover:text-[#1DF7CE] mr-2`}
                   disabled={false}
                   title={
                     stemLoadErrors[stem.id] ? "Audio unavailable - Click to simulate playback" : 
@@ -1709,14 +1760,14 @@ export default function AudioPlayer({
                 >
                   {stemLoadErrors[stem.id] ? (
                     playingStems[stem.id] ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="6" y="4" width="4" height="16" stroke="none" fill="currentColor" />
-                        <rect x="14" y="4" width="4" height="16" stroke="none" fill="currentColor" />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24">
+                        <rect x="6" y="4" width="4" height="16" fill="currentColor" />
+                        <rect x="14" y="4" width="4" height="16" fill="currentColor" />
                         <circle cx="20" cy="4" r="2" fill="currentColor" />
             </svg>
           ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24">
+                        <polygon points="5 3 19 12 5 21 5 3" fill="currentColor"></polygon>
                         <circle cx="19" cy="5" r="2" fill="currentColor" />
                       </svg>
                     )
@@ -1726,19 +1777,42 @@ export default function AudioPlayer({
                       <path d="M12 2C6.5 2 2 6.5 2 12"></path>
                     </svg>
                   ) : playingStems[stem.id] ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="6" y="4" width="4" height="16" stroke="none" fill="currentColor" />
-                      <rect x="14" y="4" width="4" height="16" stroke="none" fill="currentColor" />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24">
+                      <rect x="6" y="4" width="4" height="16" fill="currentColor" />
+                      <rect x="14" y="4" width="4" height="16" fill="currentColor" />
                     </svg>
                   ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                    </svg>
-                  )}
-                </button>
-                
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24">
+                      <polygon points="5 3 19 12 5 21 5 3" fill="currentColor"></polygon>
+            </svg>
+          )}
+        </button>
+        
                 {/* Progress bar for stems */}
-                <div className="flex-grow h-4 bg-[#3A3A3A] rounded mx-2 relative">
+                <div 
+                  className="flex-grow h-4 relative mx-1 flex items-center"
+                  style={{ maxWidth: "calc(62% - 50px)" }}
+                  onClick={(e) => {
+                    if (stemLoadErrors[stem.id]) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const percentage = clickX / rect.width;
+                    const newTime = percentage * stem.duration;
+                    
+                    if (stemAudio[stem.id]) {
+                      stemAudio[stem.id].currentTime = newTime;
+                      setStemProgress(prev => ({...prev, [stem.id]: percentage * 100}));
+                      
+                      if (!playingStems[stem.id]) {
+                        // Start playing if not already
+                        handleStemPlayPause(stem.id);
+                      }
+                    }
+                  }}
+                >
+                  {/* Gray track background */}
+                  <div className="w-full h-[8px] bg-[#3A3A3A] rounded-full cursor-pointer" />
+                  
                   {stemLoadErrors[stem.id] ? (
                     <>
                       <div className="absolute inset-0 flex items-center justify-center text-xs text-red-400">
@@ -1746,50 +1820,98 @@ export default function AudioPlayer({
                       </div>
                       {playingStems[stem.id] && (
                         <div 
-                          className="absolute top-0 left-0 h-4 rounded bg-amber-500/30"
-                          style={{ width: `${stemProgress[stem.id] || 0}%` }}
+                          className="absolute top-1/2 h-[8px] rounded-full bg-amber-500/30 transform -translate-y-1/2"
+                          style={{ width: `${stemProgress[stem.id] || 0}%`, left: 0 }}
                         />
                       )}
                     </>
                   ) : (
-                    <div 
-                      className={`absolute top-0 left-0 h-4 rounded ${playingStems[stem.id] ? 'bg-[#1DF7CE]' : 'bg-[#555555]'}`}
-                      style={{ width: `${stemProgress[stem.id] || 0}%` }}
-                    />
+                    <>
+                      {/* Teal progress fill */}
+                      <div 
+                        className={`absolute top-1/2 h-[8px] rounded-full ${playingStems[stem.id] ? 'bg-[#1DF7CE]' : 'bg-[#555555]'} transform -translate-y-1/2`}
+                        style={{ width: `${stemProgress[stem.id] || 0}%`, left: 0, zIndex: 2 }}
+                      />
+                      
+                      {/* Teal dot at the edge of progress */}
+                      <div 
+                        className={`absolute w-3.5 h-3.5 rounded-full ${playingStems[stem.id] ? 'bg-[#1DF7CE]' : 'bg-[#555555]'} cursor-pointer`}
+                        style={{ 
+                          left: `${stemProgress[stem.id] || 0}%`, 
+                          top: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          zIndex: 3
+                        }}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          
+                          // Get the parent progress bar element reference
+                          const progressBarEl = e.currentTarget.closest('.flex-grow');
+                          if (!progressBarEl) return;
+                          
+                          // Create a function for handling the drag
+                          const handleDrag = (moveEvent: MouseEvent) => {
+                            const rect = progressBarEl.getBoundingClientRect();
+                            if (!rect) return;
+                            
+                            const posX = moveEvent.clientX - rect.left;
+                            const percentage = Math.max(0, Math.min(1, posX / rect.width));
+                            const newTime = percentage * stem.duration;
+                            
+                            if (stemAudio[stem.id]) {
+                              stemAudio[stem.id].currentTime = newTime;
+                              setStemProgress(prev => ({...prev, [stem.id]: percentage * 100}));
+                              
+                              if (!playingStems[stem.id]) {
+                                // Start playing if not already
+                                handleStemPlayPause(stem.id);
+                              }
+                            }
+                          };
+                          
+                          // Function to remove event listeners when done
+                          const handleDragEnd = () => {
+                            document.removeEventListener('mousemove', handleDrag);
+                            document.removeEventListener('mouseup', handleDragEnd);
+                          };
+                          
+                          // Add event listeners for drag and release
+                          document.addEventListener('mousemove', handleDrag);
+                          document.addEventListener('mouseup', handleDragEnd);
+                        }}
+                      />
+                    </>
                   )}
                 </div>
                 
-                <div className="w-16 text-white text-xs font-normal text-right mr-3">
-                  {formatTime(stem.duration)}
+                <div className="w-20 text-white text-xs font-normal text-center mx-1">
+                  {formatTime(stemProgress[stem.id] ? (stem.duration * stemProgress[stem.id] / 100) : 0)} / {formatTime(stem.duration)}
                 </div>
                 
-                <div className="flex flex-col items-center">
-                  {/* New add/remove button design with + or Cart with X */}
+                <div className="flex flex-col items-center ml-1">
+                  {/* New add/remove button design with Material Design cart icons */}
                   {stemAddedToCart[stem.id] ? (
         <button 
                       onClick={() => handleStemRemoveFromCart(stem)}
-                      className="w-8 h-8 rounded-full flex items-center justify-center border-2 border-red-500 text-red-500 hover:bg-red-500/10 transition-colors"
+                      className="w-8 h-8 flex items-center justify-center text-red-500 hover:text-red-700 transition-colors"
                       title="Remove from cart"
                     >
-                      {/* Cart with X icon */}
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="8" cy="21" r="1" />
-                        <circle cx="19" cy="21" r="1" />
-                        <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
-                        <line x1="15" y1="8" x2="9" y2="14" />
-                        <line x1="9" y1="8" x2="15" y2="14" />
-            </svg>
-        </button>
+                      {/* Material Design remove shopping cart icon */}
+                      <span className="material-symbols-outlined text-[20px]">
+                        remove_shopping_cart
+                      </span>
+                    </button>
                   ) : (
                     <button 
                       onClick={() => handleStemAddToCart(stem)}
-                      className="w-8 h-8 rounded-full flex items-center justify-center border-2 border-[#1DF7CE] text-[#1DF7CE] hover:bg-[#1DF7CE]/10 transition-colors"
+                      className="w-8 h-8 flex items-center justify-center text-[#1DF7CE] hover:text-[#19b8a3] transition-colors"
                       title="Add to cart"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
+                      {/* Material Design add shopping cart icon */}
+                      <span className="material-symbols-outlined text-[20px]">
+                        add_shopping_cart
+                      </span>
         </button>
                   )}
                   <span className="mt-1 text-xs text-[#999999]">€{stem.price}</span>
@@ -1799,16 +1921,14 @@ export default function AudioPlayer({
           </div>
           
           {/* Buy all stems button */}
-          <div className="flex justify-between items-center mt-4">
-            <div>
-              <p className="text-xs text-[#999999]">Buy all stems:</p>
-              <p className="text-[#1DF7CE] font-bold">€{discountedStemsPrice} <span className="line-through text-[#999999] text-xs font-normal">€{totalStemsPrice}</span></p>
-            </div>
+          <div className="flex justify-end items-center mt-4">
             <button
               onClick={handleDownloadAllStems}
-              className="bg-[#1DF7CE] hover:bg-[#19d9b6] text-[#1E1E1E] px-4 py-2 rounded text-sm font-bold transition-colors"
+              className="bg-[#1DF7CE] hover:bg-[#19d9b6] text-[#1E1E1E] px-4 py-2 rounded-full font-medium transition-colors"
             >
-              Add to Cart
+              <span className="text-sm">€{discountedStemsPrice}</span>
+              <span className="text-xs mx-2 text-black/50 line-through">€{totalStemsPrice}</span>
+              <span className="font-medium">Buy All Stems</span>
         </button>
       </div>
         </div>
@@ -1820,7 +1940,7 @@ export default function AudioPlayer({
           {showToast.action === 'add' ? (
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#1DF7CE] mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 12l5 5l10 -10"></path>
-            </svg>
+          </svg>
           ) : (
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="8" cy="21" r="1" />
@@ -1843,8 +1963,8 @@ export default function AudioPlayer({
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
-          </button>
-        </div>
+        </button>
+      </div>
       )}
     </div>
   );

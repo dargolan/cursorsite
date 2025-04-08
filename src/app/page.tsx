@@ -9,9 +9,12 @@ import Header from '../components/Header';
 import Image from 'next/image';
 import { getTracks, getTags, getTracksByTags, searchTracks } from '../services/strapi';
 import { getCart, addToCart, removeFromCart, getCartTotal } from '../services/cart';
+import AudioPlayer from '../components/AudioPlayer';
+import Footer from '../components/Footer';
+import { useDebounce } from '../hooks/useDebounce';
 
 // Lazy load the AudioPlayer component to improve performance
-const AudioPlayer = dynamic(() => import('../components/AudioPlayer'), {
+const AudioPlayerComponent = dynamic(() => import('../components/AudioPlayer'), {
   loading: () => <div className="h-24 bg-[#1E1E1E] animate-pulse rounded"></div>,
   ssr: false, // This component uses browser APIs like wavesurfer
 });
@@ -21,6 +24,7 @@ export default function MusicLibrary() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Add a ref to track if we've already fetched data to prevent double fetching
   const dataFetchedRef = useRef(false);
@@ -42,6 +46,9 @@ export default function MusicLibrary() {
   const [genres, setGenres] = useState<Tag[]>([]);
   const [moods, setMoods] = useState<Tag[]>([]);
   const [instruments, setInstruments] = useState<Tag[]>([]);
+
+  // Global state to track which track's stems are open (can only be one at a time)
+  const [openStemsTrackId, setOpenStemsTrackId] = useState<string | null>(null);
 
   // Define fetchData function for reuse
   const fetchData = async () => {
@@ -319,16 +326,19 @@ export default function MusicLibrary() {
 
     return (
       <div className="flex flex-col w-full">
+        {/* Track row */}
         {filteredTracks.map(track => (
-          <div key={track.id} className="relative w-full">
-            <AudioPlayer
-              track={track}
+          <div key={track.id} className="mb-0">
+            <AudioPlayerComponent 
+              track={track} 
               isPlaying={playingTrackId === track.id}
               onPlay={() => setPlayingTrackId(track.id)}
               onStop={() => setPlayingTrackId(null)}
               onAddToCart={handleAddToCart}
               onTagClick={handleTagClick}
               onRemoveFromCart={handleRemoveFromCart}
+              openStemsTrackId={openStemsTrackId}
+              setOpenStemsTrackId={setOpenStemsTrackId}
             />
           </div>
         ))}
@@ -362,7 +372,7 @@ export default function MusicLibrary() {
             {/* Fixed height container for selected tags */}
             <div className="h-[40px] mb-4">
               {/* Selected tags display with clear button */}
-              {selectedTags.length > 0 && (
+              {(selectedTags.length > 0 || searchQuery) && (
                 <div className="flex flex-wrap items-center gap-2">
                   {selectedTags.map(tag => (
                     <TagFilter
@@ -370,23 +380,43 @@ export default function MusicLibrary() {
                       tag={tag} 
                       selected={true} 
                       onClick={() => handleTagToggle(tag)}
-                        />
-                      ))}
+                    />
+                  ))}
+                  
+                  {/* Display search query as a tag-like filter */}
+                  {searchQuery && (
+                    <div className="flex items-center space-x-1 text-xs font-normal px-3 py-1 rounded-full bg-[#303030] text-[#1DF7CE] border border-[#1DF7CE]">
+                      <span>Search: {searchQuery}</span>
+                      <button 
+                        onClick={() => setSearchQuery('')}
+                        className="ml-1 text-[#1DF7CE] hover:text-white"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                  
                   <button 
-                    onClick={handleClearTags}
+                    onClick={() => {
+                      handleClearTags();
+                      setSearchQuery('');
+                    }}
                     className="text-sm text-white bg-transparent hover:text-[#1DF7CE] transition-colors ml-2 flex items-center"
                   >
                     Clear All <span className="ml-1">×</span>
                   </button>
                 </div>
               )}
-              </div>
-              
+            </div>
+            
             {/* Tracks list */}
             {renderContent()}
             </div>
         </div>
       </main>
+      <Footer />
     </div>
   );
 } 

@@ -59,7 +59,7 @@ export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart
               <li>
                 <Link 
                   href="/sound-effects" 
-                  className="text-[#CDCDCD] hover:text-[#1DF7CE] transition-colors font-normal"
+                  className="text-[#999999] hover:text-[#1DF7CE] transition-colors font-normal"
                 >
                   Sound Effects
                 </Link>
@@ -67,7 +67,7 @@ export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart
               <li>
                 <Link 
                   href="/video" 
-                  className="text-[#CDCDCD] hover:text-[#1DF7CE] transition-colors font-normal"
+                  className="text-[#999999] hover:text-[#1DF7CE] transition-colors font-normal"
                 >
                   Video
                 </Link>
@@ -75,7 +75,7 @@ export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart
               <li>
                 <Link 
                   href="/about" 
-                  className="text-[#CDCDCD] hover:text-[#1DF7CE] transition-colors font-normal"
+                  className="text-[#999999] hover:text-[#1DF7CE] transition-colors font-normal"
                 >
                   About
                 </Link>
@@ -83,7 +83,7 @@ export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart
               <li>
                 <Link 
                   href="/contact"
-                  className="text-[#CDCDCD] hover:text-[#1DF7CE] transition-colors font-normal"
+                  className="text-[#999999] hover:text-[#1DF7CE] transition-colors font-normal"
                 >
                   Contact
                 </Link>
@@ -95,7 +95,7 @@ export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart
           <div className="flex items-center space-x-6 absolute right-[55px] top-1/2 transform -translate-y-1/2">
             <Link 
               href="/signin"
-              className="text-[#CDCDCD] hover:text-[#1DF7CE] transition-colors font-normal hidden md:block" 
+              className="text-[#999999] hover:text-[#1DF7CE] transition-colors font-normal hidden md:block" 
             >
               Sign In
             </Link>

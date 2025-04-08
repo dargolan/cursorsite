@@ -264,18 +264,39 @@ const normalizeTag = (strapiTag: any): Tag => {
 const MOCK_TRACKS: Track[] = [
   {
     id: 'mock-1',
-    title: 'Demo Track (API Unavailable)',
+    title: 'Demo Beat 1',
     bpm: 128,
     tags: [
       { id: 'mock-tag-1', name: 'House', type: 'genre' },
       { id: 'mock-tag-2', name: 'Energetic', type: 'mood' },
     ],
     duration: 180,
-    imageUrl: 'https://placehold.co/600x400?text=Demo+Track',
-    audioUrl: '',  // No audio for mock data
+    imageUrl: 'https://picsum.photos/id/65/200',
+    audioUrl: 'https://soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
     waveform: Array(100).fill(0).map(() => Math.random() * 0.8 + 0.2),
-    hasStems: false,
-    stems: [],
+    hasStems: true,
+    stems: [
+      { id: 'mock-stem-1', name: 'Drums', url: 'https://soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', price: 19.99, duration: 180 },
+      { id: 'mock-stem-2', name: 'Bass', url: 'https://soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', price: 14.99, duration: 180 }
+    ],
+  },
+  {
+    id: 'mock-2',
+    title: 'Chillout Demo',
+    bpm: 95,
+    tags: [
+      { id: 'mock-tag-3', name: 'Electronic', type: 'genre' },
+      { id: 'mock-tag-4', name: 'Chill', type: 'mood' },
+    ],
+    duration: 210,
+    imageUrl: 'https://picsum.photos/id/68/200',
+    audioUrl: 'https://soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+    waveform: Array(100).fill(0).map(() => Math.random() * 0.8 + 0.2),
+    hasStems: true,
+    stems: [
+      { id: 'mock-stem-3', name: 'Synth', url: 'https://soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3', price: 19.99, duration: 210 },
+      { id: 'mock-stem-4', name: 'Pad', url: 'https://soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3', price: 14.99, duration: 210 }
+    ],
   }
 ];
 
@@ -296,15 +317,37 @@ async function getTracks(): Promise<Track[]> {
     console.log('Using headers:', JSON.stringify(getHeaders()));
     
     // Try a simpler fetch first to verify the connection
+    let strapiServerReachable = false;
     try {
-      const pingResponse = await fetch('http://localhost:1337/admin/ping');
+      const pingResponse = await fetch('http://localhost:1337/admin/ping', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          'Accept': 'application/json',
+        },
+        signal: AbortSignal.timeout(3000) // 3 second timeout
+      });
+      
       if (pingResponse.ok) {
         console.log('✅ Connection to Strapi server confirmed');
+        strapiServerReachable = true;
       } else {
         console.warn('⚠️ Connection to Strapi possible but ping failed:', pingResponse.status);
       }
-    } catch (e) {
-      console.error('❌ Cannot connect to Strapi server at all:', e);
+    } catch (e: any) {
+      console.error('❌ Cannot connect to Strapi server:', e);
+      
+      // If we can't reach the server at all, return mock data immediately
+      if (e?.name === 'AbortError' || e?.name === 'TypeError') {
+        console.log('⚠️ Returning mock data due to connection issue');
+        return MOCK_TRACKS;
+      }
+    }
+
+    // Skip the main fetch if we already know the server is unreachable
+    if (!strapiServerReachable) {
+      console.log('⚠️ Strapi server is unreachable, returning mock data');
+      return MOCK_TRACKS;
     }
     
     // Try the main fetch with more options for troubleshooting
