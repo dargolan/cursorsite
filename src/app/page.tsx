@@ -8,7 +8,7 @@ import { Tag, Stem, Track, CartItem } from '../types';
 import Header from '../components/Header';
 import Image from 'next/image';
 import { getTracks, getTags, getTracksByTags, searchTracks } from '../services/strapi';
-import { getCart, addToCart, removeFromCart, getCartTotal, addStemBundle } from '../services/cart';
+import { getCart, addToCart, removeFromCart, getCartTotal, addStemBundle, removeStemBundle } from '../services/cart';
 import AudioPlayer from '../components/AudioPlayer';
 import Footer from '../components/Footer';
 import { useDebounce } from '../hooks/useDebounce';
@@ -149,13 +149,13 @@ export default function MusicLibrary() {
   }, []);
 
   // Load cart from localStorage
+  const loadCart = useCallback(() => {
+    const cart = getCart();
+    setCartItems(cart);
+    setCartTotal(getCartTotal());
+  }, []);
+
   useEffect(() => {
-    const loadCart = () => {
-      const cart = getCart();
-      setCartItems(cart);
-      setCartTotal(getCartTotal());
-    };
-    
     loadCart();
     
     // Listen for storage events to update cart if changed in another tab
@@ -164,7 +164,7 @@ export default function MusicLibrary() {
     return () => {
       window.removeEventListener('storage', loadCart);
     };
-  }, []);
+  }, [loadCart]);
 
   // Filter tracks based on selected tags, search query, and ranges
   useEffect(() => {
@@ -241,23 +241,20 @@ export default function MusicLibrary() {
   // Handler for adding a stem to cart
   const handleAddToCart = useCallback((stem: Stem, track: Track) => {
     addToCart(stem, track);
-    setCartItems(getCart());
-    setCartTotal(getCartTotal());
-  }, []);
+    loadCart();
+  }, [loadCart]);
 
   // Handler for adding a stem bundle to cart
   const handleAddStemBundle = useCallback((stems: Stem[], track: Track) => {
     addStemBundle(stems, track);
-    setCartItems(getCart());
-    setCartTotal(getCartTotal());
-  }, []);
+    loadCart();
+  }, [loadCart]);
 
   // Handler for removing an item from cart
   const handleRemoveFromCart = useCallback((itemId: string) => {
     removeFromCart(itemId);
-    setCartItems(getCart());
-    setCartTotal(getCartTotal());
-  }, []);
+    loadCart();
+  }, [loadCart]);
 
   // Handler for tag click
   const handleTagClick = useCallback((tag: Tag) => {
@@ -270,6 +267,12 @@ export default function MusicLibrary() {
       }
     });
   }, []);
+
+  // Add this new function to remove a stem bundle
+  const handleRemoveStemBundle = useCallback((trackId: string) => {
+    removeStemBundle(trackId);
+    loadCart();
+  }, [loadCart]);
 
   // Function to format duration from seconds to mm:ss
   const formatDuration = (seconds: number) => {
@@ -343,6 +346,7 @@ export default function MusicLibrary() {
               onStop={() => setPlayingTrackId(null)}
               onAddToCart={handleAddToCart}
               onAddStemBundle={handleAddStemBundle}
+              onRemoveStemBundle={handleRemoveStemBundle}
               onTagClick={handleTagClick}
               onRemoveFromCart={handleRemoveFromCart}
               openStemsTrackId={openStemsTrackId}

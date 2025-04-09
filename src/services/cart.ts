@@ -118,4 +118,30 @@ export function addStemBundle(stems: Stem[], track: Track): void {
   });
   
   localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(filteredCart));
+}
+
+/**
+ * Check if a stem bundle is in the cart
+ */
+export function isStemBundleInCart(trackId: string): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  
+  const cart = getCart();
+  return cart.some(item => item.id === `bundle_${trackId}`);
+}
+
+/**
+ * Remove a stem bundle from the cart
+ */
+export function removeStemBundle(trackId: string): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  
+  const cart = getCart();
+  const updatedCart = cart.filter(item => item.id !== `bundle_${trackId}`);
+  
+  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updatedCart));
 } 

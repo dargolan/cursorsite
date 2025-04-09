@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Tag, Stem, Track, CartItem } from '../types';
 import { findFileInStrapiByName, STRAPI_URL } from '../services/strapi';
 import { findStemFile } from '../services/strapi';
+import { isStemBundleInCart } from '../services/cart';
 
 // Global audio manager to ensure only one audio source plays at a time
 const globalAudioManager = {
@@ -649,6 +650,7 @@ interface AudioPlayerProps {
   onStop: () => void;
   onAddToCart: (stem: Stem, track: Track) => void;
   onAddStemBundle?: (stems: Stem[], track: Track) => void;
+  onRemoveStemBundle?: (trackId: string) => void;
   onTagClick: (tag: Tag) => void;
   onRemoveFromCart: (itemId: string) => void;
   openStemsTrackId: string | null;
@@ -737,6 +739,7 @@ export default function AudioPlayer({
   onStop,
   onAddToCart,
   onAddStemBundle,
+  onRemoveStemBundle,
   onTagClick,
   onRemoveFromCart,
   openStemsTrackId,
@@ -1250,36 +1253,65 @@ export default function AudioPlayer({
   const handleDownloadAllStems = () => {
     if (!track.stems) return;
     
-    // Use the bundle function if available
-    if (onAddStemBundle) {
-      // Mark all stems as added to cart in UI
-      track.stems.forEach(stem => {
-        setStemAddedToCart(prev => ({ ...prev, [stem.id]: true }));
-      });
-      
-      // Add all stems as a bundle with discount
-      onAddStemBundle(track.stems, track);
-      
-      // Show toast notification for the bundle
-      setShowToast({
-        stemId: 'bundle',
-        stemName: `${track.stems.length} Stems Bundle`,
-        price: discountedStemsPrice,
-        action: 'add'
-      });
-      
-      // Hide toast after 4 seconds
-      setTimeout(() => {
-        setShowToast(null);
-      }, 4000);
+    // Check if bundle is already in the cart
+    const bundleId = `bundle_${track.id}`;
+    const bundleInCart = isStemBundleInCart(track.id);
+    
+    if (bundleInCart) {
+      // Remove the bundle
+      if (onRemoveStemBundle) {
+        onRemoveStemBundle(track.id);
+        
+        // Update UI state
+        track.stems.forEach(stem => {
+          setStemAddedToCart(prev => ({ ...prev, [stem.id]: false }));
+        });
+        
+        // Show toast notification for bundle removal
+        setShowToast({
+          stemId: bundleId,
+          stemName: 'Stem Bundle',
+          price: discountedStemsPrice,
+          action: 'remove'
+        });
+        
+        // Hide toast after 4 seconds
+        setTimeout(() => {
+          setShowToast(null);
+        }, 4000);
+      }
     } else {
-      // Fall back to adding stems individually
-      track.stems.forEach(stem => {
-        if (!stemAddedToCart[stem.id]) {
+      // Add the bundle
+      if (onAddStemBundle) {
+        // Mark all stems as added to cart in UI
+        track.stems.forEach(stem => {
           setStemAddedToCart(prev => ({ ...prev, [stem.id]: true }));
-          onAddToCart(stem, track);
-        }
-      });
+        });
+        
+        // Add all stems as a bundle with discount
+        onAddStemBundle(track.stems, track);
+        
+        // Show toast notification for the bundle
+        setShowToast({
+          stemId: bundleId,
+          stemName: 'Stem Bundle',
+          price: discountedStemsPrice,
+          action: 'add'
+        });
+        
+        // Hide toast after 4 seconds
+        setTimeout(() => {
+          setShowToast(null);
+        }, 4000);
+      } else {
+        // Fall back to adding stems individually
+        track.stems.forEach(stem => {
+          if (!stemAddedToCart[stem.id]) {
+            setStemAddedToCart(prev => ({ ...prev, [stem.id]: true }));
+            onAddToCart(stem, track);
+          }
+        });
+      }
     }
   };
 
@@ -1973,11 +2005,21 @@ export default function AudioPlayer({
           <div className="flex justify-end items-center mt-4 mr-8">
             <button
               onClick={handleDownloadAllStems}
-              className="bg-[#1DF7CE] hover:bg-[#19d9b6] text-[#1E1E1E] px-4 py-2 rounded-full font-medium transition-colors"
+              className={`px-4 py-2 rounded-full font-medium transition-colors ${
+                isStemBundleInCart(track.id) 
+                  ? 'bg-red-500 hover:bg-red-600 text-white' 
+                  : 'bg-[#1DF7CE] hover:bg-[#19d9b6] text-[#1E1E1E]'
+              }`}
             >
-              <span className="text-sm">€{discountedStemsPrice.toFixed(2)}</span>
-              <span className="text-xs mx-2 text-black/50 line-through">€{totalStemsPrice.toFixed(2)}</span>
-              <span className="font-medium">Buy All Stems</span>
+              {isStemBundleInCart(track.id) ? (
+                <span className="font-medium">Remove All Stems</span>
+              ) : (
+                <>
+                  <span className="text-sm">€{discountedStemsPrice.toFixed(2)}</span>
+                  <span className="text-xs mx-2 text-black/50 line-through">€{totalStemsPrice.toFixed(2)}</span>
+                  <span className="font-medium">Buy All Stems</span>
+                </>
+              )}
             </button>
           </div>
         </div>
