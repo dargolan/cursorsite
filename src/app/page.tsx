@@ -328,7 +328,7 @@ export default function MusicLibrary() {
       <div className="flex flex-col w-full">
         {/* Track row */}
         {filteredTracks.map(track => (
-          <div key={track.id} className="mb-0">
+          <div key={track.id} className="mb-0 max-w-[1464px] mx-auto w-full">
             <AudioPlayerComponent 
               track={track} 
               isPlaying={playingTrackId === track.id}
@@ -366,8 +366,8 @@ export default function MusicLibrary() {
         />
         
         {/* Main content area with tracks list */}
-        <div className="ml-[271px] flex-1">
-          <div className="p-8 pt-10">
+        <div className="ml-[295px] flex-1">
+          <div className="p-8 pt-24">
             
             {/* Fixed height container for selected tags */}
             <div className="h-[40px] mb-4">

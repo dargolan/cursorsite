@@ -39,14 +39,11 @@ export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart
   const formattedCartTotal = cartTotal.toFixed(2);
 
   return (
-    <header className="bg-transparent z-50">
-      <div className="w-full relative px-0">
-        <div className="flex h-16 relative">
-          {/* Left spacer to match sidebar width */}
-          <div className="w-[271px]" />
-          
+    <header className="fixed top-0 right-0 left-[363px] bg-[#121212] z-10">
+      <div className="w-full relative px-8">
+        <div className="flex h-16 relative justify-between">
           {/* Main navigation */}
-          <nav className="hidden md:block pl-8 py-5">
+          <nav className="hidden md:block py-5 ml-4">
             <ul className="flex space-x-8">
               <li>
                 <Link 
@@ -92,7 +89,7 @@ export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart
           </nav>
           
           {/* Right side content area - sign in and cart */}
-          <div className="flex items-center space-x-6 absolute right-[55px] top-1/2 transform -translate-y-1/2">
+          <div className="flex items-center space-x-6 pr-24">
             <Link 
               href="/signin"
               className="text-[#999999] hover:text-[#1DF7CE] transition-colors font-normal hidden md:block" 

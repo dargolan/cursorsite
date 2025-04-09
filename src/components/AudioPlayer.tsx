@@ -1575,155 +1575,170 @@ export default function AudioPlayer({
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      <div 
-        className="flex items-center px-4 py-[6px] rounded"
-        style={{ minHeight: '84px' }} // Increased from 80px to 84px
-      >
-        {/* Track image with fixed width - increased size */}
-        <div className="w-14 h-14 rounded overflow-hidden relative mr-4 flex-shrink-0">
-          <div 
-            className={`absolute inset-0 bg-black ${isHovering || isPlaying ? 'opacity-50' : 'opacity-0'} transition-opacity z-10`}
-          />
-          <Image 
-            src={track.imageUrl || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18V5l12-2v13'%3E%3C/path%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Ccircle cx='18' cy='16' r='3'%3E%3C/circle%3E%3C/svg%3E"} 
-            alt={track.title}
-            width={56}
-            height={56}
-            className="object-cover w-14 h-14"
-          />
-          <button 
-            onClick={mainAudioError ? undefined : handlePlayPause}
-            disabled={mainAudioError}
-            className={`absolute inset-0 flex items-center justify-center z-20 ${
-              isHovering || isPlaying ? 'opacity-100' : 'opacity-0'
-            } transition-opacity ${mainAudioError ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-            title={mainAudioError ? "Audio file could not be loaded" : "Play/Pause"}
-          >
-            {mainAudioError ? (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-500" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
-                <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2" />
-                <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" strokeWidth="2" />
-              </svg>
-            ) : isPlaying ? (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24">
-                <rect x="6" y="4" width="4" height="16" fill="currentColor"/>
-                <rect x="14" y="4" width="4" height="16" fill="currentColor"/>
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" fill="currentColor"/>
-              </svg>
-            )}
-          </button>
+      {/* Track title, tags, and audio player section - using flex with specific widths */}
+      <div className="flex items-center flex-grow w-full px-4 py-[6px]" style={{ minHeight: '84px' }}>
+        {/* Track image and info - left side - fixed width */}
+        <div className="flex items-center w-[384px] flex-shrink-0">
+          {/* Track image with fixed width */}
+          <div className="w-14 h-14 rounded overflow-hidden relative mr-4 flex-shrink-0">
+            <div 
+              className={`absolute inset-0 bg-black ${isHovering || isPlaying ? 'opacity-50' : 'opacity-0'} transition-opacity z-10`}
+            />
+            <Image 
+              src={track.imageUrl || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18V5l12-2v13'%3E%3C/path%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Ccircle cx='18' cy='16' r='3'%3E%3C/circle%3E%3C/svg%3E"} 
+              alt={track.title}
+              width={56}
+              height={56}
+              className="object-cover w-14 h-14"
+            />
+            <button 
+              onClick={mainAudioError ? undefined : handlePlayPause}
+              disabled={mainAudioError}
+              className={`absolute inset-0 flex items-center justify-center z-20 ${
+                isHovering || isPlaying ? 'opacity-100' : 'opacity-0'
+              } transition-opacity ${mainAudioError ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+              title={mainAudioError ? "Audio file could not be loaded" : "Play/Pause"}
+            >
+              {mainAudioError ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-500" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
+                  <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" strokeWidth="2" />
+                </svg>
+              ) : isPlaying ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24">
+                  <rect x="6" y="4" width="4" height="16" fill="currentColor"/>
+                  <rect x="14" y="4" width="4" height="16" fill="currentColor"/>
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" fill="currentColor"/>
+                </svg>
+              )}
+            </button>
         </div>
-        
-        {/* Title and BPM area - centered vertically and aligned as a group */}
-        <div className="w-32 mr-6 flex-shrink-0">
-          <h3 className="font-bold text-[15px] text-white break-words leading-tight mb-0 line-clamp-2">{track.title}</h3>
-          <span className="text-[12.5px] font-normal text-[#999999] block">{track.bpm} BPM</span>
-        </div>
-        
-        {/* Tags area - fixed width, filtered to only show Genre and Mood tags */}
-        <div className="w-52 mr-2 flex-shrink-0">
-          <div className="text-[12.5px] font-normal text-[#999999] overflow-hidden line-clamp-2">
-            {Object.entries(tagsByType).flatMap(([type, tags], typeIndex, array) => (
-              tags.map((tag, tagIndex, tagArray) => (
-                <React.Fragment key={tag.id}>
-                  <button 
-                    onClick={() => {
-                      console.log('[AudioPlayer] Tag clicked:', tag);
-                      console.log('[AudioPlayer] Tag object structure:', JSON.stringify(tag));
-                      onTagClick(tag);
-                    }}
-                    className="hover:text-[#1DF7CE] transition-colors inline"
-                  >
-                    {tag.name}
-                  </button>
-                  {tagIndex < tagArray.length - 1 && <span>, </span>}
-                  {typeIndex < array.length - 1 && tagIndex === tagArray.length - 1 && <span>, </span>}
-                </React.Fragment>
-              ))
-            ))}
+          
+          {/* Title and BPM area */}
+          <div className="w-32 mr-6 flex-shrink-0">
+            <h3 className="font-bold text-[15px] text-white break-words leading-tight mb-0 line-clamp-2">{track.title}</h3>
+            <span className="text-[12.5px] font-normal text-[#999999] block">{track.bpm} BPM</span>
+          </div>
+          
+          {/* Tags area */}
+          <div className="w-52 mr-8 flex-shrink-0">
+            <div className="text-[12.5px] font-normal text-[#999999] overflow-hidden line-clamp-2">
+              {Object.entries(tagsByType).flatMap(([type, tags], typeIndex, array) => (
+                tags.map((tag, tagIndex, tagArray) => (
+                  <React.Fragment key={tag.id}>
+                    <button 
+                      onClick={() => {
+                        console.log('[AudioPlayer] Tag clicked:', tag);
+                        console.log('[AudioPlayer] Tag object structure:', JSON.stringify(tag));
+                        onTagClick(tag);
+                      }}
+                      className="hover:text-[#1DF7CE] transition-colors inline"
+                    >
+                      {tag.name}
+                    </button>
+                    {tagIndex < tagArray.length - 1 && <span>, </span>}
+                    {typeIndex < array.length - 1 && tagIndex === tagArray.length - 1 && <span>, </span>}
+                  </React.Fragment>
+                ))
+              ))}
+            </div>
         </div>
       </div>
       
-        {/* Similar Tracks button - positioned more centrally */}
-        <button className="text-white hover:text-[#1DF7CE] transition-colors mx-4 flex-shrink-0">
-          <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>
-            fiber_smart_record
-          </span>
-        </button>
-        
-        {/* Progress bar - using all remaining space */}
-        <div className="flex-1 ml-2 mr-4 flex items-center">
-          <div 
-            className="relative w-full"
-            ref={progressBarRef}
-            onClick={handleProgressBarClick}
-          >
-            {/* Gray track background */}
-            <div className="w-full h-[8px] bg-[#3A3A3A] rounded-full cursor-pointer" />
-            
-            {/* Teal progress fill */}
+        {/* Progress bar, duration, and buttons - fixed layout with reliable spacing */}
+        <div className="flex items-center justify-between flex-grow pl-24">
+          {/* Progress bar - fixed width */}
+          <div className="w-[calc(100%-240px)] min-w-[200px]">
             <div 
-              className="absolute top-0 left-0 h-[8px] bg-[#1DF7CE] rounded-full"
-              style={{ width: `${progress}%`, zIndex: 2 }}
-            />
-            
-            {/* Teal dot at the edge of progress */}
-            <div 
-              ref={thumbRef}
-              onMouseDown={handleThumbMouseDown}
-              className="absolute top-1/2 w-3.5 h-3.5 rounded-full bg-[#1DF7CE] cursor-pointer"
-              style={{ 
-                left: `calc(${progress}% - 2px)`, 
-                zIndex: 3,
-                transform: 'translateY(-50%)'
-              }}
-            />
-          </div>
-        </div>
-        
-        {/* Duration - fixed width */}
-        <div className="w-24 text-[12.5px] font-normal text-[#999999] whitespace-nowrap mr-4 flex-shrink-0">
-          {formatTime(currentTime)} / {formatTime(track.duration)}
-        </div>
-        
-        {/* Action buttons - fixed width with text instead of icons */}
-        <div className="flex items-center justify-end space-x-3 flex-shrink-0">
-          {track.hasStems && (
-        <button 
-              onClick={() => setOpenStemsTrackId(isStemsOpen ? null : track.id)}
-              className="ml-10 text-white hover:text-[#1DF7CE] px-3 py-1 text-sm flex items-center transition-colors"
+              className="relative w-full"
+              ref={progressBarRef}
+              onClick={handleProgressBarClick}
             >
-              <span>Stems</span>
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                className={`h-4 w-4 ml-1 transition-transform ${isStemsOpen ? 'transform rotate-180' : ''}`} 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-              >
-                <polyline points="6 9 12 15 18 9"></polyline>
+              {/* Gray track background */}
+              <div className="w-full h-[8px] bg-[#3A3A3A] rounded-full cursor-pointer" />
+              
+              {/* Teal progress fill */}
+              <div 
+                className="absolute top-0 left-0 h-[8px] bg-[#1DF7CE] rounded-full"
+                style={{ width: `${progress}%`, zIndex: 2 }}
+              />
+              
+              {/* Teal dot at the edge of progress */}
+              <div 
+                ref={thumbRef}
+                onMouseDown={handleThumbMouseDown}
+                className="absolute top-1/2 w-3.5 h-3.5 rounded-full bg-[#1DF7CE] cursor-pointer"
+                style={{ 
+                  left: `calc(${progress}% - 2px)`, 
+                  zIndex: 3,
+                  transform: 'translateY(-50%)'
+                }}
+              />
+            </div>
+          </div>
+          
+          {/* Duration - fixed width with spacer */}
+          <div className="w-20 text-[12.5px] font-normal text-[#999999] whitespace-nowrap ml-2 mr-24 flex-shrink-0 text-right">
+            {formatTime(currentTime)} / {formatTime(track.duration)}
+          </div>
+          
+          {/* Action buttons area */}
+          <div className="flex items-center space-x-3 flex-shrink-0 min-w-[110px]">
+            {/* Consistent width container for Stems button or placeholder */}
+            <div className="w-[68px] flex justify-end">
+              {track.hasStems && (
+        <button 
+                  onClick={() => setOpenStemsTrackId(isStemsOpen ? null : track.id)}
+                  className="text-white hover:text-[#1DF7CE] px-3 py-1 text-sm flex items-center transition-colors"
+                >
+                  <span>Stems</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points={isStemsOpen ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}></polyline>
+                  </svg>
+                </button>
+              )}
+            </div>
+            
+            <button 
+              className="w-10 h-10 flex items-center justify-center text-[#1E1E1E] hover:text-[#1DF7CE] transition-colors border-2 border-[#1DF7CE] rounded-full bg-[#1DF7CE] hover:bg-transparent focus:outline-none"
+              onClick={async () => {
+                try {
+                  // Fetch the file as a blob
+                  const response = await fetch(track.audioUrl);
+                  const blob = await response.blob();
+                  
+                  // Create a temporary anchor element
+                  const a = document.createElement('a');
+                  a.href = window.URL.createObjectURL(blob);
+                  
+                  // Set the download attribute with the track title as filename
+                  const filename = `${track.title}.mp3`;
+                  a.download = filename;
+                  
+                  // Append to body, click, and remove
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  
+                  // Clean up the URL object
+                  window.URL.revokeObjectURL(a.href);
+                } catch (error) {
+                  console.error('Error downloading track:', error);
+                }
+              }}
+              title="Download track"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
               </svg>
             </button>
-          )}
-          
-          <button 
-            className="w-10 h-10 flex items-center justify-center text-[#1E1E1E] hover:text-[#1DF7CE] transition-colors border-2 border-[#1DF7CE] rounded-full bg-[#1DF7CE] hover:bg-transparent focus:outline-none"
-            onClick={() => window.open(track.audioUrl, '_blank')}
-            title="Download track"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="7 10 12 15 17 10"></polyline>
-              <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-          </button>
+          </div>
         </div>
       </div>
       
@@ -1731,14 +1746,15 @@ export default function AudioPlayer({
       {isStemsOpen && track.stems && (
         <div className="bg-[#232323] rounded-b p-4 pt-2">
           <div className="flex justify-end items-center mb-3">
-            <button 
+            {/* Remove this button that has the extra chevron */}
+            {/* <button 
               onClick={() => setOpenStemsTrackId(null)}
               className="text-white hover:text-[#1DF7CE]"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="18 15 12 9 6 15"></polyline>
               </svg>
-            </button>
+            </button> */}
           </div>
           
           <div className="grid grid-cols-2 gap-3">
@@ -1927,7 +1943,7 @@ export default function AudioPlayer({
           </div>
           
           {/* Buy all stems button */}
-          <div className="flex justify-end items-center mt-4">
+          <div className="flex justify-end items-center mt-4 mr-8">
             <button
               onClick={handleDownloadAllStems}
               className="bg-[#1DF7CE] hover:bg-[#19d9b6] text-[#1E1E1E] px-4 py-2 rounded-full font-medium transition-colors"
@@ -1935,8 +1951,8 @@ export default function AudioPlayer({
               <span className="text-sm">€{discountedStemsPrice}</span>
               <span className="text-xs mx-2 text-black/50 line-through">€{totalStemsPrice}</span>
               <span className="font-medium">Buy All Stems</span>
-        </button>
-      </div>
+            </button>
+          </div>
         </div>
       )}
       

@@ -123,7 +123,7 @@ export default function FilterSidebar({
   };
 
   return (
-    <div className="w-[271px] bg-[#1B1B1B] fixed top-0 left-0 h-screen overflow-y-auto z-0">
+    <div className="w-[295px] bg-[#1B1B1B] fixed top-0 left-0 h-screen overflow-y-auto z-0">
       {/* Logo */}
       <Link href="/" className="flex items-center justify-center pt-[30px] pb-[32px]">
         <div className="w-[78px] h-[78px] relative">
@@ -139,7 +139,7 @@ export default function FilterSidebar({
         </div>
       </Link>
 
-      <div className="px-4 pb-4">
+      <div className="px-6 pb-6">
         <SearchBar onSearch={onSearch} />
         
         <div className="mb-6">
