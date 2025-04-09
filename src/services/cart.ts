@@ -1,4 +1,5 @@
 import { CartItem, Stem, Track } from '../types';
+import { createBundleId, createStemCartItemId } from '../utils/audio';
 
 // Local storage key for cart
 const CART_STORAGE_KEY = 'music_library_cart';
@@ -26,7 +27,7 @@ export function addToCart(stem: Stem, track: Track): void {
   const cart = getCart();
   
   // Use a consistent ID format for both adding and removing
-  const cartItemId = `stem_${stem.id}`;
+  const cartItemId = createStemCartItemId(stem.id);
   
   // Check if item is already in cart
   const existingItemIndex = cart.findIndex(item => item.id === cartItemId);
@@ -109,7 +110,7 @@ export function addStemBundle(stems: Stem[], track: Track): void {
   
   // Add the bundle as a single cart item
   filteredCart.push({
-    id: `bundle_${track.id}`,
+    id: createBundleId(track.id),
     type: 'stem_bundle',
     price: discountedPrice,
     name: `${stems.length} Stems Bundle`,
@@ -129,7 +130,7 @@ export function isStemBundleInCart(trackId: string): boolean {
   }
   
   const cart = getCart();
-  return cart.some(item => item.id === `bundle_${trackId}`);
+  return cart.some(item => item.id === createBundleId(trackId));
 }
 
 /**
@@ -141,7 +142,7 @@ export function removeStemBundle(trackId: string): void {
   }
   
   const cart = getCart();
-  const updatedCart = cart.filter(item => item.id !== `bundle_${trackId}`);
+  const updatedCart = cart.filter(item => item.id !== createBundleId(trackId));
   
   localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updatedCart));
 } 
