@@ -648,6 +648,7 @@ interface AudioPlayerProps {
   onPlay: () => void;
   onStop: () => void;
   onAddToCart: (stem: Stem, track: Track) => void;
+  onAddStemBundle?: (stems: Stem[], track: Track) => void;
   onTagClick: (tag: Tag) => void;
   onRemoveFromCart: (itemId: string) => void;
   openStemsTrackId: string | null;
@@ -735,6 +736,7 @@ export default function AudioPlayer({
   onPlay,
   onStop,
   onAddToCart,
+  onAddStemBundle,
   onTagClick,
   onRemoveFromCart,
   openStemsTrackId,
@@ -1206,11 +1208,11 @@ export default function AudioPlayer({
   };
   
   const handleStemAddToCart = (stem: Stem) => {
-    // Show toast notification
+    // Show toast notification for adding to cart
     setShowToast({
       stemId: stem.id,
       stemName: stem.name,
-      price: stem.price,
+      price: stem.price || 0,
       action: 'add'
     });
     
@@ -1228,7 +1230,7 @@ export default function AudioPlayer({
     setShowToast({
       stemId: stem.id,
       stemName: stem.name,
-      price: stem.price,
+      price: stem.price || 0,
       action: 'remove'
     });
     
@@ -1239,25 +1241,50 @@ export default function AudioPlayer({
     
     setStemAddedToCart(prev => ({ ...prev, [stem.id]: false }));
     if (onRemoveFromCart) {
-      // Create a cart item ID using track and stem IDs
-      const itemId = `${track.id}_${stem.id}`;
-      onRemoveFromCart(itemId);
+      // Use the same ID format as in addToCart
+      const cartItemId = `stem_${stem.id}`;
+      onRemoveFromCart(cartItemId);
     }
   };
   
   const handleDownloadAllStems = () => {
     if (!track.stems) return;
     
-    track.stems.forEach(stem => {
-      if (!stemAddedToCart[stem.id]) {
+    // Use the bundle function if available
+    if (onAddStemBundle) {
+      // Mark all stems as added to cart in UI
+      track.stems.forEach(stem => {
         setStemAddedToCart(prev => ({ ...prev, [stem.id]: true }));
-        onAddToCart(stem, track);
-      }
-    });
+      });
+      
+      // Add all stems as a bundle with discount
+      onAddStemBundle(track.stems, track);
+      
+      // Show toast notification for the bundle
+      setShowToast({
+        stemId: 'bundle',
+        stemName: `${track.stems.length} Stems Bundle`,
+        price: discountedStemsPrice,
+        action: 'add'
+      });
+      
+      // Hide toast after 4 seconds
+      setTimeout(() => {
+        setShowToast(null);
+      }, 4000);
+    } else {
+      // Fall back to adding stems individually
+      track.stems.forEach(stem => {
+        if (!stemAddedToCart[stem.id]) {
+          setStemAddedToCart(prev => ({ ...prev, [stem.id]: true }));
+          onAddToCart(stem, track);
+        }
+      });
+    }
   };
 
   // Calculate total stems price
-  const totalStemsPrice = track.stems?.reduce((sum, stem) => sum + stem.price, 0) || 0;
+  const totalStemsPrice = track.stems?.reduce((sum, stem) => sum + (stem.price || 0), 0) || 0;
   const discountedStemsPrice = Math.floor(totalStemsPrice * 0.75 * 100) / 100;
 
   // Update interaction state when playing state changes
@@ -1936,7 +1963,7 @@ export default function AudioPlayer({
                       </span>
         </button>
                   )}
-                  <span className="mt-1 text-xs text-[#999999]">€{stem.price}</span>
+                  <span className="mt-1 text-xs text-[#999999]">€{(stem.price || 0).toFixed(2)}</span>
                 </div>
               </div>
             ))}
@@ -1948,8 +1975,8 @@ export default function AudioPlayer({
               onClick={handleDownloadAllStems}
               className="bg-[#1DF7CE] hover:bg-[#19d9b6] text-[#1E1E1E] px-4 py-2 rounded-full font-medium transition-colors"
             >
-              <span className="text-sm">€{discountedStemsPrice}</span>
-              <span className="text-xs mx-2 text-black/50 line-through">€{totalStemsPrice}</span>
+              <span className="text-sm">€{discountedStemsPrice.toFixed(2)}</span>
+              <span className="text-xs mx-2 text-black/50 line-through">€{totalStemsPrice.toFixed(2)}</span>
               <span className="font-medium">Buy All Stems</span>
             </button>
           </div>

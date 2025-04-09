@@ -149,7 +149,7 @@ export const StemItem = ({ stem, track, onAddToCart, isPlaying, isOpen }: StemIt
             onClick={handleAddToCart}
             className="px-2 py-1 rounded bg-green-600 hover:bg-green-700"
           >
-            +${stem.price}
+            +€{stem.price.toFixed(2)}
           </button>
         </div>
       </div>

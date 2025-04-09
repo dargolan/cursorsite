@@ -31,7 +31,7 @@ export interface Track {
 
 export interface CartItem {
   id: string;
-  type: 'track' | 'stem';
+  type: 'track' | 'stem' | 'stem_bundle';
   price: number;
   name: string;
   trackTitle: string;

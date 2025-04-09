@@ -25,13 +25,16 @@ export function addToCart(stem: Stem, track: Track): void {
   
   const cart = getCart();
   
+  // Use a consistent ID format for both adding and removing
+  const cartItemId = `stem_${stem.id}`;
+  
   // Check if item is already in cart
-  const existingItemIndex = cart.findIndex(item => item.id === stem.id && item.type === 'stem');
+  const existingItemIndex = cart.findIndex(item => item.id === cartItemId);
   
   if (existingItemIndex === -1) {
     // Add new item
     cart.push({
-      id: stem.id,
+      id: cartItemId,
       type: 'stem',
       price: stem.price,
       name: stem.name,
@@ -81,4 +84,38 @@ export function getCartTotal(): number {
  */
 export function getCartCount(): number {
   return getCart().length;
+}
+
+/**
+ * Add a bundle of stems to the cart with a discount
+ */
+export function addStemBundle(stems: Stem[], track: Track): void {
+  if (typeof window === 'undefined' || !stems.length) {
+    return;
+  }
+  
+  const cart = getCart();
+  
+  // Remove any individual stems from this track that might be in the cart
+  const filteredCart = cart.filter(item => {
+    const stemPrefix = 'stem_';
+    // Keep items that are not stems from this track
+    return !(item.id.startsWith(stemPrefix) && item.trackTitle === track.title);
+  });
+  
+  // Calculate the total price and apply discount
+  const totalPrice = stems.reduce((sum, stem) => sum + (stem.price || 0), 0);
+  const discountedPrice = Math.floor(totalPrice * 0.75 * 100) / 100;
+  
+  // Add the bundle as a single cart item
+  filteredCart.push({
+    id: `bundle_${track.id}`,
+    type: 'stem_bundle',
+    price: discountedPrice,
+    name: `${stems.length} Stems Bundle`,
+    trackTitle: track.title,
+    imageUrl: track.imageUrl
+  });
+  
+  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(filteredCart));
 } 

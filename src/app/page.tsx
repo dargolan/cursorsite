@@ -8,7 +8,7 @@ import { Tag, Stem, Track, CartItem } from '../types';
 import Header from '../components/Header';
 import Image from 'next/image';
 import { getTracks, getTags, getTracksByTags, searchTracks } from '../services/strapi';
-import { getCart, addToCart, removeFromCart, getCartTotal } from '../services/cart';
+import { getCart, addToCart, removeFromCart, getCartTotal, addStemBundle } from '../services/cart';
 import AudioPlayer from '../components/AudioPlayer';
 import Footer from '../components/Footer';
 import { useDebounce } from '../hooks/useDebounce';
@@ -245,6 +245,13 @@ export default function MusicLibrary() {
     setCartTotal(getCartTotal());
   }, []);
 
+  // Handler for adding a stem bundle to cart
+  const handleAddStemBundle = useCallback((stems: Stem[], track: Track) => {
+    addStemBundle(stems, track);
+    setCartItems(getCart());
+    setCartTotal(getCartTotal());
+  }, []);
+
   // Handler for removing an item from cart
   const handleRemoveFromCart = useCallback((itemId: string) => {
     removeFromCart(itemId);
@@ -335,6 +342,7 @@ export default function MusicLibrary() {
               onPlay={() => setPlayingTrackId(track.id)}
               onStop={() => setPlayingTrackId(null)}
               onAddToCart={handleAddToCart}
+              onAddStemBundle={handleAddStemBundle}
               onTagClick={handleTagClick}
               onRemoveFromCart={handleRemoveFromCart}
               openStemsTrackId={openStemsTrackId}

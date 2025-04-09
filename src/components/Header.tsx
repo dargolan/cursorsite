@@ -152,9 +152,12 @@ export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart
                             <p className="text-gray-400 text-xs">{item.trackTitle}</p>
                           </div>
                           <div className="flex items-center">
-                            <span className="text-[#1DF7CE] font-medium mr-3">{item.price.toFixed(2)}€</span>
+                            <span className="text-[#1DF7CE] font-medium mr-3">{(item.price || 0).toFixed(2)}€</span>
                             <button 
-                              onClick={() => onRemoveFromCart(item.id)}
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent cart from closing when removing item
+                                onRemoveFromCart(item.id);
+                              }}
                               className="text-gray-400 hover:text-red-500 transition-colors"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
