@@ -1,38 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-
-interface CartItem {
-  id: string;
-  name: string;
-  trackName: string;
-  price: number;
-  imageUrl?: string;
-}
+import { useCart } from '@/contexts/CartContext';
 
 export default function CheckoutPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const { items: cartItems, removeItem, getTotalPrice } = useCart();
   const router = useRouter();
 
-  // Load cart items from localStorage on component mount
-  useEffect(() => {
-    try {
-      const storedCart = localStorage.getItem('wavecave_cart');
-      if (storedCart) {
-        setCartItems(JSON.parse(storedCart));
-      }
-    } catch (err) {
-      console.error('Error loading cart:', err);
-      setError('Failed to load your cart items');
-    }
-  }, []);
-
-  const totalAmount = cartItems.reduce((sum, item) => sum + item.price, 0);
+  const totalAmount = getTotalPrice();
 
   const handleCheckout = async () => {
     if (cartItems.length === 0) {
@@ -78,14 +58,6 @@ export default function CheckoutPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const removeItem = (itemId: string) => {
-    const updatedCart = cartItems.filter(item => item.id !== itemId);
-    setCartItems(updatedCart);
-    
-    // Update localStorage
-    localStorage.setItem('wavecave_cart', JSON.stringify(updatedCart));
   };
 
   return (
