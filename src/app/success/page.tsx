@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import DownloadButton from '@/components/checkout/DownloadButton';
 
@@ -14,16 +14,24 @@ interface PurchaseDetails {
 
 export default function SuccessPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const sessionId = searchParams.get('session_id');
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
-  const [purchaseDetails, setPurchaseDetails] = useState<PurchaseDetails | null>(null);
+  const [purchasedItems, setPurchasedItems] = useState<PurchaseDetails[]>([]);
 
   useEffect(() => {
     if (!sessionId) {
       setStatus('error');
       setMessage('No session ID provided');
       return;
+    }
+
+    // Clear the cart from localStorage after successful purchase
+    try {
+      localStorage.removeItem('wavecave_cart');
+    } catch (err) {
+      console.error('Error clearing cart:', err);
     }
 
     // Verify the purchase was successful and get purchase details
@@ -41,30 +49,16 @@ export default function SuccessPage() {
           
           // Extract purchase details if available
           if (data.session && data.session.metadata) {
-            const { stemId, trackId } = data.session.metadata;
+            const metadata = data.session.metadata;
             
-            // Fetch stem details to get the name
-            if (stemId) {
-              try {
-                const stemResponse = await fetch(`/api/stems/${stemId}`);
-                const stemData = await stemResponse.json();
-                
-                setPurchaseDetails({
-                  stemId,
-                  stemName: stemData.name || 'Purchased Stem',
-                  trackId: trackId || '',
-                  trackName: stemData.trackName || '',
-                });
-              } catch (err) {
-                console.error('Error fetching stem details:', err);
-                // Fallback to basic info without the stem name
-                setPurchaseDetails({
-                  stemId,
-                  stemName: 'Purchased Stem',
-                  trackId: trackId || '',
-                  trackName: '',
-                });
-              }
+            // Check if it's a single stem or multiple stems
+            if (metadata.stemId) {
+              // Single stem purchase
+              await fetchStemDetails(metadata.stemId, metadata.trackId);
+            } else if (metadata.stemIds) {
+              // Multiple stem purchase
+              const stemIds = metadata.stemIds.split(',');
+              await fetchMultipleStemDetails(stemIds);
             }
           }
         } else {
@@ -79,7 +73,74 @@ export default function SuccessPage() {
     };
 
     verifyPurchase();
-  }, [sessionId]);
+  }, [sessionId, router]);
+
+  const fetchStemDetails = async (stemId: string, trackId?: string) => {
+    try {
+      const stemResponse = await fetch(`/api/stems/${stemId}`);
+      if (!stemResponse.ok) {
+        throw new Error('Failed to fetch stem details');
+      }
+      
+      const stemData = await stemResponse.json();
+      
+      setPurchasedItems([{
+        stemId,
+        stemName: stemData.name || 'Purchased Stem',
+        trackId: trackId || stemData.trackId || '',
+        trackName: stemData.trackName || '',
+      }]);
+    } catch (err) {
+      console.error('Error fetching stem details:', err);
+      setPurchasedItems([{
+        stemId,
+        stemName: 'Purchased Stem',
+        trackId: trackId || '',
+        trackName: '',
+      }]);
+    }
+  };
+
+  const fetchMultipleStemDetails = async (stemIds: string[]) => {
+    try {
+      const items: PurchaseDetails[] = [];
+      
+      for (const stemId of stemIds) {
+        try {
+          const stemResponse = await fetch(`/api/stems/${stemId}`);
+          const stemData = await stemResponse.json();
+          
+          if (stemResponse.ok) {
+            items.push({
+              stemId,
+              stemName: stemData.name || `Stem ${stemId}`,
+              trackId: stemData.trackId || '',
+              trackName: stemData.trackName || '',
+            });
+          } else {
+            items.push({
+              stemId,
+              stemName: `Stem ${stemId}`,
+              trackId: '',
+              trackName: '',
+            });
+          }
+        } catch (err) {
+          console.error(`Error fetching details for stem ${stemId}:`, err);
+          items.push({
+            stemId,
+            stemName: `Stem ${stemId}`,
+            trackId: '',
+            trackName: '',
+          });
+        }
+      }
+      
+      setPurchasedItems(items);
+    } catch (err) {
+      console.error('Error fetching multiple stem details:', err);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -105,21 +166,40 @@ export default function SuccessPage() {
             </div>
             <p className="mb-6">{message}</p>
             
-            {/* Download button for purchased stem */}
-            {purchaseDetails && purchaseDetails.stemId && (
+            {/* Download buttons for purchased stems */}
+            {purchasedItems.length > 0 && (
               <div className="mb-6">
                 <p className="mb-3 text-gray-600">
-                  Your stem is ready for download:
+                  {purchasedItems.length === 1 
+                    ? "Your stem is ready for download:" 
+                    : "Your stems are ready for download:"}
                 </p>
-                <DownloadButton 
-                  stemId={purchaseDetails.stemId}
-                  stemName={purchaseDetails.stemName}
-                  sessionId={sessionId || undefined}
-                  buttonText="Download Your Stem"
-                  className="px-6 py-3 text-lg"
-                />
+                
+                <div className="space-y-3">
+                  {purchasedItems.map((item) => (
+                    <div key={item.stemId} className="p-3 border rounded-lg bg-gray-50">
+                      <p className="font-medium mb-2">
+                        {item.stemName}
+                        {item.trackName && <span className="text-sm text-gray-500 ml-1">({item.trackName})</span>}
+                      </p>
+                      <DownloadButton 
+                        stemId={item.stemId}
+                        stemName={item.stemName}
+                        sessionId={sessionId || undefined}
+                        buttonText="Download"
+                        className="w-full"
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
+
+            <div className="mt-6 pt-4 border-t">
+              <p className="text-sm text-gray-500 mb-4">
+                Your purchased stems will be available in your account for future downloads.
+              </p>
+            </div>
           </div>
         )}
         

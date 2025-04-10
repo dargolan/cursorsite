@@ -41,25 +41,24 @@ async function queryStrapi(endpoint: string, options: RequestInit = {}): Promise
 /**
  * Record a purchase in Strapi
  */
-async function recordPurchaseInStrapi(session: Stripe.Checkout.Session) {
+async function recordPurchaseInStrapi(
+  stemId: string, 
+  sessionId: string, 
+  userId: string, 
+  amount: number,
+  customerEmail: string,
+  trackId?: string
+): Promise<boolean> {
   try {
-    const { metadata } = session;
-    if (!metadata) {
-      console.error('No metadata found in session');
-      return false;
-    }
-
-    const { stemId, trackId, userId } = metadata;
-
     // Call Strapi's endpoint to record the purchase
     const data = {
       stemId,
-      trackId,
+      trackId: trackId || null,
       userId: userId || 'anonymous',
-      sessionId: session.id,
-      amount: session.amount_total ? session.amount_total / 100 : 0, // Convert cents to dollars
-      status: session.payment_status,
-      customerEmail: session.customer_details?.email || ''
+      sessionId,
+      amount,
+      status: 'completed',
+      customerEmail: customerEmail || ''
     };
 
     // Use the queryStrapi function to send the purchase data
@@ -81,9 +80,79 @@ async function recordPurchaseInStrapi(session: Stripe.Checkout.Session) {
 }
 
 /**
- * Process a stem purchase in the system
+ * Grant access to a stem for a user
  */
-async function processStemPurchase(session: Stripe.Checkout.Session) {
+async function grantStemAccess(stemId: string, userId: string): Promise<boolean> {
+  try {
+    // Skip if either stemId or userId is missing
+    if (!stemId || !userId) {
+      console.error('Missing stemId or userId for granting access');
+      return false;
+    }
+
+    // Use the queryStrapi function to grant access
+    const response = await queryStrapi('/api/stem-access', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        userId,
+        stemId,
+        source: 'stripe',
+        expiresAt: null // Permanent access
+      })
+    });
+
+    if (!response.ok) {
+      console.error('Failed to grant stem access:', await response.text());
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error granting stem access:', error);
+    return false;
+  }
+}
+
+/**
+ * Process a single stem purchase
+ */
+async function processSingleStemPurchase(
+  stemId: string, 
+  session: Stripe.Checkout.Session, 
+  trackId?: string
+): Promise<boolean> {
+  try {
+    const userId = session.metadata?.userId || 'anonymous';
+    const amount = session.amount_total ? session.amount_total / 100 : 0;
+    const customerEmail = session.customer_details?.email || '';
+    
+    // Record in Strapi
+    const purchaseRecorded = await recordPurchaseInStrapi(
+      stemId, 
+      session.id, 
+      userId, 
+      amount, 
+      customerEmail,
+      trackId
+    );
+    
+    // Grant access to the stem
+    if (purchaseRecorded && userId && userId !== 'anonymous') {
+      const accessGranted = await grantStemAccess(stemId, userId);
+      return accessGranted;
+    }
+
+    return purchaseRecorded;
+  } catch (error) {
+    console.error('Error processing stem purchase:', error);
+    return false;
+  }
+}
+
+/**
+ * Process multiple stem purchases from a cart
+ */
+async function processCartPurchases(session: Stripe.Checkout.Session): Promise<boolean> {
   try {
     const { metadata } = session;
     if (!metadata) {
@@ -91,36 +160,33 @@ async function processStemPurchase(session: Stripe.Checkout.Session) {
       return false;
     }
 
-    const { stemId, userId } = metadata;
+    // Get stem IDs from metadata
+    const stemIds = metadata.stemIds?.split(',') || [];
+    const itemCount = parseInt(metadata.itemCount || '0', 10);
     
-    // Record in Strapi
-    const purchaseRecorded = await recordPurchaseInStrapi(session);
-    
-    // Grant access to the stem
-    if (purchaseRecorded) {
-      // If we have a user ID, we can grant them access to the stem
-      if (userId) {
-        // Use the queryStrapi function to grant access
-        const response = await queryStrapi('/api/stem-access', {
-          method: 'POST',
-          body: JSON.stringify({ 
-            userId,
-            stemId,
-            source: 'stripe',
-            expiresAt: null // Permanent access
-          })
-        });
+    if (stemIds.length === 0 || stemIds.length !== itemCount) {
+      console.error(`Item count mismatch: expected ${itemCount}, got ${stemIds.length}`);
+      return false;
+    }
 
-        if (!response.ok) {
-          console.error('Failed to grant stem access:', await response.text());
-          return false;
-        }
+    // Calculate amount per item (simple average division)
+    const totalAmount = session.amount_total ? session.amount_total / 100 : 0;
+    const amountPerItem = totalAmount / itemCount;
+    
+    // Process each stem
+    let allSuccessful = true;
+    
+    for (const stemId of stemIds) {
+      const success = await processSingleStemPurchase(stemId, session);
+      if (!success) {
+        allSuccessful = false;
+        console.error(`Failed to process purchase for stem ${stemId}`);
       }
     }
 
-    return true;
+    return allSuccessful;
   } catch (error) {
-    console.error('Error processing stem purchase:', error);
+    console.error('Error processing cart purchases:', error);
     return false;
   }
 }
@@ -157,15 +223,36 @@ export async function POST(request: Request) {
       // Process the order
       console.log('Processing checkout session completed:', session.id);
       
-      // Process the stem purchase
-      const success = await processStemPurchase(session);
-      
-      if (success) {
-        console.log(`Successfully processed purchase for session ${session.id}`);
-        return NextResponse.json({ received: true, status: 'success' });
+      // Check if it's a single stem or cart purchase
+      if (session.metadata?.stemId) {
+        // Single stem purchase
+        const success = await processSingleStemPurchase(
+          session.metadata.stemId,
+          session,
+          session.metadata.trackId
+        );
+        
+        if (success) {
+          console.log(`Successfully processed purchase for stem ${session.metadata.stemId}`);
+          return NextResponse.json({ received: true, status: 'success' });
+        } else {
+          console.error(`Failed to process purchase for stem ${session.metadata.stemId}`);
+          return NextResponse.json({ received: true, status: 'processing_failed' }, { status: 500 });
+        }
+      } else if (session.metadata?.stemIds) {
+        // Cart purchase with multiple stems
+        const success = await processCartPurchases(session);
+        
+        if (success) {
+          console.log(`Successfully processed cart purchase for session ${session.id}`);
+          return NextResponse.json({ received: true, status: 'success' });
+        } else {
+          console.error(`Failed to process some items in cart for session ${session.id}`);
+          return NextResponse.json({ received: true, status: 'partial_success' }, { status: 500 });
+        }
       } else {
-        console.error(`Failed to process purchase for session ${session.id}`);
-        return NextResponse.json({ received: true, status: 'processing_failed' }, { status: 500 });
+        console.error(`No stem IDs found in session metadata`);
+        return NextResponse.json({ received: true, status: 'missing_metadata' }, { status: 400 });
       }
     }
 

@@ -1,5 +1,9 @@
 import '../styles/globals.css';
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import { CartProvider } from '@/contexts/CartContext';
+
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Music Library',
@@ -27,9 +31,11 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-[#121212]">
-        <main className="min-h-screen">
-          {children}
-        </main>
+        <CartProvider>
+          <main className="min-h-screen">
+            {children}
+          </main>
+        </CartProvider>
       </body>
     </html>
   );
