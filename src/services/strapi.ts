@@ -714,6 +714,70 @@ async function createDummyAudioFiles(): Promise<void> {
 // Export a utility function to help find stem files
 export async function findStemFile(stemName: string, trackTitle: string): Promise<string | null> {
   try {
+    console.log(`Finding stem file: "${stemName}" for track "${trackTitle}"`);
+    
+    // Step 1: First try to find the parent track by title
+    // This is a more reliable approach as it preserves the track-stem relationship
+    const encodedTitle = encodeURIComponent(trackTitle);
+    const trackApiUrl = `${API_URL}/tracks?filters[title][$containsi]=${encodedTitle}&populate=*`;
+    
+    console.log(`Searching for parent track: ${trackApiUrl}`);
+    const trackResponse = await fetch(trackApiUrl, {
+      headers: getHeaders()
+    });
+    
+    if (trackResponse.ok) {
+      const trackData = await trackResponse.json();
+      
+      if (trackData.data && trackData.data.length > 0) {
+        console.log(`Found ${trackData.data.length} matching tracks`);
+        
+        // Find the best matching track
+        const matchingTrack = trackData.data.find((t: any) => 
+          t.attributes.title.toLowerCase() === trackTitle.toLowerCase()
+        ) || trackData.data[0]; // Fallback to first result if no exact match
+        
+        console.log(`Selected track: ${matchingTrack.attributes.title} (ID: ${matchingTrack.id})`);
+        
+        // Get the stems from the track
+        const stems = matchingTrack.attributes.stems || [];
+        
+        if (stems.length > 0) {
+          console.log(`Track has ${stems.length} stems`);
+          
+          // Find the stem by name
+          const matchingStem = stems.find((s: any) => 
+            (s.name && s.name.toLowerCase() === stemName.toLowerCase()) || 
+            (s.Name && s.Name.toLowerCase() === stemName.toLowerCase())
+          );
+          
+          if (matchingStem) {
+            console.log(`Found matching stem: ${matchingStem.name || matchingStem.Name}`);
+            
+            // Get the audio file URL from the stem
+            const audioFile = matchingStem.audio || matchingStem.file;
+            
+            if (audioFile && audioFile.data && audioFile.data.attributes) {
+              const url = `${STRAPI_URL}${audioFile.data.attributes.url}`;
+              console.log(`✅ Found stem URL from track-stem relationship: ${url}`);
+              return url;
+            }
+          }
+          
+          console.log(`No matching stem found with name "${stemName}" in track stems`);
+        } else {
+          console.log(`Track has no stems`);
+        }
+      } else {
+        console.log(`No tracks found matching "${trackTitle}"`);
+      }
+    } else {
+      console.log(`Error fetching track: ${trackResponse.status}`);
+    }
+    
+    // Step 2: Fallback - try to find by file pattern (our previous approach)
+    console.log('Falling back to file pattern search');
+    
     // Clean up names for filename matching
     const cleanStemName = stemName.replace(/ /g, '_');
     const cleanTrackTitle = trackTitle.replace(/ /g, '_');
@@ -721,6 +785,7 @@ export async function findStemFile(stemName: string, trackTitle: string): Promis
     // Build URL patterns to try (based on the file naming patterns we observed)
     const patterns = [
       `${cleanStemName}_${cleanTrackTitle}`, // Example: Drums_Elevator_music
+      `${cleanTrackTitle}_${cleanStemName}`, // Example: Elevator_music_Drums
       `${cleanStemName}`,                    // Example: Drums
     ];
     
@@ -737,24 +802,57 @@ export async function findStemFile(stemName: string, trackTitle: string): Promis
     const files = await response.json();
     console.log(`Found ${files.length} total files on server`);
     
-    // Filter to just MP3 files
-    const audioFiles = files.filter((f: any) => f.mime === 'audio/mpeg');
+    // Filter to just audio files (include all audio formats)
+    const audioFiles = files.filter((f: any) => 
+      f.mime && (f.mime.startsWith('audio/') || f.mime.includes('audio'))
+    );
     console.log(`Found ${audioFiles.length} audio files`);
     
+    // Log available audio files for debugging
+    console.log("Available audio files:", audioFiles.map((f: any) => f.name));
+    
     // Try to find a match using our patterns
+    let possibleMatches = [];
+    
     for (const pattern of patterns) {
-      const match = audioFiles.find((f: any) => 
-        f.name.includes(pattern) || f.hash.includes(pattern.toLowerCase())
-      );
+      const matches = audioFiles.filter((f: any) => {
+        const fileName = f.name.toLowerCase();
+        const patternLower = pattern.toLowerCase();
+        return fileName.includes(patternLower);
+      });
       
-      if (match) {
-        const url = `${STRAPI_URL}${match.url}`;
-        console.log(`Found matching file for ${stemName} in ${trackTitle}: ${url}`);
-        return url;
+      if (matches.length > 0) {
+        possibleMatches.push(...matches);
       }
     }
     
-    console.log(`No matching file found for ${stemName} in ${trackTitle}`);
+    // Prioritize more specific matches
+    possibleMatches.sort((a, b) => {
+      const aName = a.name.toLowerCase();
+      const bName = b.name.toLowerCase();
+      
+      // Check if file contains both stem name and track title
+      const aHasBoth = aName.includes(cleanStemName.toLowerCase()) && aName.includes(cleanTrackTitle.toLowerCase());
+      const bHasBoth = bName.includes(cleanStemName.toLowerCase()) && bName.includes(cleanTrackTitle.toLowerCase());
+      
+      if (aHasBoth && !bHasBoth) return -1;
+      if (!aHasBoth && bHasBoth) return 1;
+      
+      // Prefer shorter filenames (less noise)
+      return aName.length - bName.length;
+    });
+    
+    if (possibleMatches.length > 0) {
+      const bestMatch = possibleMatches[0];
+      const url = bestMatch.url.startsWith('/') 
+        ? `${STRAPI_URL}${bestMatch.url}` 
+        : `${STRAPI_URL}/${bestMatch.url}`;
+      
+      console.log(`⚠️ Found stem file by pattern matching: ${url}`);
+      return url;
+    }
+    
+    console.log(`❌ No matching file found for ${stemName} in ${trackTitle}`);
     return null;
   } catch (error) {
     console.error('Error finding stem file:', error);

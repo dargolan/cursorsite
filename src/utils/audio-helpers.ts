@@ -45,16 +45,56 @@ export function getConsistentStemUrl(stemName: string, trackTitle: string): stri
 // Function to search for a stem file through the Strapi API
 export async function findStemFileUrl(stemName: string, trackTitle: string): Promise<string | null> {
   try {
+    console.log(`Looking for stem "${stemName}" in track "${trackTitle}"`);
+    
     // First try to use the utility function from strapi.ts that was made for this purpose
+    // This now uses a more reliable method that fetches stems directly from their parent track
     const strapiStemUrl = await findStemFile(stemName, trackTitle);
     if (strapiStemUrl) {
+      console.log(`✅ Found stem URL via strapi.ts: ${strapiStemUrl}`);
       return strapiStemUrl;
     }
     
-    // If the utility function doesn't find it, fall back to our own implementation
+    // If no URL was found through the track relationship, try different approaches
+    console.log(`⚠️ Trying alternative approaches for stem "${stemName}" in "${trackTitle}"`);
+    
+    // Use hash-based approach for known tracks
+    const trackLower = trackTitle.toLowerCase();
+    
+    // Handle special case for Lo-Fi Beats
+    if ((trackLower === 'lo-fi beat' || trackLower === 'lo-fi beats') && LOFI_BEATS_STEM_HASHES[stemName]) {
+      const url = `${STRAPI_URL}/uploads/${stemName}_Lo_Fi_Beat_${LOFI_BEATS_STEM_HASHES[stemName]}.mp3`;
+      console.log(`🔍 Using hash-based URL for Lo-Fi Beats: ${url}`);
+      return url;
+    }
+    
+    // Handle special case for Elevator Music
+    if (trackLower === 'elevator music' && ELEVATOR_MUSIC_STEM_HASHES[stemName]) {
+      const url = `${STRAPI_URL}/uploads/${stemName}_Elevator_music_${ELEVATOR_MUSIC_STEM_HASHES[stemName]}.mp3`;
+      console.log(`🔍 Using hash-based URL for Elevator Music: ${url}`);
+      return url;
+    }
+    
+    // Handle special case for Crazy Meme Music
+    if (trackLower === 'crazy meme music' && CRAZY_MEME_MUSIC_STEM_HASHES[stemName]) {
+      const url = `${STRAPI_URL}/uploads/${stemName}_Crazy_meme_music_${CRAZY_MEME_MUSIC_STEM_HASHES[stemName]}.mp3`;
+      console.log(`🔍 Using hash-based URL for Crazy Meme Music: ${url}`);
+      return url;
+    }
+    
+    // Handle special case for Dramatic Epic Cinema
+    if ((trackLower.includes('dramatic') && (trackLower.includes('epic') || trackLower.includes('countdown'))) && 
+        DRAMATIC_EPIC_CINEMA_STEM_HASHES[stemName]) {
+      const url = `${STRAPI_URL}/uploads/${stemName}_Dramatic_Countdown_${DRAMATIC_EPIC_CINEMA_STEM_HASHES[stemName]}.mp3`;
+      console.log(`🔍 Using hash-based URL for Dramatic Epic: ${url}`);
+      return url;
+    }
+    
+    // If we don't have a hash-based approach, try the API search
     const basePattern = getConsistentStemUrl(stemName, trackTitle);
     const apiUrl = `${STRAPI_URL}/api/upload/files?filters[name][$contains]=${encodeURIComponent(basePattern)}`;
     
+    console.log(`🌐 Searching Strapi API for ${basePattern}`);
     const response = await fetch(apiUrl);
     if (!response.ok) {
       throw new Error(`API request failed: ${response.status}`);
@@ -62,6 +102,8 @@ export async function findStemFileUrl(stemName: string, trackTitle: string): Pro
     
     const files = await response.json();
     if (files && files.length > 0) {
+      console.log(`Found ${files.length} possible files`);
+      
       // Sort to find the most relevant match
       const sortedFiles = [...files].sort((a, b) => {
         // Prioritize files that match our pattern exactly (may have different hash)
@@ -93,9 +135,11 @@ export async function findStemFileUrl(stemName: string, trackTitle: string): Pro
         ? `${STRAPI_URL}${bestMatch.url}` 
         : `${STRAPI_URL}/${bestMatch.url}`;
       
+      console.log(`📁 Found best match by API search: ${bestMatch.name} -> ${url}`);
       return url;
     }
     
+    console.log(`❌ All approaches failed for stem "${stemName}" in track "${trackTitle}"`);
     return null;
   } catch (error) {
     console.error(`Error searching for stem file: ${error}`);

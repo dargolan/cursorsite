@@ -27,7 +27,9 @@ function StemItem({
     toggle, 
     duration, 
     currentTime, 
-    progress 
+    progress,
+    reload,
+    url
   } = useStemPlayer({ stem, track });
 
   const handleAddToCart = () => {
@@ -41,6 +43,11 @@ function StemItem({
       onRemoveFromCart(stem);
     }
   };
+
+  const handleRetry = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    reload();
+  };
   
   // Determine if the play button should be disabled
   const isDisabled = isLoadingUrl || isLoading || isError;
@@ -48,6 +55,13 @@ function StemItem({
   // Calculate formatted time displays
   const currentTimeDisplay = formatTime(currentTime);
   const durationDisplay = formatTime(duration);
+
+  // Get the filename from URL for display
+  const getFilenameFromUrl = (url: string | null) => {
+    if (!url) return '';
+    const parts = url.split('/');
+    return parts[parts.length - 1] || '';
+  };
 
   return (
     <div className="flex flex-col md:flex-row items-start md:items-center p-3 border-b border-gray-700">
@@ -84,10 +98,39 @@ function StemItem({
         
         {/* Stem Name and Status */}
         <div className="flex-grow">
-          <h3 className="text-lg font-medium">{stem.name}</h3>
+          <div className="flex items-center">
+            <h3 className="text-lg font-medium">{stem.name}</h3>
+            {isLoading && <span className="ml-2 text-yellow-400 text-xs">(Loading...)</span>}
+            {!isLoading && !isError && url && <span className="ml-2 text-green-400 text-xs">(Ready)</span>}
+          </div>
+          
           {isError && (
-            <p className="text-red-500 text-sm">{error || 'Audio unavailable'}</p>
+            <div className="text-red-500 text-sm">
+              <p>{error || 'Audio unavailable'}</p>
+              {url && (
+                <p className="text-xs opacity-70 mt-1">
+                  Failed URL: {getFilenameFromUrl(url)}
+                  <button 
+                    onClick={handleRetry}
+                    className="ml-2 px-2 py-0.5 bg-blue-600 rounded text-white hover:bg-blue-700"
+                  >
+                    Retry
+                  </button>
+                </p>
+              )}
+              {!url && (
+                <button 
+                  onClick={handleRetry}
+                  className="mt-1 px-2 py-0.5 bg-blue-600 rounded text-white hover:bg-blue-700"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
           )}
+          
+          {/* Track display for verification */}
+          <p className="text-xs text-gray-400">Track: {track.title}</p>
         </div>
       </div>
       
