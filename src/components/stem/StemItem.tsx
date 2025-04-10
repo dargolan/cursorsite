@@ -1,173 +1,131 @@
-import React, { useState, useEffect } from 'react';
+import React, { memo } from 'react';
 import { Stem, Track } from '../../types';
-import { globalAudioManager } from '../../lib/audio-manager';
-import { saveStemUrlToCache } from '../../utils/stem-cache';
-import { findStemFile } from '../../services/strapi';
+import { useStemPlayer } from '../../hooks/useStemPlayer';
+import { formatTime } from '../../utils/audio-utils';
 
 interface StemItemProps {
   stem: Stem;
   track: Track;
-  onAddToCart: (stem: Stem, track: Track) => void;
-  isPlaying: boolean;
-  isOpen: boolean;
+  onAddToCart?: (stem: Stem) => void;
+  onRemoveFromCart?: (stem: Stem) => void;
+  inCart?: boolean;
 }
 
-export const StemItem = ({ stem, track, onAddToCart, isPlaying, isOpen }: StemItemProps) => {
-  const [progress, setProgress] = useState(0);
-  const [stemPlaying, setStemPlaying] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    // Listen for stem-stopped events
-    const handleStemStopped = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      if (customEvent.detail.stemId === stem.id) {
-        setStemPlaying(false);
-      }
-    };
-
-    document.addEventListener('stem-stopped', handleStemStopped);
-    return () => {
-      document.removeEventListener('stem-stopped', handleStemStopped);
-    };
-  }, [stem.id]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      // If the stem container is closed, stop playback
-      if (stemPlaying && audio) {
-        globalAudioManager.stop();
-        setStemPlaying(false);
-      }
-      return;
-    }
-
-    const loadStemAudio = async () => {
-      if (audio) return; // Already loaded
-
-      try {
-        setLoading(true);
-        
-        // Try to find the stem file
-        const stemUrl = await findStemFile(stem.name, track.title);
-        if (!stemUrl) {
-          setLoadError(true);
-          setLoading(false);
-          return;
-        }
-
-        // Create and configure audio element
-        const newAudio = new Audio(stemUrl);
-        newAudio.dataset.stem = stem.name;
-        newAudio.dataset.track = track.title;
-        newAudio.dataset.stemId = stem.id;
-        newAudio.dataset.trackId = track.id;
-
-        // Save the successful URL to cache
-        saveStemUrlToCache(track.title, stem.name, stemUrl);
-        
-        // Set up event handlers
-        newAudio.addEventListener('timeupdate', () => {
-          const current = newAudio.currentTime;
-          const duration = newAudio.duration || stem.duration || 30;
-          setProgress((current / duration) * 100);
-        });
-
-        newAudio.addEventListener('ended', () => {
-          setStemPlaying(false);
-          setProgress(0);
-          if (globalAudioManager.activeAudio === newAudio) {
-            globalAudioManager.stop();
-          }
-        });
-
-        newAudio.addEventListener('canplaythrough', () => {
-          setLoading(false);
-          setLoadError(false);
-        });
-
-        newAudio.addEventListener('error', () => {
-          setLoadError(true);
-          setLoading(false);
-        });
-
-        setAudio(newAudio);
-      } catch (err) {
-        console.error(`Failed to create audio element for ${stem.name}`);
-        setLoadError(true);
-        setLoading(false);
-      }
-    };
-
-    loadStemAudio();
-
-    // Cleanup function
-    return () => {
-      if (audio) {
-        audio.pause();
-        audio.src = '';
-        audio.remove();
-      }
-    };
-  }, [stem, track, isOpen, audio]);
-
-  const togglePlay = () => {
-    if (!audio) return;
-    
-    if (stemPlaying) {
-      globalAudioManager.stop();
-      setStemPlaying(false);
-    } else {
-      globalAudioManager.play(audio, { stemId: stem.id, trackId: track.id });
-      setStemPlaying(true);
-    }
-  };
+function StemItem({ 
+  stem, 
+  track, 
+  onAddToCart, 
+  onRemoveFromCart, 
+  inCart = false 
+}: StemItemProps) {
+  const { 
+    isPlaying, 
+    isLoading, 
+    isLoadingUrl, 
+    isError, 
+    error, 
+    toggle, 
+    duration, 
+    currentTime, 
+    progress 
+  } = useStemPlayer({ stem, track });
 
   const handleAddToCart = () => {
-    onAddToCart(stem, track);
+    if (onAddToCart) {
+      onAddToCart(stem);
+    }
   };
 
+  const handleRemoveFromCart = () => {
+    if (onRemoveFromCart) {
+      onRemoveFromCart(stem);
+    }
+  };
+  
+  // Determine if the play button should be disabled
+  const isDisabled = isLoadingUrl || isLoading || isError;
+  
+  // Calculate formatted time displays
+  const currentTimeDisplay = formatTime(currentTime);
+  const durationDisplay = formatTime(duration);
+
   return (
-    <div className="flex flex-col p-2 mb-2 bg-gray-800 rounded-md">
-      <div className="flex justify-between items-center">
-        <span className="text-white font-medium">{stem.name}</span>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={togglePlay}
-            disabled={loading || loadError}
-            className={`px-2 py-1 rounded ${
-              stemPlaying 
+    <div className="flex flex-col md:flex-row items-start md:items-center p-3 border-b border-gray-700">
+      <div className="flex-grow flex items-center">
+        {/* Play/Pause Button */}
+        <button
+          onClick={toggle}
+          disabled={isDisabled}
+          className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 ${
+            isDisabled 
+              ? 'bg-gray-700 cursor-not-allowed opacity-50' 
+              : isPlaying 
                 ? 'bg-red-600 hover:bg-red-700' 
                 : 'bg-blue-600 hover:bg-blue-700'
-            } ${(loading || loadError) ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            {loading ? 'Loading...' : stemPlaying ? 'Stop' : 'Play'}
-          </button>
-          <button
-            onClick={handleAddToCart}
-            className="px-2 py-1 rounded bg-green-600 hover:bg-green-700"
-          >
-            +${stem.price}
-          </button>
+          }`}
+          aria-label={isPlaying ? 'Pause' : 'Play'}
+        >
+          {isLoadingUrl ? (
+            <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          ) : isPlaying ? (
+            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <rect x="6" y="4" width="4" height="16" />
+              <rect x="14" y="4" width="4" height="16" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <polygon points="5,3 19,12 5,21" />
+            </svg>
+          )}
+        </button>
+        
+        {/* Stem Name and Status */}
+        <div className="flex-grow">
+          <h3 className="text-lg font-medium">{stem.name}</h3>
+          {isError && (
+            <p className="text-red-500 text-sm">{error || 'Audio unavailable'}</p>
+          )}
         </div>
       </div>
       
-      {loadError && (
-        <div className="mt-2 text-red-400 text-sm">
-          Failed to load stem audio.
-        </div>
-      )}
+      {/* Progress Bar */}
+      <div className="w-full md:w-1/3 h-2 bg-gray-700 rounded-full mx-2 my-3 md:my-0 overflow-hidden">
+        <div 
+          className={`h-full rounded-full ${isPlaying ? 'bg-green-500' : 'bg-blue-500'}`} 
+          style={{ width: `${progress}%` }}
+        ></div>
+      </div>
       
-      {!loadError && (
-        <div className="mt-2 w-full bg-gray-700 rounded-full h-2">
-          <div 
-            className="bg-blue-500 h-2 rounded-full" 
-            style={{ width: `${progress}%` }}
-          ></div>
-        </div>
-      )}
+      {/* Time Display */}
+      <div className="text-sm text-gray-400 whitespace-nowrap mx-2">
+        {currentTimeDisplay} / {durationDisplay}
+      </div>
+      
+      {/* Price and Cart Button */}
+      <div className="flex items-center mt-3 md:mt-0">
+        <span className="text-lg font-semibold mr-3">€{stem.price?.toFixed(2) || '0.00'}</span>
+        {inCart ? (
+          <button
+            onClick={handleRemoveFromCart}
+            className="bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded"
+          >
+            Remove
+          </button>
+        ) : (
+          <button
+            onClick={handleAddToCart}
+            className="bg-green-600 hover:bg-green-700 text-white py-1 px-3 rounded"
+          >
+            Add to Cart
+          </button>
+        )}
+      </div>
     </div>
   );
-}; 
+}
+
+// Memoize the component to prevent unnecessary re-renders
+export default memo(StemItem); 

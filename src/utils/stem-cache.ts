@@ -20,6 +20,12 @@ export function saveStemUrlToCache(trackTitle: string, stemName: string, url: st
   }
 }
 
+// Get stem URL from cache
+export function getStemUrlFromCache(trackTitle: string, stemName: string): string | null {
+  const cacheKey = `${trackTitle}:${stemName}`;
+  return stemUrlCache[cacheKey] || null;
+}
+
 // Initialize cache from local storage
 export function initStemUrlCache() {
   if (typeof window !== 'undefined' && window.localStorage) {
