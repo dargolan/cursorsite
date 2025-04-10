@@ -8,7 +8,7 @@ import { Tag, Stem, Track, CartItem } from '../types';
 import Header from '../components/Header';
 import Image from 'next/image';
 import { getTracks, getTags, getTracksByTags, searchTracks } from '../services/strapi';
-import { getCart, addToCart, removeFromCart, getCartTotal } from '../services/cart';
+import { useCart } from '../contexts/CartContext';
 import AudioPlayer from '../components/AudioPlayer';
 import Footer from '../components/Footer';
 import { useDebounce } from '../hooks/useDebounce';
@@ -38,9 +38,8 @@ export default function MusicLibrary() {
   // Audio player state
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
   
-  // Cart state
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [cartTotal, setCartTotal] = useState(0);
+  // Access cart functions from CartContext
+  const { items: cartItems, addItem, removeItem, getTotalPrice } = useCart();
 
   // Tags categorized by type
   const [genres, setGenres] = useState<Tag[]>([]);
@@ -148,24 +147,6 @@ export default function MusicLibrary() {
     fetchData();
   }, []);
 
-  // Load cart from localStorage
-  useEffect(() => {
-    const loadCart = () => {
-      const cart = getCart();
-      setCartItems(cart);
-      setCartTotal(getCartTotal());
-    };
-    
-    loadCart();
-    
-    // Listen for storage events to update cart if changed in another tab
-    window.addEventListener('storage', loadCart);
-    
-    return () => {
-      window.removeEventListener('storage', loadCart);
-    };
-  }, []);
-
   // Filter tracks based on selected tags, search query, and ranges
   useEffect(() => {
     // Start with all tracks
@@ -238,19 +219,21 @@ export default function MusicLibrary() {
     setDurationRange(range);
   }, []);
 
-  // Handler for adding a stem to cart
+  // Handle adding a stem to the cart using CartContext
   const handleAddToCart = useCallback((stem: Stem, track: Track) => {
-    addToCart(stem, track);
-    setCartItems(getCart());
-    setCartTotal(getCartTotal());
-  }, []);
+    addItem({
+      id: stem.id,
+      name: stem.name,
+      trackName: track.title,
+      price: stem.price,
+      imageUrl: track.imageUrl
+    });
+  }, [addItem]);
 
-  // Handler for removing an item from cart
+  // Handle removing an item from the cart using CartContext
   const handleRemoveFromCart = useCallback((itemId: string) => {
-    removeFromCart(itemId);
-    setCartItems(getCart());
-    setCartTotal(getCartTotal());
-  }, []);
+    removeItem(itemId);
+  }, [removeItem]);
 
   // Handler for tag click
   const handleTagClick = useCallback((tag: Tag) => {
@@ -334,9 +317,7 @@ export default function MusicLibrary() {
               isPlaying={playingTrackId === track.id}
               onPlay={() => setPlayingTrackId(track.id)}
               onStop={() => setPlayingTrackId(null)}
-              onAddToCart={handleAddToCart}
               onTagClick={handleTagClick}
-              onRemoveFromCart={handleRemoveFromCart}
               openStemsTrackId={openStemsTrackId}
               setOpenStemsTrackId={setOpenStemsTrackId}
             />
@@ -348,7 +329,7 @@ export default function MusicLibrary() {
 
   return (
     <div className="flex flex-col min-h-screen bg-[#121212] text-white">
-      <Header cartTotal={cartTotal} cartItems={cartItems} onRemoveFromCart={handleRemoveFromCart} />
+      <Header />
       
       <main className="flex flex-1">
         {/* Sidebar with filter controls */}
@@ -393,9 +374,9 @@ export default function MusicLibrary() {
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+                        </svg>
+                      </button>
+                    </div>
                   )}
                   
                   <button 
@@ -409,11 +390,11 @@ export default function MusicLibrary() {
                   </button>
                 </div>
               )}
-              </div>
+            </div>
               
             {/* Tracks list */}
             {renderContent()}
-            </div>
+          </div>
         </div>
       </main>
       <Footer />
