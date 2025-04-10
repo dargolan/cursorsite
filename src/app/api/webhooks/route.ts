@@ -183,7 +183,7 @@ async function processCartPurchases(session: Stripe.Checkout.Session): Promise<b
         console.error(`Failed to process purchase for stem ${stemId}`);
       }
     }
-
+    
     return allSuccessful;
   } catch (error) {
     console.error('Error processing cart purchases:', error);
@@ -191,72 +191,48 @@ async function processCartPurchases(session: Stripe.Checkout.Session): Promise<b
   }
 }
 
+/**
+ * Handle POST requests for webhook events from Stripe
+ */
 export async function POST(request: Request) {
   try {
-    // Get the signature from the headers
-    const signature = request.headers.get('stripe-signature');
+    const payload = await request.text();
+    const sig = request.headers.get('stripe-signature') || '';
     
-    if (!signature) {
-      return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
+    if (!process.env.STRIPE_WEBHOOK_SECRET) {
+      throw new Error('Missing STRIPE_WEBHOOK_SECRET');
     }
-
-    // Get the raw body
-    const rawBody = await request.text();
-
-    // Verify the event with Stripe
-    let event;
-    try {
-      event = stripe.webhooks.constructEvent(
-        rawBody,
-        signature,
-        process.env.STRIPE_WEBHOOK_SECRET || ''
-      );
-    } catch (err: any) {
-      console.error(`Webhook signature verification failed: ${err.message}`);
-      return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
-    }
-
-    // Handle different event types
+    
+    // Verify webhook signature
+    const event = stripe.webhooks.constructEvent(
+      payload,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+    
+    // Log the event type for debugging
+    console.log(`Stripe webhook received: ${event.type}`);
+    
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
       
-      // Process the order
-      console.log('Processing checkout session completed:', session.id);
-      
-      // Check if it's a single stem or cart purchase
+      // Extract stem information from the session
       if (session.metadata?.stemId) {
         // Single stem purchase
-        const success = await processSingleStemPurchase(
+        await processSingleStemPurchase(
           session.metadata.stemId,
           session,
           session.metadata.trackId
         );
-        
-        if (success) {
-          console.log(`Successfully processed purchase for stem ${session.metadata.stemId}`);
-          return NextResponse.json({ received: true, status: 'success' });
-        } else {
-          console.error(`Failed to process purchase for stem ${session.metadata.stemId}`);
-          return NextResponse.json({ received: true, status: 'processing_failed' }, { status: 500 });
-        }
       } else if (session.metadata?.stemIds) {
         // Cart purchase with multiple stems
-        const success = await processCartPurchases(session);
-        
-        if (success) {
-          console.log(`Successfully processed cart purchase for session ${session.id}`);
-          return NextResponse.json({ received: true, status: 'success' });
-        } else {
-          console.error(`Failed to process some items in cart for session ${session.id}`);
-          return NextResponse.json({ received: true, status: 'partial_success' }, { status: 500 });
-        }
+        await processCartPurchases(session);
       } else {
-        console.error(`No stem IDs found in session metadata`);
-        return NextResponse.json({ received: true, status: 'missing_metadata' }, { status: 400 });
+        console.error('No stem information found in session metadata');
       }
     }
-
-    // Return a response for other event types
+    
+    // Send a 200 response to acknowledge receipt of the event
     return NextResponse.json({ received: true, type: event.type });
   } catch (error) {
     console.error('Webhook error:', error);

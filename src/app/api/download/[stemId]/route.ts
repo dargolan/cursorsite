@@ -205,7 +205,7 @@ async function fetchStemDetails(stemId: string): Promise<{ url: string; name: st
       
       // Fallback to tracks API to find the stem
       // This is needed because stems might be nested within tracks
-      const tracksResponse = await queryStrapi('/api/tracks?populate=stems');
+      const tracksResponse = await queryStrapi('/api/tracks?populate=stems.audio');
       
       if (!tracksResponse.ok) {
         return null;
@@ -214,7 +214,9 @@ async function fetchStemDetails(stemId: string): Promise<{ url: string; name: st
       const tracksData = await tracksResponse.json();
       
       // Search for the stem in all tracks
-      let stemDetails = null;
+      let stemUrl = null;
+      let stemName = '';
+      
       if (tracksData && tracksData.data) {
         for (const track of tracksData.data) {
           if (track.attributes && track.attributes.stems) {
@@ -222,34 +224,41 @@ async function fetchStemDetails(stemId: string): Promise<{ url: string; name: st
               (stem: any) => stem.id === stemId || `${track.id}-stem-${stem.id}` === stemId
             );
             
-            if (foundStem) {
-              stemDetails = {
-                url: foundStem.attributes.audio?.data?.attributes?.url || '',
-                name: foundStem.attributes.name || `stem-${stemId}.mp3`
-              };
+            if (foundStem && foundStem.attributes) {
+              stemUrl = foundStem.attributes.audio?.data?.attributes?.url || null;
+              stemName = foundStem.attributes.name || `Stem ${stemId}`;
               break;
             }
           }
         }
       }
       
-      return stemDetails;
+      if (!stemUrl) {
+        return null;
+      }
+      
+      return {
+        url: stemUrl,
+        name: stemName
+      };
     }
 
     const data = await response.json();
     
-    if (!data || !data.data) {
+    if (!data || !data.data || !data.data.attributes) {
       return null;
     }
     
-    // Extract the file URL and name
-    const stem = data.data;
-    const audioUrl = stem.attributes?.audio?.data?.attributes?.url || '';
-    const stemName = stem.attributes?.name || `stem-${stemId}.mp3`;
+    const attributes = data.data.attributes;
+    const audioUrl = attributes.audio?.data?.attributes?.url;
+    
+    if (!audioUrl) {
+      return null;
+    }
     
     return {
       url: audioUrl,
-      name: stemName
+      name: attributes.name || `Stem ${stemId}`
     };
   } catch (error) {
     console.error('Error fetching stem details:', error);
@@ -258,26 +267,22 @@ async function fetchStemDetails(stemId: string): Promise<{ url: string; name: st
 }
 
 /**
- * Generate a secure, time-limited download URL
+ * Generate a secure download URL for the file
  */
 async function generateSecureDownloadUrl(fileUrl: string, fileName: string): Promise<string | null> {
-  // Check if the URL is already absolute
-  if (fileUrl.startsWith('http')) {
-    return fileUrl;
+  try {
+    // In a real implementation, you might generate a signed URL with AWS S3 or similar
+    // For this example, we'll just return a fully qualified URL
+    if (fileUrl.startsWith('http')) {
+      return fileUrl;
+    }
+    
+    // If it's a relative URL, prepend the Strapi URL
+    return `${STRAPI_URL}${fileUrl}`;
+  } catch (error) {
+    console.error('Error generating secure download URL:', error);
+    return null;
   }
-  
-  // Build the complete URL
-  const fullUrl = `${STRAPI_URL}${fileUrl}`;
-  
-  // Use our proxy endpoint for security and CORS handling
-  const proxyUrl = `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/api/proxy${fileUrl}`;
-  
-  // Add download parameters to force download with proper filename
-  const downloadUrl = new URL(proxyUrl);
-  downloadUrl.searchParams.append('download', 'true');
-  downloadUrl.searchParams.append('filename', fileName);
-  
-  return downloadUrl.toString();
 }
 
 /**
@@ -285,32 +290,30 @@ async function generateSecureDownloadUrl(fileUrl: string, fileName: string): Pro
  */
 async function proxyFileDownload(fileUrl: string, fileName: string): Promise<NextResponse> {
   try {
-    // Build the complete URL if it's not already absolute
+    // Construct the full URL if it's a relative path
     const fullUrl = fileUrl.startsWith('http') ? fileUrl : `${STRAPI_URL}${fileUrl}`;
     
     // Fetch the file
     const response = await fetch(fullUrl);
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch file: ${response.status}`);
+      throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
     }
     
-    // Get the file data as an array buffer
-    const fileData = await response.arrayBuffer();
+    // Get the file data
+    const data = await response.arrayBuffer();
     
-    // Create a readable stream from the array buffer
-    const buffer = Buffer.from(fileData);
-    
-    // Set headers for file download
-    const headers = new Headers();
-    headers.set('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
-    headers.set('Content-Type', response.headers.get('Content-Type') || 'application/octet-stream');
-    headers.set('Content-Length', buffer.length.toString());
+    // Get content type
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
     
     // Return the file with appropriate headers
-    return new NextResponse(buffer, {
+    return new NextResponse(data, {
       status: 200,
-      headers
+      headers: {
+        'Content-Type': contentType,
+        'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`,
+        'Content-Length': response.headers.get('content-length') || '',
+      },
     });
   } catch (error) {
     console.error('Error proxying file download:', error);
