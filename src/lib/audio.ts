@@ -118,4 +118,19 @@ export function preloadAudio(src: string): Promise<HTMLAudioElement> {
     
     audio.load();
   });
+}
+
+/**
+ * Check if a URL exists by sending a HEAD request
+ * @param url The URL to check
+ * @returns Promise<boolean> True if the URL exists, false otherwise
+ */
+export async function checkIfUrlExists(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, { method: 'HEAD' });
+    return response.ok;
+  } catch (error) {
+    console.error('Error checking if URL exists:', error);
+    return false;
+  }
 } 
