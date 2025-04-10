@@ -1,60 +1,92 @@
-// Global audio manager to ensure only one audio source plays at a time
-export const globalAudioManager = {
-  activeAudio: null as HTMLAudioElement | null,
-  activeStemId: null as string | null,
-  activeTrackId: null as string | null,
-  
-  // Play an audio element and stop any currently playing audio
-  play(audio: HTMLAudioElement, info?: { stemId?: string, trackId?: string }) {
-    // Stop any currently playing audio
-    if (this.activeAudio && this.activeAudio !== audio && !this.activeAudio.paused) {
-      this.activeAudio.pause();
-      
-      // Reset currentTime if needed
-      this.activeAudio.currentTime = 0;
-      
-      // Dispatch custom event for stem stopped
-      if (this.activeStemId) {
-        const event = new CustomEvent('stem-stopped', {
-          detail: {
-            stemId: this.activeStemId,
-            trackId: this.activeTrackId
-          }
-        });
-        document.dispatchEvent(event);
-      }
+'use client';
+
+interface AudioPlayOptions {
+  trackId: string;
+}
+
+class GlobalAudioManager {
+  private currentlyPlaying: HTMLAudioElement | null = null;
+  private currentTrackId: string | null = null;
+  private listeners: Set<(trackId: string | null) => void> = new Set();
+
+  play(audio: HTMLAudioElement, options: AudioPlayOptions): void {
+    // If we're already playing this audio, do nothing
+    if (this.currentlyPlaying === audio) return;
+
+    // If something else is playing, pause it
+    if (this.currentlyPlaying) {
+      this.currentlyPlaying.pause();
     }
+
+    // Set the current audio and play it
+    this.currentlyPlaying = audio;
+    this.currentTrackId = options.trackId;
     
-    // Set new active audio
-    this.activeAudio = audio;
-    this.activeStemId = info?.stemId || null;
-    this.activeTrackId = info?.trackId || null;
+    // Notify listeners before playing
+    this.notifyListeners();
     
-    // Play the new audio
-    audio.play().catch(err => {
-      console.error('Error playing audio:', err);
+    // Play the audio
+    audio.play().catch(error => {
+      console.error('Error playing audio:', error);
+      this.currentlyPlaying = null;
+      this.currentTrackId = null;
+      this.notifyListeners();
     });
-  },
-  
-  // Stop the currently playing audio
-  stop() {
-    if (this.activeAudio && !this.activeAudio.paused) {
-      this.activeAudio.pause();
-      
-      // Dispatch custom event if it's a stem
-      if (this.activeStemId) {
-        const event = new CustomEvent('stem-stopped', {
-          detail: {
-            stemId: this.activeStemId,
-            trackId: this.activeTrackId
-          }
-        });
-        document.dispatchEvent(event);
-      }
-    }
-    
-    this.activeAudio = null;
-    this.activeStemId = null;
-    this.activeTrackId = null;
+
+    // Set up event listener for when audio ends
+    audio.addEventListener('ended', this.handleAudioEnded);
   }
-}; 
+
+  pause(): void {
+    if (this.currentlyPlaying) {
+      this.currentlyPlaying.pause();
+      // Don't reset currentlyPlaying because we might want to resume
+    }
+  }
+
+  stop(): void {
+    if (this.currentlyPlaying) {
+      this.currentlyPlaying.pause();
+      this.currentlyPlaying.currentTime = 0;
+      this.currentlyPlaying.removeEventListener('ended', this.handleAudioEnded);
+      this.currentlyPlaying = null;
+      this.currentTrackId = null;
+      this.notifyListeners();
+    }
+  }
+
+  getCurrentTrackId(): string | null {
+    return this.currentTrackId;
+  }
+
+  isPlaying(trackId: string): boolean {
+    return this.currentTrackId === trackId && !!this.currentlyPlaying;
+  }
+
+  subscribe(listener: (trackId: string | null) => void): () => void {
+    this.listeners.add(listener);
+    
+    // Return unsubscribe function
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private handleAudioEnded = (): void => {
+    if (this.currentlyPlaying) {
+      this.currentlyPlaying.removeEventListener('ended', this.handleAudioEnded);
+      this.currentlyPlaying = null;
+      this.currentTrackId = null;
+      this.notifyListeners();
+    }
+  };
+
+  private notifyListeners(): void {
+    this.listeners.forEach(listener => {
+      listener(this.currentTrackId);
+    });
+  }
+}
+
+// Create a singleton instance
+export const globalAudioManager = new GlobalAudioManager(); 
