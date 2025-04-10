@@ -4,7 +4,8 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Tag, Stem, Track, CartItem } from '../types';
 import { findFileInStrapiByName, STRAPI_URL } from '../services/strapi';
-import { findStemFile } from '../services/strapi';
+import { findStemFileUrl as helperFindStemFileUrl } from '../utils/audio-helpers';
+import { createAudio, convertUrlToProxyUrl } from '../lib/audio';
 
 // Global audio manager to ensure only one audio source plays at a time
 const globalAudioManager = {
@@ -94,6 +95,10 @@ function saveStemUrlToCache(trackTitle: string, stemName: string, url: string) {
 // Initialize cache from local storage
 if (typeof window !== 'undefined' && window.localStorage) {
   try {
+    // Clear cache first to ensure we don't use old URLs (uncomment to reset cache)
+    localStorage.removeItem('stemUrlCache');
+    console.log('Cleared stem URL cache for fresh loading');
+    
     const storedCache = localStorage.getItem('stemUrlCache');
     if (storedCache) {
       const parsedCache = JSON.parse(storedCache);
@@ -511,7 +516,11 @@ function getConsistentStemUrl(stemName: string, trackTitle: string): string {
 async function findStemFileUrl(stemName: string, trackTitle: string): Promise<string | null> {
   try {
     // First try to use the utility function from strapi.ts that was made for this purpose
-    const strapiStemUrl = await findStemFile(stemName, trackTitle);
+    const strapiStemUrl = await helperFindStemFileUrl(
+      'unknown',  // trackId (using a default value since we don't have track.id here)
+      trackTitle,  // trackTitle
+      stemName     // stemName
+    );
     if (strapiStemUrl) {
       console.log(`✅ Found stem file via strapi.ts findStemFile: ${strapiStemUrl}`);
       return strapiStemUrl;
@@ -825,7 +834,14 @@ export default function AudioPlayer({
   // Initialize audio element
   useEffect(() => {
     if (!audioRef.current) {
-      audioRef.current = new Audio(track.audioUrl);
+      // Use the convertUrlToProxyUrl function to handle CORS
+      const proxyUrl = convertUrlToProxyUrl(track.audioUrl);
+      console.log(`Converting main track URL from ${track.audioUrl} to ${proxyUrl}`);
+      
+      // Create audio with cross-origin settings
+      audioRef.current = new Audio();
+      audioRef.current.crossOrigin = 'anonymous';
+      audioRef.current.src = proxyUrl;
       
       // Add data attributes for identification
       if (audioRef.current) {
@@ -840,16 +856,19 @@ export default function AudioPlayer({
       
       // Add error and canplaythrough handlers
       audioRef.current.addEventListener('error', () => {
-        console.error(`Error loading main audio: ${track.audioUrl}`);
+        console.error(`Error loading main audio: ${proxyUrl} (original: ${track.audioUrl})`);
         setMainAudioError(true);
       });
       
       audioRef.current.addEventListener('canplaythrough', () => {
-        console.log('Main audio loaded successfully');
+        console.log(`Main audio loaded successfully: ${proxyUrl}`);
         setMainAudioLoaded(true);
       });
     } else {
-      audioRef.current.src = track.audioUrl;
+      // Use the convertUrlToProxyUrl function for updates too
+      const proxyUrl = convertUrlToProxyUrl(track.audioUrl);
+      console.log(`Updating main track URL from ${track.audioUrl} to ${proxyUrl}`);
+      audioRef.current.src = proxyUrl;
       
       // Update data attributes
       audioRef.current.dataset.track = track.title;
@@ -1284,74 +1303,48 @@ export default function AudioPlayer({
             // Mark the stem as loading
             setStemLoading(prev => ({...prev, [stem.id]: true}));
             
-            // Get URL using our discovery function
-            let initialUrl;
+            // Always use the convertUrlToProxyUrl function from our library
+            const initialProxyUrl = convertUrlToProxyUrl(getStemUrl(stem.name, track.title));
+            console.log(`Initial proxy URL for stem ${stem.name}: ${initialProxyUrl}`);
             
-            // Legacy support for known tracks
-            if ((track.title.toLowerCase() === 'elevator music' || 
-                track.title.toLowerCase() === 'crazy meme music' ||
-                track.title.toLowerCase() === 'lo-fi beat' || 
-                track.title.toLowerCase() === 'lo-fi beats' || 
-                track.title.toLowerCase() === 'dramatic countdown' || 
-                track.title.toLowerCase() === 'dramatic epic cinema' || 
-                track.title.toLowerCase() === 'dramatic epic countdown') && 
-                (stem.name === 'Drums' || stem.name === 'Bass' || stem.name === 'Keys' || 
-                 stem.name === 'FX' || stem.name === 'Drones' || stem.name === 'Strings')) {
-              initialUrl = getStemUrl(stem.name, track.title);
-            } else {
-              // For all new tracks, try to discover immediately
-              initialUrl = getStemUrl(stem.name, track.title);
-              
-              // Kick off immediate API discovery - this will update the audio.src later if found
-              findStemFileUrl(stem.name, track.title).then(url => {
-                console.log(`Initial API discovery for ${stem.name}: ${url || 'not found'}`);
-              });
-            }
-            
-            console.log(`Initial URL for stem ${stem.name}: ${initialUrl}`);
-            
-            // Ensure URL is absolute
-            let audioUrl = initialUrl;
-            if (!audioUrl.startsWith('http')) {
-              audioUrl = `${STRAPI_URL}${audioUrl.startsWith('/') ? '' : '/'}${audioUrl}`;
-            }
-            
-            // Create audio element with data attributes for identification
-            const audio = new Audio(audioUrl);
+            // Create audio element with cross-origin attribute
+            const audio = new Audio();
+            audio.crossOrigin = "anonymous"; // Add this to prevent CORS issues
             audio.dataset.stem = stem.name;
             audio.dataset.track = track.title;
             audio.dataset.stemId = stem.id;
             audio.dataset.trackId = track.id;
             
+            // Set the source to the proxied URL
+            audio.src = initialProxyUrl;
+            
             // Create an array of alternative URLs to try if the first one fails
-            // We'll try various hash patterns and formats to ensure we find the file
+            // We'll only use proxy URLs to avoid CORS issues
             const alternativeUrls = [
-              // First, try to get the actual URL via the API
+              // First, try to get the actual URL via the API with our improved search function
               async () => {
+                console.log(`Finding stem file URL for ${stem.name} in track ${track.title}...`);
                 const apiUrl = await findStemFileUrl(stem.name, track.title);
-                if (apiUrl) return apiUrl;
+                if (apiUrl) {
+                  console.log(`Found stem file URL for ${stem.name}: ${apiUrl}`);
+                  return apiUrl; // Already proxied by findStemFileUrl
+                }
                 return null;
               },
               
-              // Try variations of the pattern with and without hash
-              `${STRAPI_URL}/uploads/${stem.name}_${track.title.toLowerCase().replace(/\s+/g, '_')}.mp3`,
-              
-              // Try legacy patterns for compatibility
-              track.title.toLowerCase() === 'elevator music' && ELEVATOR_MUSIC_STEM_HASHES[stem.name]
-                ? `${STRAPI_URL}/uploads/${stem.name}_Elevator_music_${ELEVATOR_MUSIC_STEM_HASHES[stem.name]}.mp3`
+              // Try hash-based URLs for known tracks - all properly proxied
+              track.title.toLowerCase().includes('elevator music') && ELEVATOR_MUSIC_STEM_HASHES[stem.name]
+                ? convertUrlToProxyUrl(`${STRAPI_URL}/uploads/${stem.name}_Elevator_music_${ELEVATOR_MUSIC_STEM_HASHES[stem.name]}.mp3`)
                 : null,
-              track.title.toLowerCase() === 'crazy meme music' && CRAZY_MEME_MUSIC_STEM_HASHES[stem.name]
-                ? `${STRAPI_URL}/uploads/${stem.name}_Crazy_meme_music_${CRAZY_MEME_MUSIC_STEM_HASHES[stem.name]}.mp3`
+              track.title.toLowerCase().includes('crazy meme') && CRAZY_MEME_MUSIC_STEM_HASHES[stem.name]
+                ? convertUrlToProxyUrl(`${STRAPI_URL}/uploads/${stem.name}_Crazy_meme_music_${CRAZY_MEME_MUSIC_STEM_HASHES[stem.name]}.mp3`)
                 : null,
-              (track.title.toLowerCase() === 'lo-fi beat' || track.title.toLowerCase() === 'lo-fi beats') && LOFI_BEATS_STEM_HASHES[stem.name]
-                ? `${STRAPI_URL}/uploads/${stem.name}_Lo_Fi_Beat_${LOFI_BEATS_STEM_HASHES[stem.name]}.mp3`
+              (track.title.toLowerCase().includes('lo-fi beat') || track.title.toLowerCase().includes('lo-fi beats')) && LOFI_BEATS_STEM_HASHES[stem.name]
+                ? convertUrlToProxyUrl(`${STRAPI_URL}/uploads/${stem.name}_Lo_Fi_Beat_${LOFI_BEATS_STEM_HASHES[stem.name]}.mp3`)
                 : null,
-              (track.title.toLowerCase() === 'dramatic countdown' || track.title.toLowerCase() === 'dramatic epic cinema' || track.title.toLowerCase() === 'dramatic epic countdown') && DRAMATIC_EPIC_CINEMA_STEM_HASHES[stem.name]
-                ? `${STRAPI_URL}/uploads/${stem.name}_Dramatic_Countdown_${DRAMATIC_EPIC_CINEMA_STEM_HASHES[stem.name]}.mp3`
-                : null,
-              
-              // Fallback to stem name only
-              `${STRAPI_URL}/uploads/${stem.name}.mp3`,
+              (track.title.toLowerCase().includes('dramatic countdown') || track.title.toLowerCase().includes('dramatic epic')) && DRAMATIC_EPIC_CINEMA_STEM_HASHES[stem.name]
+                ? convertUrlToProxyUrl(`${STRAPI_URL}/uploads/${stem.name}_Dramatic_Countdown_${DRAMATIC_EPIC_CINEMA_STEM_HASHES[stem.name]}.mp3`)
+                : null
             ].filter(Boolean);
             
             // Use a timeout to avoid hanging on loading forever
@@ -1404,7 +1397,7 @@ export default function AudioPlayer({
             // Add error handler with URL retry logic
             audio.addEventListener('error', (e) => {
               console.error(`Error loading audio for stem ${stem.name} with URL ${audio.src}:`, e);
-              console.log(`%c❌ FAILED URL: ${audio.src}`, 'background: red; color: white; font-size: 16px');
+              console.log(`❌ FAILED URL: ${audio.src}`);
               
               // Try the next URL in our list
               tryNextUrl();
@@ -1415,9 +1408,9 @@ export default function AudioPlayer({
               clearTimeout(loadTimeout);
               console.log(`Audio loaded successfully for stem: ${stem.name} with URL ${audio.src}`);
               
-              // Store the successful URL in our cache and log it prominently
+              // Store the successful URL in our cache
               saveStemUrlToCache(track.title, stem.name, audio.src);
-              console.log(`%c✅ SUCCESSFUL URL: ${audio.src}`, 'background: green; color: white; font-size: 16px');
+              console.log(`✅ SUCCESSFUL URL: ${audio.src}`);
               
               setStemLoading(prev => ({...prev, [stem.id]: false}));
               setStemLoadErrors(prev => {
@@ -1444,6 +1437,9 @@ export default function AudioPlayer({
                 globalAudioManager.stop();
               }
             });
+            
+            // Preload the audio
+            audio.load();
             
             newStemAudio[stem.id] = audio;
           } catch (err) {

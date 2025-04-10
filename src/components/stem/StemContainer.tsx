@@ -1,6 +1,6 @@
 import React from 'react';
 import { Stem, Track } from '../../types';
-import { StemItem } from './StemItem';
+import StemItem from './StemItem';
 
 interface StemContainerProps {
   track: Track;
@@ -42,9 +42,7 @@ export const StemContainer = ({ track, isPlaying, isOpen, onAddToCart }: StemCon
               key={stem.id}
               stem={stem}
               track={track}
-              onAddToCart={onAddToCart}
-              isPlaying={isPlaying}
-              isOpen={isOpen}
+              onAddToCart={(stem) => onAddToCart(stem, track)}
             />
           ))}
         </div>

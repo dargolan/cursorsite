@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { globalAudioManager, AudioEvent } from '../lib/audio-manager';
-import { createAudio, preloadAudio, convertToProxyUrl } from '../utils/audio-utils';
+import { createAudio, preloadAudio, convertUrlToProxyUrl } from '../lib/audio';
 
 interface UseAudioPlayerOptions {
   trackId?: string;
@@ -40,7 +40,7 @@ export function useAudioPlayer(options: UseAudioPlayerOptions = {}) {
     
     try {
       // Use proxy URL for better CORS handling
-      const proxyUrl = convertToProxyUrl(audioUrl);
+      const proxyUrl = convertUrlToProxyUrl(audioUrl);
       
       // Preload audio and create element
       const audio = await preloadAudio(proxyUrl);

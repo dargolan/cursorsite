@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
+import { convertUrlToProxyUrl } from '../../lib/audio';
 
 interface WaveformPlayerProps {
   audioUrl: string;
@@ -168,10 +169,11 @@ export const WaveformPlayer: React.FC<WaveformPlayerProps> = ({
           }
         });
 
-        // Load the audio
+        // Convert the audio URL to a proxy URL to avoid CORS issues
         if (audioUrl) {
-          console.log('Loading audio URL:', audioUrl);
-          instance.load(audioUrl);
+          const proxyUrl = convertUrlToProxyUrl(audioUrl);
+          console.log('Loading audio URL in WaveSurfer:', proxyUrl);
+          instance.load(proxyUrl);
         } else {
           console.error('No audio URL provided');
           if (isMounted.current) {

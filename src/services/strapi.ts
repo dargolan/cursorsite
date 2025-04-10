@@ -1,7 +1,7 @@
 import { Track, Tag, Stem } from '../types';
 
 // Strapi base URL for media files
-const STRAPI_URL = process.env.NEXT_PUBLIC_STRAPI_MEDIA_URL || 'http://localhost:1337';
+export const STRAPI_URL = process.env.NEXT_PUBLIC_STRAPI_MEDIA_URL || 'http://localhost:1337';
 
 // Strapi API URL (may be same as STRAPI_URL)
 const API_URL_BASE = process.env.NEXT_PUBLIC_STRAPI_API_URL || 'http://localhost:1337';
@@ -13,6 +13,14 @@ const API_TOKEN = process.env.NEXT_PUBLIC_STRAPI_API_TOKEN;
 
 console.log('Using Strapi Media URL:', STRAPI_URL);
 console.log('Using Strapi API URL:', API_URL);
+
+/**
+ * Get the Strapi media URL
+ * @returns The base URL for Strapi media files
+ */
+export function getStrapiMediaUrl(): string {
+  return STRAPI_URL;
+}
 
 // Helper to format the image URL
 const getStrapiMedia = (url: string | null) => {
@@ -863,6 +871,7 @@ export async function findStemFile(stemName: string, trackTitle: string): Promis
 // Export functions to be used by other components
 export {
   getStrapiMedia,
+  getHeaders,
   normalizeTrack,
   normalizeTag,
   getTracks,
@@ -873,6 +882,5 @@ export {
   checkFileExists,
   queryStrapi,
   findFileInStrapiByName,
-  createDummyAudioFiles,
-  STRAPI_URL
+  createDummyAudioFiles
 }; 
