@@ -1,13 +1,12 @@
 'use client';
 
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import { CartItem as GlobalCartItem } from '../types';
 
-interface CartItem {
-  id: string;
-  name: string;
+// Extending the CartItem from types.ts but making the type field optional with a default
+interface CartItem extends Omit<GlobalCartItem, 'type' | 'trackTitle'> {
+  type?: 'track' | 'stem';
   trackName: string;
-  price: number;
-  imageUrl?: string;
 }
 
 interface CartContextType {
@@ -37,7 +36,17 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     try {
       const storedCart = localStorage.getItem('wavecave_cart');
       if (storedCart) {
-        setItems(JSON.parse(storedCart));
+        // Convert any old cart format to new format if needed
+        const parsedCart = JSON.parse(storedCart);
+        const convertedCart = parsedCart.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          trackName: item.trackName || item.trackTitle || '', // Support both properties
+          price: item.price,
+          imageUrl: item.imageUrl,
+          type: item.type || 'stem' // Default to stem if not specified
+        }));
+        setItems(convertedCart);
       }
     } catch (err) {
       console.error('Error loading cart from localStorage:', err);
@@ -63,8 +72,14 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     
-    // Add the item to the cart
-    setItems(prevItems => [...prevItems, item]);
+    // Add the item to the cart with default type if not specified
+    setItems(prevItems => [
+      ...prevItems, 
+      {
+        ...item,
+        type: item.type || 'stem'
+      }
+    ]);
   };
   
   const removeItem = (itemId: string) => {

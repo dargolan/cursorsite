@@ -6,6 +6,7 @@ import { Tag, Stem, Track, CartItem } from '../types';
 import { findFileInStrapiByName, STRAPI_URL } from '../services/strapi';
 import { findStemFileUrl as helperFindStemFileUrl } from '../utils/audio-helpers';
 import { createAudio, convertUrlToProxyUrl } from '../lib/audio';
+import { useCart } from '../contexts/CartContext';
 
 // Global audio manager to ensure only one audio source plays at a time
 const globalAudioManager = {
@@ -656,9 +657,7 @@ interface AudioPlayerProps {
   isPlaying: boolean;
   onPlay: () => void;
   onStop: () => void;
-  onAddToCart: (stem: Stem, track: Track) => void;
   onTagClick: (tag: Tag) => void;
-  onRemoveFromCart: (itemId: string) => void;
   openStemsTrackId: string | null;
   setOpenStemsTrackId: (id: string | null) => void;
 }
@@ -743,15 +742,16 @@ export default function AudioPlayer({
   isPlaying,
   onPlay,
   onStop,
-  onAddToCart,
   onTagClick,
-  onRemoveFromCart,
   openStemsTrackId,
   setOpenStemsTrackId
 }: AudioPlayerProps): React.ReactElement {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const thumbRef = useRef<HTMLDivElement>(null);
+  
+  // Add cart context
+  const { addItem, removeItem } = useCart();
   
   const [currentTime, setCurrentTime] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
@@ -1239,7 +1239,16 @@ export default function AudioPlayer({
     }, 4000);
     
     setStemAddedToCart(prev => ({ ...prev, [stem.id]: true }));
-    onAddToCart(stem, track);
+    
+    // Use CartContext instead of onAddToCart prop
+    addItem({
+      id: stem.id,
+      name: stem.name,
+      trackName: track.title,
+      price: stem.price,
+      imageUrl: track.imageUrl,
+      type: 'stem'
+    });
   };
 
   const handleStemRemoveFromCart = (stem: Stem) => {
@@ -1257,11 +1266,9 @@ export default function AudioPlayer({
     }, 4000);
     
     setStemAddedToCart(prev => ({ ...prev, [stem.id]: false }));
-    if (onRemoveFromCart) {
-      // Create a cart item ID using track and stem IDs
-      const itemId = `${track.id}_${stem.id}`;
-      onRemoveFromCart(itemId);
-    }
+    
+    // Use CartContext's removeItem
+    removeItem(stem.id);
   };
   
   const handleDownloadAllStems = () => {
@@ -1270,7 +1277,16 @@ export default function AudioPlayer({
     track.stems.forEach(stem => {
       if (!stemAddedToCart[stem.id]) {
         setStemAddedToCart(prev => ({ ...prev, [stem.id]: true }));
-        onAddToCart(stem, track);
+        
+        // Use CartContext's addItem
+        addItem({
+          id: stem.id,
+          name: stem.name,
+          trackName: track.title,
+          price: stem.price,
+          imageUrl: track.imageUrl,
+          type: 'stem'
+        });
       }
     });
   };
@@ -1939,14 +1955,14 @@ export default function AudioPlayer({
           </div>
           
           {/* Buy all stems button */}
-          <div className="flex justify-end items-center mt-4 mr-8">
+          <div style={{ marginRight: '88px' }} className="flex justify-end items-center mt-4">
             <button
               onClick={handleDownloadAllStems}
               className="bg-[#1DF7CE] hover:bg-[#19d9b6] text-[#1E1E1E] px-4 py-2 rounded-full font-medium transition-colors"
             >
-              <span className="text-sm">€{discountedStemsPrice}</span>
-              <span className="text-xs mx-2 text-black/50 line-through">€{totalStemsPrice}</span>
               <span className="font-medium">Buy All Stems</span>
+              <span className="text-xs mx-2 text-black/50 line-through">€{totalStemsPrice}</span>
+              <span className="text-sm">€{discountedStemsPrice}</span>
             </button>
           </div>
         </div>
@@ -1989,18 +2005,20 @@ export default function AudioPlayer({
 } 
 
 // Add animation for the toast notification
-const existingStyle = document.getElementById('toast-animation');
-if (!existingStyle) {
-  const style = document.createElement('style');
-  style.id = 'toast-animation';
-  style.textContent = `
-    @keyframes slide-up {
-      from { transform: translate(-50%, 100%); opacity: 0; }
-      to { transform: translate(-50%, 0); opacity: 1; }
-    }
-    .animate-slide-up {
-      animation: slide-up 0.3s ease forwards;
-    }
-  `;
-  document.head.appendChild(style);
+if (typeof document !== 'undefined') {
+  const existingStyle = document.getElementById('toast-animation');
+  if (!existingStyle) {
+    const style = document.createElement('style');
+    style.id = 'toast-animation';
+    style.textContent = `
+      @keyframes slide-up {
+        from { transform: translate(-50%, 100%); opacity: 0; }
+        to { transform: translate(-50%, 0); opacity: 1; }
+      }
+      .animate-slide-up {
+        animation: slide-up 0.3s ease forwards;
+      }
+    `;
+    document.head.appendChild(style);
+  }
 }

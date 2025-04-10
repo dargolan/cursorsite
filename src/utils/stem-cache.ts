@@ -97,6 +97,12 @@ export function clearStemUrlCache(trackId: string, trackTitle: string, stemName:
   }
 }
 
+/**
+ * Validate a cache item to ensure the URL matches the track and stem
+ * @param key - The cache key
+ * @param url - The URL to validate
+ * @returns Whether the URL is valid for the given key
+ */
 export function validateCacheItem(key: string, url: string): boolean {
   try {
     // If there's no URL, it's invalid
@@ -241,14 +247,13 @@ export function initStemUrlCache(): void {
   }
 }
 
-// Auto-initialize the cache if in a browser environment
-if (typeof window !== 'undefined') {
-  // Run as a microtask to ensure it's executed after module initialization
-  Promise.resolve().then(() => {
-    initStemUrlCache();
-  });
-}
-
+/**
+ * Cache a stem URL with validation
+ * @param trackId - The ID of the track
+ * @param trackTitle - The title of the track
+ * @param stemName - The name of the stem
+ * @param url - The URL to cache
+ */
 export function cacheStemUrl(
   trackId: string,
   trackTitle: string,
@@ -280,4 +285,12 @@ export function cacheStemUrl(
   } catch (error) {
     console.error(`[Cache] Error caching stem URL for ${stemName} (${trackTitle}):`, error);
   }
-} 
+}
+
+// Auto-initialize the cache if in a browser environment
+if (typeof window !== 'undefined') {
+  // Run as a microtask to ensure it's executed after module initialization
+  Promise.resolve().then(() => {
+    initStemUrlCache();
+  });
+}

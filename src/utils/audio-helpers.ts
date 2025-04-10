@@ -136,6 +136,51 @@ export function filenameMatchesTrack(filename: string, trackTitle: string): bool
   return false;
 }
 
+// Function to check if a URL exists (returns 200 OK)
+export async function urlExists(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, { method: 'HEAD' });
+    return response.ok;
+  } catch (error) {
+    console.error(`Error checking URL ${url}:`, error);
+    return false;
+  }
+}
+
+// Function to find the first valid URL from a list
+export async function findFirstValidUrl(urls: string[]): Promise<string | null> {
+  for (const url of urls) {
+    console.log(`[URL CHECK] Testing URL: ${url}`);
+    try {
+      const isValid = await urlExists(url);
+      if (isValid) {
+        console.log(`[URL CHECK] ✅ URL is valid: ${url}`);
+        return url;
+      } else {
+        console.log(`[URL CHECK] ❌ URL is invalid: ${url}`);
+      }
+    } catch (error) {
+      console.error(`[URL CHECK] Error checking URL ${url}:`, error);
+    }
+  }
+  console.log(`[URL CHECK] No valid URLs found from ${urls.length} candidates`);
+  return null;
+}
+
+// Ensure audio files are loaded before trying to use them
+export async function ensureAudioFiles(): Promise<boolean> {
+  if (audioFiles.length === 0) {
+    try {
+      const files = await fetchAudioFiles();
+      return files.length > 0;
+    } catch (error) {
+      console.error('[AUDIO] Failed to load audio files:', error);
+      return false;
+    }
+  }
+  return true;
+}
+
 export const findStemFileUrl = async (
   stemName: string,
   trackTitle: string,
@@ -303,56 +348,11 @@ export function getStemUrl(stemName: string, trackTitle: string): string {
       .split(' ')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join('_');
-    
+  
     // Use a more specific pattern that matches what we see in the proxy logs
     url = `${STRAPI_URL}/uploads/${normalizedStemName}_${normalizedTrackTitle}_placeholder.mp3`;
   }
   
   // Always convert to proxy URL
   return convertUrlToProxyUrl(url);
-}
-
-// Function to check if a URL exists (returns 200 OK)
-export async function urlExists(url: string): Promise<boolean> {
-  try {
-    const response = await fetch(url, { method: 'HEAD' });
-    return response.ok;
-  } catch (error) {
-    console.error(`Error checking URL ${url}:`, error);
-    return false;
-  }
-}
-
-// Function to find the first valid URL from a list
-export async function findFirstValidUrl(urls: string[]): Promise<string | null> {
-  for (const url of urls) {
-    console.log(`[URL CHECK] Testing URL: ${url}`);
-    try {
-      const isValid = await urlExists(url);
-      if (isValid) {
-        console.log(`[URL CHECK] ✅ URL is valid: ${url}`);
-        return url;
-      } else {
-        console.log(`[URL CHECK] ❌ URL is invalid: ${url}`);
-      }
-    } catch (error) {
-      console.error(`[URL CHECK] Error checking URL ${url}:`, error);
-    }
-  }
-  console.log(`[URL CHECK] No valid URLs found from ${urls.length} candidates`);
-  return null;
-}
-
-// Ensure audio files are loaded before trying to use them
-export async function ensureAudioFiles(): Promise<boolean> {
-  if (audioFiles.length === 0) {
-    try {
-      const files = await fetchAudioFiles();
-      return files.length > 0;
-    } catch (error) {
-      console.error('[AUDIO] Failed to load audio files:', error);
-      return false;
-    }
-  }
-  return true;
 } 

@@ -6,25 +6,25 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'picsum.photos',
-        pathname: '**',
+        pathname: '**'
       },
       {
         protocol: 'https',
         hostname: 'dargo-strapi-media.s3.eu-north-1.amazonaws.com',
-        pathname: '**',
+        pathname: '**'
       },
       {
         protocol: 'http',
         hostname: 'localhost',
         port: '1337',
-        pathname: '**',
+        pathname: '**'
       },
       {
         protocol: 'https',
         hostname: 'placehold.co',
-        pathname: '**',
-      },
-    ],
+        pathname: '**'
+      }
+    ]
   },
   // Add headers for cross-origin audio playback
   async headers() {
@@ -35,17 +35,17 @@ const nextConfig = {
         headers: [
           {
             key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin',
+            value: 'same-origin'
           },
           {
             key: 'Cross-Origin-Embedder-Policy',
-            value: 'require-corp',
+            value: 'require-corp'
           },
           {
             key: 'Cross-Origin-Resource-Policy',
-            value: 'cross-origin',
-          },
-        ],
+            value: 'cross-origin'
+          }
+        ]
       },
       {
         // Specific headers for the proxy API route
@@ -53,24 +53,24 @@ const nextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value: '*',
+            value: '*'
           },
           {
             key: 'Access-Control-Allow-Methods',
-            value: 'GET, OPTIONS',
+            value: 'GET, OPTIONS'
           },
           {
             key: 'Access-Control-Allow-Headers',
-            value: 'Content-Type, Authorization',
+            value: 'Content-Type, Authorization'
           },
           {
             key: 'Cache-Control',
-            value: 'public, max-age=3600',
-          },
-        ],
-      },
+            value: 'public, max-age=3600'
+          }
+        ]
+      }
     ];
-  },
+  }
 };
 
-module.exports = nextConfig; 
+module.exports = nextConfig;

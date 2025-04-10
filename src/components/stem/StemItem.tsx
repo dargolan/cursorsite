@@ -3,22 +3,23 @@ import { Stem, Track } from '../../types';
 import { useStemPlayer } from '../../hooks/useStemPlayer';
 import { formatTime } from '../../utils/audio-utils';
 import { clearAllStemUrlCaches } from '../../utils/stem-cache';
+import { useCart } from '@/contexts/CartContext';
 
 interface StemItemProps {
   stem: Stem;
   track: Track;
-  onAddToCart?: (stem: Stem) => void;
-  onRemoveFromCart?: (stem: Stem) => void;
   inCart?: boolean;
 }
 
 function StemItem({ 
   stem, 
   track, 
-  onAddToCart, 
-  onRemoveFromCart, 
   inCart = false 
 }: StemItemProps) {
+  const { addItem, removeItem, items } = useCart();
+  
+  const isInCart = items.some(item => item.id === stem.id);
+  
   const { 
     isPlaying, 
     isLoading, 
@@ -59,15 +60,18 @@ function StemItem({
   }, [url, stem.name, track.title]);
 
   const handleAddToCart = () => {
-    if (onAddToCart) {
-      onAddToCart(stem);
-    }
+    addItem({
+      id: stem.id,
+      name: stem.name,
+      trackName: track.title,
+      price: stem.price,
+      imageUrl: track.imageUrl, 
+      type: 'stem'
+    });
   };
 
   const handleRemoveFromCart = () => {
-    if (onRemoveFromCart) {
-      onRemoveFromCart(stem);
-    }
+    removeItem(stem.id);
   };
 
   const handleRetry = (e: React.MouseEvent) => {
@@ -115,7 +119,7 @@ function StemItem({
     <div className="flex flex-col md:flex-row items-start md:items-center p-3 border-b border-gray-700">
       <div className="flex-grow flex items-center">
         {/* Play/Pause Button */}
-        <button
+          <button
           onClick={toggle}
           disabled={isDisabled}
           className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 ${
@@ -213,7 +217,74 @@ function StemItem({
       {/* Price and Cart Button */}
       <div className="flex items-center mt-3 md:mt-0">
         <span className="text-lg font-semibold mr-3">€{stem.price?.toFixed(2) || '0.00'}</span>
-        {inCart ? (
+        {isInCart ? (
+          <button
+            onClick={handleRemoveFromCart}
+            className="bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded"
+          >
+            Remove
+          </button>
+        ) : (
+          <button
+            onClick={handleAddToCart}
+            className="bg-green-600 hover:bg-green-700 text-white py-1 px-3 rounded"
+          >
+            Add to Cart
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Memoize the component to prevent unnecessary re-renders
+export default memo(StemItem); 
+                    onClick={handleResetAllCaches}
+                    className="ml-2 px-2 py-0.5 bg-red-600 rounded text-white hover:bg-red-700"
+                    title="Reset all cached stem URLs"
+                  >
+                    Reset Cache
+                  </button>
+                </p>
+              )}
+              {!url && (
+                <button 
+                  onClick={handleRetry}
+                  className="mt-1 px-2 py-0.5 bg-blue-600 rounded text-white hover:bg-blue-700"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
+          )}
+          
+          {/* Track display for verification */}
+          <p className="text-xs text-gray-400">Track: {track.title}</p>
+          {url && (
+            <p className="text-xs text-gray-500 truncate max-w-xs">
+              URL: {getFilenameFromUrl(url)}
+            </p>
+          )}
+        </div>
+      </div>
+      
+      {/* Progress Bar */}
+      <div className="w-full md:w-1/3 h-2 bg-gray-700 rounded-full mx-2 my-3 md:my-0 overflow-hidden">
+        <div 
+          className={`h-full rounded-full ${isPlaying ? 'bg-green-500' : 'bg-blue-500'}`} 
+          style={{ width: `${progress}%` }}
+        ></div>
+      </div>
+      
+      {/* Time Display */}
+      <div className="text-sm text-gray-400 whitespace-nowrap mx-2">
+        {currentTimeDisplay} / {durationDisplay}
+      </div>
+      
+      {/* Price and Cart Button */}
+      <div className="flex items-center mt-3 md:mt-0">
+        <span className="text-lg font-semibold mr-3">€{stem.price?.toFixed(2) || '0.00'}</span>
+        {isInCart ? (
           <button
             onClick={handleRemoveFromCart}
             className="bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded"

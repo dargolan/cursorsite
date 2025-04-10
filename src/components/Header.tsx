@@ -3,16 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { CartItem } from '../types';
+import { useCart } from '@/contexts/CartContext';
 
-interface HeaderProps {
-  cartTotal: number;
-  cartItems: CartItem[];
-  onRemoveFromCart: (id: string) => void;
-}
-
-export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart }: HeaderProps): React.ReactElement {
+export default function Header(): React.ReactElement {
   const [showCart, setShowCart] = useState(false);
+  const { items: cartItems, removeItem, getTotalPrice } = useCart();
+  
+  // Format the cart total to show two decimal places
+  const formattedCartTotal = getTotalPrice().toFixed(2);
 
   // Close cart dropdown when clicking outside
   useEffect(() => {
@@ -34,9 +32,6 @@ export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
-
-  // Format the cart total to show two decimal places
-  const formattedCartTotal = cartTotal.toFixed(2);
 
   return (
     <header className="fixed top-0 right-0 left-[363px] bg-[#121212] z-10">
@@ -149,12 +144,12 @@ export default function Header({ cartTotal = 0, cartItems = [], onRemoveFromCart
                           </div>
                           <div className="flex-1">
                             <p className="text-white text-sm font-medium">{item.name}</p>
-                            <p className="text-gray-400 text-xs">{item.trackTitle}</p>
+                            <p className="text-gray-400 text-xs">{item.trackName}</p>
                           </div>
                           <div className="flex items-center">
                             <span className="text-[#1DF7CE] font-medium mr-3">{item.price.toFixed(2)}€</span>
                             <button 
-                              onClick={() => onRemoveFromCart(item.id)}
+                              onClick={() => removeItem(item.id)}
                               className="text-gray-400 hover:text-red-500 transition-colors"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

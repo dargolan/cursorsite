@@ -312,3 +312,5 @@ export const StaticWaveform: React.FC<{ data: number[] }> = ({ data }) => {
     </svg>
   );
 }; 
+  );
+}; 
