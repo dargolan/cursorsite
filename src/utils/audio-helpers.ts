@@ -155,7 +155,7 @@ export async function findFirstValidUrl(urls: string[]): Promise<string | null> 
       const isValid = await urlExists(url);
       if (isValid) {
         console.log(`[URL CHECK] ✅ URL is valid: ${url}`);
-        return url;
+      return url;
       } else {
         console.log(`[URL CHECK] ❌ URL is invalid: ${url}`);
       }

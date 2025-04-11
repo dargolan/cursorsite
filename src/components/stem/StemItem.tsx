@@ -272,9 +272,9 @@ export default memo(StemItem);
       <div className="w-full md:w-1/3 h-2 bg-gray-700 rounded-full mx-2 my-3 md:my-0 overflow-hidden">
         <div 
           className={`h-full rounded-full ${isPlaying ? 'bg-green-500' : 'bg-blue-500'}`} 
-          style={{ width: `${progress}%` }}
-        ></div>
-      </div>
+            style={{ width: `${progress}%` }}
+          ></div>
+        </div>
       
       {/* Time Display */}
       <div className="text-sm text-gray-400 whitespace-nowrap mx-2">
