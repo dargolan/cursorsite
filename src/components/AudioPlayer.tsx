@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import { Tag, Stem, Track, CartItem } from '../types';
 import { findFileInStrapiByName, STRAPI_URL } from '../services/strapi';
@@ -769,6 +769,16 @@ export default function AudioPlayer({
   const [progressIntervals, setProgressIntervals] = useState<Record<string, number>>({});
   const [showToast, setShowToast] = useState<{stemId: string, stemName: string, price: number, action: 'add' | 'remove'} | null>(null);
   
+  // Add state for loading and stem status
+  const [isBuyingAll, setIsBuyingAll] = useState(false);
+  const [priceAnimating, setPriceAnimating] = useState(false);
+  
+  // Determine if all stems are already in cart
+  const allStemsInCart = useMemo(() => {
+    if (!track.stems || track.stems.length === 0) return false;
+    return track.stems.every(stem => stemAddedToCart[stem.id]);
+  }, [track.stems, stemAddedToCart]);
+  
   // Calculate if stems should be open for this track
   const isStemsOpen = openStemsTrackId === track.id;
   
@@ -1271,24 +1281,46 @@ export default function AudioPlayer({
     removeItem(stem.id);
   };
   
+  // Update the handleDownloadAllStems function to include animations
   const handleDownloadAllStems = () => {
-    if (!track.stems) return;
+    if (!track.stems || track.stems.length === 0 || isBuyingAll) return;
     
-    track.stems.forEach(stem => {
-      if (!stemAddedToCart[stem.id]) {
-        setStemAddedToCart(prev => ({ ...prev, [stem.id]: true }));
-        
-        // Use CartContext's addItem
-        addItem({
-          id: stem.id,
-          name: stem.name,
-          trackName: track.title,
-          price: stem.price,
-          imageUrl: track.imageUrl,
-          type: 'stem'
-        });
-      }
-    });
+    // Start loading animation
+    setIsBuyingAll(true);
+    
+    // Simulate a small delay for the loading animation
+    setTimeout(() => {
+      // Add all stems to cart
+      const stems = track.stems;
+      if (!stems) return;
+      
+      stems.forEach(stem => {
+        if (!stemAddedToCart[stem.id]) {
+          setStemAddedToCart(prev => ({ ...prev, [stem.id]: true }));
+          
+          // Use CartContext's addItem
+          addItem({
+            id: stem.id,
+            name: stem.name,
+            trackName: track.title,
+            price: stem.price,
+            imageUrl: track.imageUrl,
+            type: 'stem'
+          });
+        }
+      });
+      
+      // Stop loading animation
+      setIsBuyingAll(false);
+      
+      // Start price animation
+      setPriceAnimating(true);
+      
+      // Reset price animation after it completes
+      setTimeout(() => {
+        setPriceAnimating(false);
+      }, 800);
+    }, 800);
   };
 
   // Calculate total stems price
@@ -1924,17 +1956,19 @@ export default function AudioPlayer({
                 </div>
                 
                 <div className="flex flex-col items-center ml-1">
-                  {/* New add/remove button design with Material Design cart icons */}
+                  {/* Check mark circle instead of cart icons */}
                   {stemAddedToCart[stem.id] ? (
-        <button 
+                    <button 
                       onClick={() => handleStemRemoveFromCart(stem)}
-                      className="w-8 h-8 flex items-center justify-center text-red-500 hover:text-red-700 transition-colors"
+                      className="w-8 h-8 flex items-center justify-center text-[#1DF7CE] hover:text-[#19b8a3] transition-colors relative"
                       title="Remove from cart"
                     >
-                      {/* Material Design remove shopping cart icon */}
-                      <span className="material-symbols-outlined text-[20px]">
-                        remove_shopping_cart
-                      </span>
+                      <div className="animate-stroke-reveal">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle className="animate-circle-reveal" cx="12" cy="12" r="10" />
+                          <path className="animate-check-reveal" d="M8 12l3 3 6-6" />
+                        </svg>
+                      </div>
                     </button>
                   ) : (
                     <button 
@@ -1946,7 +1980,7 @@ export default function AudioPlayer({
                       <span className="material-symbols-outlined text-[20px]">
                         add_shopping_cart
                       </span>
-        </button>
+                    </button>
                   )}
                   <span className="mt-1 text-xs text-[#999999]">€{stem.price}</span>
                 </div>
@@ -1955,15 +1989,48 @@ export default function AudioPlayer({
           </div>
           
           {/* Buy all stems button */}
-          <div style={{ marginRight: '88px' }} className="flex justify-end items-center mt-4">
-            <button
-              onClick={handleDownloadAllStems}
-              className="bg-[#1DF7CE] hover:bg-[#19d9b6] text-[#1E1E1E] px-4 py-2 rounded-full font-medium transition-colors"
-            >
-              <span className="font-medium">Buy All Stems</span>
-              <span className="text-xs mx-2 text-black/50 line-through">€{totalStemsPrice}</span>
-              <span className="text-sm">€{discountedStemsPrice}</span>
-            </button>
+          <div className="flex justify-end items-center mt-4">
+            <div className="flex items-center">
+              {/* Prices moved to left side */}
+              <div className="mr-3 text-right relative">
+                <div className="flex items-center">
+                  <span className="text-sm text-[#999999] line-through mr-2">€{totalStemsPrice}</span>
+                  <span className="text-sm text-[#1DF7CE] font-bold">€{discountedStemsPrice}</span>
+                </div>
+                
+                {/* Flying price animation */}
+                {priceAnimating && (
+                  <span 
+                    className="absolute text-sm text-[#1DF7CE] font-bold animate-fly-to-cart"
+                    style={{
+                      top: '0',
+                      right: '0',
+                      transform: 'translateY(0)',
+                    }}
+                  >
+                    €{discountedStemsPrice}
+                  </span>
+                )}
+              </div>
+              
+              <button
+                onClick={handleDownloadAllStems}
+                disabled={isBuyingAll || allStemsInCart}
+                className="bg-[#1DF7CE] hover:bg-[#19d9b6] text-[#1E1E1E] px-4 py-2 rounded-full font-medium transition-colors flex items-center justify-center whitespace-nowrap w-[140px] h-[36px]"
+              >
+                {isBuyingAll ? (
+                  <span className="flex justify-center items-center space-x-1">
+                    <span className="w-1.5 h-1.5 bg-[#1E1E1E] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                    <span className="w-1.5 h-1.5 bg-[#1E1E1E] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                    <span className="w-1.5 h-1.5 bg-[#1E1E1E] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                  </span>
+                ) : allStemsInCart ? (
+                  <span className="font-medium text-sm">Added to Cart</span>
+                ) : (
+                  <span className="font-medium text-sm">Buy All</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1997,14 +2064,14 @@ export default function AudioPlayer({
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
-        </button>
-      </div>
+          </button>
+        </div>
       )}
     </div>
   );
 } 
 
-// Add animation for the toast notification
+// Add animation for the toast notification and cart animations
 if (typeof document !== 'undefined') {
   const existingStyle = document.getElementById('toast-animation');
   if (!existingStyle) {
@@ -2017,6 +2084,40 @@ if (typeof document !== 'undefined') {
       }
       .animate-slide-up {
         animation: slide-up 0.3s ease forwards;
+      }
+      
+      @keyframes check-reveal {
+        0% { stroke-dashoffset: 50; }
+        60% { stroke-dashoffset: 0; }
+        100% { stroke-dashoffset: 0; }
+      }
+      .animate-check-reveal {
+        stroke-dasharray: 50;
+        stroke-dashoffset: 50;
+        animation: check-reveal 0.6s ease-in-out forwards;
+        animation-delay: 0.2s;
+      }
+      
+      @keyframes circle-reveal {
+        0% { stroke-dashoffset: 70; }
+        60% { stroke-dashoffset: 0; }
+        100% { stroke-dashoffset: 0; }
+      }
+      .animate-circle-reveal {
+        stroke-dasharray: 70;
+        stroke-dashoffset: 70;
+        animation: circle-reveal 0.6s ease-in-out forwards;
+      }
+      
+      @keyframes fly-to-cart {
+        0% { opacity: 1; transform: translate(0, 0); }
+        25% { opacity: 0.8; transform: translate(3vw, -25vh); }
+        50% { opacity: 0.6; transform: translate(5vw, -45vh); }
+        75% { opacity: 0.3; transform: translate(6vw, -65vh); }
+        100% { opacity: 0; transform: translate(7vw, -80vh); }
+      }
+      .animate-fly-to-cart {
+        animation: fly-to-cart 1s ease-in forwards;
       }
     `;
     document.head.appendChild(style);
