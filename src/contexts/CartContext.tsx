@@ -1,118 +1,81 @@
 'use client';
 
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { CartItem as GlobalCartItem } from '../types';
-
-// Extending the CartItem from types.ts but making the type field optional with a default
-interface CartItem extends Omit<GlobalCartItem, 'type' | 'trackTitle'> {
-  type?: 'track' | 'stem';
-  trackName: string;
-}
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { CartItem } from '@/types';
 
 interface CartContextType {
   items: CartItem[];
   addItem: (item: CartItem) => void;
-  removeItem: (itemId: string) => void;
+  removeItem: (id: string) => void;
   clearCart: () => void;
-  getItemCount: () => number;
+  getItemCount: (id: string) => number;
   getTotalPrice: () => number;
 }
 
-// Create the context with default values
-const CartContext = createContext<CartContextType>({
-  items: [],
-  addItem: () => {},
-  removeItem: () => {},
-  clearCart: () => {},
-  getItemCount: () => 0,
-  getTotalPrice: () => 0,
-});
+const CartContext = createContext<CartContextType | undefined>(undefined);
 
-export const CartProvider = ({ children }: { children: ReactNode }) => {
+export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
-  
-  // Load cart from localStorage on initial render
+
+  // Load cart from localStorage on mount
   useEffect(() => {
-    try {
-      const storedCart = localStorage.getItem('wavecave_cart');
-      if (storedCart) {
-        // Convert any old cart format to new format if needed
-        const parsedCart = JSON.parse(storedCart);
-        const convertedCart = parsedCart.map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          trackName: item.trackName || item.trackTitle || '', // Support both properties
-          price: item.price,
-          imageUrl: item.imageUrl,
-          type: item.type || 'stem' // Default to stem if not specified
-        }));
-        setItems(convertedCart);
+    if (typeof window !== 'undefined') {
+      const savedCart = localStorage.getItem('cart');
+      if (savedCart) {
+        try {
+          setItems(JSON.parse(savedCart));
+        } catch (e) {
+          console.error('Failed to parse cart from localStorage:', e);
+        }
       }
-    } catch (err) {
-      console.error('Error loading cart from localStorage:', err);
     }
   }, []);
-  
+
   // Save cart to localStorage whenever it changes
   useEffect(() => {
-    try {
-      localStorage.setItem('wavecave_cart', JSON.stringify(items));
-    } catch (err) {
-      console.error('Error saving cart to localStorage:', err);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cart', JSON.stringify(items));
     }
   }, [items]);
-  
+
   const addItem = (item: CartItem) => {
-    // Check if the item is already in the cart
-    const existingItemIndex = items.findIndex(i => i.id === item.id);
-    
-    if (existingItemIndex >= 0) {
-      // Item already in cart - could update quantity if needed
-      // For now, we'll just skip adding it again
-      return;
-    }
-    
-    // Add the item to the cart with default type if not specified
-    setItems(prevItems => [
-      ...prevItems, 
-      {
-        ...item,
-        type: item.type || 'stem'
-      }
-    ]);
+    setItems(prev => [...prev, item]);
   };
-  
-  const removeItem = (itemId: string) => {
-    setItems(prevItems => prevItems.filter(item => item.id !== itemId));
+
+  const removeItem = (id: string) => {
+    setItems(prev => prev.filter(item => item.id !== id));
   };
-  
+
   const clearCart = () => {
     setItems([]);
   };
-  
-  const getItemCount = () => {
-    return items.length;
+
+  const getItemCount = (id: string) => {
+    return items.filter(item => item.id === id).length;
   };
-  
+
   const getTotalPrice = () => {
     return items.reduce((total, item) => total + item.price, 0);
   };
-  
+
   return (
-    <CartContext.Provider 
-      value={{ 
-        items, 
-        addItem, 
-        removeItem, 
-        clearCart, 
-        getItemCount, 
-        getTotalPrice 
-      }}
-    >
+    <CartContext.Provider value={{
+      items,
+      addItem,
+      removeItem,
+      clearCart,
+      getItemCount,
+      getTotalPrice,
+    }}>
       {children}
     </CartContext.Provider>
   );
-};
+}
 
-// Custom hook to use the cart context
-export const useCart = () => useContext(CartContext); 
+export function useCart() {
+  const context = useContext(CartContext);
+  if (context === undefined) {
+    throw new Error('useCart must be used within a CartProvider');
+  }
+  return context;
+} 
