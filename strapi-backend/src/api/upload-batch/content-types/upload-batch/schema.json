@@ -1,0 +1,54 @@
+{
+  "kind": "collectionType",
+  "collectionName": "upload-batches",
+  "info": {
+    "singularName": "upload-batch",
+    "pluralName": "upload-batches",
+    "displayName": "Upload Batch",
+    "description": "Tracks bulk upload processing"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "pending",
+        "processing",
+        "completed",
+        "failed"
+      ],
+      "default": "pending",
+      "required": true
+    },
+    "totalFiles": {
+      "type": "integer",
+      "required": true
+    },
+    "processedFiles": {
+      "type": "integer",
+      "default": 0
+    },
+    "errorCount": {
+      "type": "integer",
+      "default": 0
+    },
+    "startedAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "completedAt": {
+      "type": "datetime"
+    },
+    "errorLog": {
+      "type": "text"
+    },
+    "tracks": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::track.track",
+      "mappedBy": "uploadBatch"
+    }
+  }
+} 

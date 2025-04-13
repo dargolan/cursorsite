@@ -369,9 +369,53 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiStemStem extends Struct.CollectionTypeSchema {
+  collectionName: 'stems';
+  info: {
+    description: 'Individual audio stems for tracks';
+    displayName: 'Stem';
+    pluralName: 'stems';
+    singularName: 'stem';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  pluginOptions: {
+    i18n: {
+      localized: true;
+    };
+  };
+  attributes: {
+    audioUrl: Schema.Attribute.String & Schema.Attribute.Required;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    description: Schema.Attribute.Text;
+    duration: Schema.Attribute.Decimal & Schema.Attribute.Required;
+    fileFormat: Schema.Attribute.String & Schema.Attribute.Required;
+    fileSize: Schema.Attribute.Integer & Schema.Attribute.Required;
+    isAvailable: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
+    locale: Schema.Attribute.String;
+    localizations: Schema.Attribute.Relation<'oneToMany', 'api::stem.stem'>;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    previewCount: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    price: Schema.Attribute.Decimal & Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    purchaseCount: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    sku: Schema.Attribute.String & Schema.Attribute.Unique;
+    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
+    track: Schema.Attribute.Relation<'manyToOne', 'api::track.track'>;
+    type: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiTagTag extends Struct.CollectionTypeSchema {
   collectionName: 'tags';
   info: {
+    description: 'Tags for categorizing tracks';
     displayName: 'Tag';
     pluralName: 'tags';
     singularName: 'tag';
@@ -379,17 +423,27 @@ export interface ApiTagTag extends Struct.CollectionTypeSchema {
   options: {
     draftAndPublish: true;
   };
+  pluginOptions: {
+    i18n: {
+      localized: true;
+    };
+  };
   attributes: {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<'oneToMany', 'api::tag.tag'> &
-      Schema.Attribute.Private;
-    Name: Schema.Attribute.String & Schema.Attribute.Required;
+    description: Schema.Attribute.Text;
+    locale: Schema.Attribute.String;
+    localizations: Schema.Attribute.Relation<'oneToMany', 'api::tag.tag'>;
+    name: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
     publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
     tracks: Schema.Attribute.Relation<'manyToMany', 'api::track.track'>;
-    Type: Schema.Attribute.Enumeration<['Genre', 'Mood', 'Instrument']> &
+    type: Schema.Attribute.Enumeration<
+      ['genre', 'mood', 'instrument', 'style']
+    > &
       Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -400,6 +454,7 @@ export interface ApiTagTag extends Struct.CollectionTypeSchema {
 export interface ApiTrackTrack extends Struct.CollectionTypeSchema {
   collectionName: 'tracks';
   info: {
+    description: 'A music track with stems and metadata';
     displayName: 'Track';
     pluralName: 'tracks';
     singularName: 'track';
@@ -407,25 +462,80 @@ export interface ApiTrackTrack extends Struct.CollectionTypeSchema {
   options: {
     draftAndPublish: true;
   };
+  pluginOptions: {
+    i18n: {
+      localized: true;
+    };
+  };
   attributes: {
-    AudioPreview: Schema.Attribute.Media<
-      'images' | 'files' | 'videos' | 'audios'
-    > &
-      Schema.Attribute.Required;
-    BPM: Schema.Attribute.Integer & Schema.Attribute.Required;
+    audioUrl: Schema.Attribute.String & Schema.Attribute.Required;
+    bpm: Schema.Attribute.Integer & Schema.Attribute.Required;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    Duration: Schema.Attribute.Decimal & Schema.Attribute.Required;
-    Image: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'> &
-      Schema.Attribute.Required;
-    locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<'oneToMany', 'api::track.track'> &
-      Schema.Attribute.Private;
+    description: Schema.Attribute.Text;
+    downloadCount: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    duration: Schema.Attribute.Decimal & Schema.Attribute.Required;
+    fileFormat: Schema.Attribute.String & Schema.Attribute.Required;
+    fileSize: Schema.Attribute.Integer & Schema.Attribute.Required;
+    genre: Schema.Attribute.String;
+    imageUrl: Schema.Attribute.String & Schema.Attribute.Required;
+    instruments: Schema.Attribute.JSON;
+    key: Schema.Attribute.String;
+    locale: Schema.Attribute.String;
+    localizations: Schema.Attribute.Relation<'oneToMany', 'api::track.track'>;
+    metaDescription: Schema.Attribute.Text;
+    metaTitle: Schema.Attribute.String;
+    mood: Schema.Attribute.String;
+    playCount: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
     publishedAt: Schema.Attribute.DateTime;
-    stems: Schema.Attribute.Component<'music.stem', true>;
+    slug: Schema.Attribute.UID<'title'> & Schema.Attribute.Required;
+    stems: Schema.Attribute.Relation<'oneToMany', 'api::stem.stem'>;
     tags: Schema.Attribute.Relation<'manyToMany', 'api::tag.tag'>;
-    Title: Schema.Attribute.String & Schema.Attribute.Required;
+    title: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    waveform: Schema.Attribute.JSON;
+  };
+}
+
+export interface ApiUploadBatchUploadBatch extends Struct.CollectionTypeSchema {
+  collectionName: 'upload-batches';
+  info: {
+    description: 'Tracks bulk upload processing';
+    displayName: 'Upload Batch';
+    pluralName: 'upload-batches';
+    singularName: 'upload-batch';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    completedAt: Schema.Attribute.DateTime;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    errorCount: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    errorLog: Schema.Attribute.Text;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::upload-batch.upload-batch'
+    > &
+      Schema.Attribute.Private;
+    processedFiles: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    publishedAt: Schema.Attribute.DateTime;
+    startedAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    status: Schema.Attribute.Enumeration<
+      ['pending', 'processing', 'completed', 'failed']
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'pending'>;
+    totalFiles: Schema.Attribute.Integer & Schema.Attribute.Required;
+    tracks: Schema.Attribute.Relation<'oneToMany', 'api::track.track'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -941,8 +1051,10 @@ declare module '@strapi/strapi' {
       'admin::transfer-token': AdminTransferToken;
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
+      'api::stem.stem': ApiStemStem;
       'api::tag.tag': ApiTagTag;
       'api::track.track': ApiTrackTrack;
+      'api::upload-batch.upload-batch': ApiUploadBatchUploadBatch;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
       'plugin::i18n.locale': PluginI18NLocale;

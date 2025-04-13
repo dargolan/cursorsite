@@ -1,0 +1,78 @@
+{
+  "kind": "collectionType",
+  "collectionName": "stems",
+  "info": {
+    "singularName": "stem",
+    "pluralName": "stems",
+    "displayName": "Stem",
+    "description": "Individual audio stems for tracks"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {
+    "i18n": {
+      "localized": true
+    }
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "type": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "text"
+    },
+    "price": {
+      "type": "decimal",
+      "required": true
+    },
+    "duration": {
+      "type": "decimal",
+      "required": true
+    },
+    "audioUrl": {
+      "type": "string",
+      "required": true
+    },
+    "purchaseCount": {
+      "type": "integer",
+      "default": 0
+    },
+    "previewCount": {
+      "type": "integer",
+      "default": 0
+    },
+    "fileSize": {
+      "type": "integer",
+      "required": true
+    },
+    "fileFormat": {
+      "type": "string",
+      "required": true
+    },
+    "isAvailable": {
+      "type": "boolean",
+      "default": true
+    },
+    "sku": {
+      "type": "string",
+      "unique": true
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
+      "required": true
+    },
+    "track": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::track.track",
+      "inversedBy": "stems"
+    }
+  }
+} 

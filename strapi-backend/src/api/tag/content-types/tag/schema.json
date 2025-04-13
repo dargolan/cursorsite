@@ -4,30 +4,46 @@
   "info": {
     "singularName": "tag",
     "pluralName": "tags",
-    "displayName": "Tag"
+    "displayName": "Tag",
+    "description": "Tags for categorizing tracks"
   },
   "options": {
     "draftAndPublish": true
   },
+  "pluginOptions": {
+    "i18n": {
+      "localized": true
+    }
+  },
   "attributes": {
-    "Name": {
+    "name": {
       "type": "string",
-      "required": true
+      "required": true,
+      "unique": true
     },
-    "Type": {
+    "type": {
       "type": "enumeration",
       "enum": [
-        "Genre",
-        "Mood",
-        "Instrument"
+        "genre",
+        "mood",
+        "instrument",
+        "style"
       ],
+      "required": true
+    },
+    "description": {
+      "type": "text"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
       "required": true
     },
     "tracks": {
       "type": "relation",
       "relation": "manyToMany",
       "target": "api::track.track",
-      "mappedBy": "tags"
+      "inversedBy": "tags"
     }
   }
 }
