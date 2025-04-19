@@ -1,404 +1,283 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import dynamic from 'next/dynamic';
-import FilterSidebar from '../components/FilterSidebar';
-import TagFilter from '../components/TagFilter';
-import { Tag, Stem, Track, CartItem } from '../types';
-import Header from '../components/Header';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { getTracks, getTags, getTracksByTags, searchTracks } from '../services/strapi';
-import { useCart } from '../contexts/CartContext';
-import AudioPlayer from '../components/AudioPlayer';
+import Link from 'next/link';
+import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { useDebounce } from '../hooks/useDebounce';
+import { getTracks, getTags } from '../services/strapi';
+import { Track, Tag } from '../types';
 
-// Lazy load the AudioPlayer component to improve performance
-const AudioPlayerComponent = dynamic(() => import('../components/AudioPlayer'), {
-  loading: () => <div className="h-24 bg-[#1E1E1E] animate-pulse rounded"></div>,
-  ssr: false, // This component uses browser APIs like wavesurfer
-});
-
-export default function MusicLibrary() {
-  // State for tracks data
-  const [tracks, setTracks] = useState<Track[]>([]);
-  const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  // Add a ref to track if we've already fetched data to prevent double fetching
-  const dataFetchedRef = useRef(false);
-  
-  // State for filters
-  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [bpmRange, setBpmRange] = useState<[number, number]>([0, 200]);
-  const [durationRange, setDurationRange] = useState<[number, number]>([0, 600]);
-  
-  // Audio player state
-  const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
-  
-  // Access cart functions from CartContext
-  const { items: cartItems, addItem, removeItem, getTotalPrice } = useCart();
-
-  // Tags categorized by type
+export default function HomePage() {
+  const [featuredTracks, setFeaturedTracks] = useState<Track[]>([]);
   const [genres, setGenres] = useState<Tag[]>([]);
-  const [moods, setMoods] = useState<Tag[]>([]);
-  const [instruments, setInstruments] = useState<Tag[]>([]);
-
-  // Global state to track which track's stems are open (can only be one at a time)
-  const [openStemsTrackId, setOpenStemsTrackId] = useState<string | null>(null);
-
-  // Define fetchData function for reuse
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      console.log('Fetching tracks and tags...');
-      
-      // Test direct fetch to check API connection - with more detailed debug info
-      try {
-        const testUrl = 'http://localhost:1337/api/tracks?populate=*';
-        console.log('Testing API connection directly to:', testUrl);
-        
-        // Test if we can reach the Strapi server at all
-        try {
-          const pingResponse = await fetch('http://localhost:1337/admin/ping');
-          const pingText = await pingResponse.text();
-          console.log('Ping response from Strapi server:', pingText);
-        } catch (e) {
-          console.error('Failed to ping Strapi server:', e);
-        }
-        
-        const testResponse = await fetch(testUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-        });
-        
-        if (!testResponse.ok) {
-          console.error(`API test failed with status: ${testResponse.status} ${testResponse.statusText}`);
-          throw new Error(`API returned ${testResponse.status}`);
-        }
-        
-        const testData = await testResponse.json();
-        console.log('Direct API test successful. Response:', testData);
-      } catch (e) {
-        console.error('Direct API test failed:', e);
-      }
-      
-      // Fetch tracks
-      const tracksData = await getTracks();
-      console.log('Tracks fetched:', tracksData.length);
-      setTracks(tracksData);
-      setFilteredTracks(tracksData);
-      
-      // Fetch tags
-      const tagsData = await getTags();
-      console.log('Tags fetched:', tagsData.length);
-      
-      // Categorize tags
-      const genresList = tagsData.filter(tag => tag.type === 'genre');
-      const moodsList = tagsData.filter(tag => tag.type === 'mood');
-      const instrumentsList = tagsData.filter(tag => tag.type === 'instrument');
-      
-      console.log('Genres:', genresList.length);
-      console.log('Moods:', moodsList.length);
-      console.log('Instruments:', instrumentsList.length);
-      
-      // Count tag occurrences in tracks
-      const tagCounts = new Map<string, number>();
-      tracksData.forEach(track => {
-        track.tags.forEach(tag => {
-          const count = tagCounts.get(tag.id) || 0;
-          tagCounts.set(tag.id, count + 1);
-        });
-      });
-      
-      // Add count property to tags
-      genresList.forEach(tag => tag.count = tagCounts.get(tag.id) || 0);
-      moodsList.forEach(tag => tag.count = tagCounts.get(tag.id) || 0);
-      instrumentsList.forEach(tag => tag.count = tagCounts.get(tag.id) || 0);
-      
-      setGenres(genresList);
-      setMoods(moodsList);
-      setInstruments(instrumentsList);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      // If API fails, use an empty state
-      setTracks([]);
-      setFilteredTracks([]);
-      setGenres([]);
-      setMoods([]);
-      setInstruments([]);
-    } finally {
-      setLoading(false);
-      // Mark that we've completed a fetch to prevent duplicate fetches
-      dataFetchedRef.current = true;
+  const [featuredProjects, setFeaturedProjects] = useState([
+    {
+      id: '1',
+      title: 'Cinematic Documentary',
+      description: 'Award-winning nature documentary featuring our ambient tracks',
+      image: '/images/projects/documentary.jpg',
+      link: '/projects/documentary'
+    },
+    {
+      id: '2',
+      title: 'Gaming Stream',
+      description: 'Popular Twitch streamer using our electronic music',
+      image: '/images/projects/gaming.jpg',
+      link: '/projects/gaming'
+    },
+    {
+      id: '3',
+      title: 'Corporate Brand',
+      description: 'Global tech company\'s promotional video',
+      image: '/images/projects/corporate.jpg',
+      link: '/projects/corporate'
     }
-  };
+  ]);
+  
+  const [loading, setLoading] = useState(true);
 
-  // Fetch data from Strapi
   useEffect(() => {
-    // Skip if we've already fetched data (prevents double fetch in StrictMode)
-    if (dataFetchedRef.current) return;
-    
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const tracks = await getTracks();
+        // Get featured tracks (limit to 4)
+        setFeaturedTracks(tracks?.slice(0, 4) || []);
+        
+        const tags = await getTags();
+        // Filter out genre tags and get the top ones
+        const genreTags = tags
+          ?.filter(tag => tag.type === 'genre')
+          ?.sort((a, b) => (b.count || 0) - (a.count || 0))
+          ?.slice(0, 4) || [];
+        setGenres(genreTags);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setFeaturedTracks([]);
+        setGenres([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchData();
   }, []);
 
-  // Filter tracks based on selected tags, search query, and ranges
-  useEffect(() => {
-    // Start with all tracks
-    let filtered = [...tracks];
-    
-    // Filter by selected tags
-    if (selectedTags.length > 0) {
-      console.log('Filtering by tags:', selectedTags.map(t => `${t.name} (${t.id})`));
-      filtered = filtered.filter(track => {
-        // Track must have ALL selected tags
-        const matches = selectedTags.every(selectedTag => 
-          track.tags.some(tag => tag.id === selectedTag.id)
-        );
-        console.log('Track', track.title, 'has tags:', track.tags.map(t => t.name), 'matches?', matches);
-        return matches;
-      });
-    }
-    
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(track => 
-        track.title.toLowerCase().includes(query) ||
-        track.tags.some(tag => tag.name.toLowerCase().includes(query))
-      );
-    }
-    
-    // Filter by BPM range
-    filtered = filtered.filter(track => 
-      track.bpm >= bpmRange[0] && track.bpm <= bpmRange[1]
-    );
-    
-    // Filter by duration range
-    filtered = filtered.filter(track => 
-      track.duration >= durationRange[0] && track.duration <= durationRange[1]
-    );
-    
-    setFilteredTracks(filtered);
-  }, [tracks, selectedTags, searchQuery, bpmRange, durationRange]);
-
-  // Handler for toggling a tag
-  const handleTagToggle = useCallback((tag: Tag) => {
-    setSelectedTags(prevTags => {
-      const isSelected = prevTags.some(t => t.id === tag.id);
-      if (isSelected) {
-        return prevTags.filter(t => t.id !== tag.id);
-      } else {
-        return [...prevTags, tag];
-      }
-    });
-  }, []);
-
-  // Handler for clearing all tags
-  const handleClearTags = useCallback(() => {
-    setSelectedTags([]);
-  }, []);
-
-  // Handler for search input
-  const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query);
-  }, []);
-
-  // Handler for BPM range change
-  const handleBpmChange = useCallback((range: [number, number]) => {
-    setBpmRange(range);
-  }, []);
-
-  // Handler for duration range change
-  const handleDurationChange = useCallback((range: [number, number]) => {
-    setDurationRange(range);
-  }, []);
-
-  // Handle adding a stem to the cart using CartContext
-  const handleAddToCart = useCallback((stem: Stem, track: Track) => {
-    addItem({
-      id: stem.id,
-      name: stem.name,
-      trackName: track.title,
-      price: stem.price,
-      imageUrl: track.imageUrl
-    });
-  }, [addItem]);
-
-  // Handle removing an item from the cart using CartContext
-  const handleRemoveFromCart = useCallback((itemId: string) => {
-    removeItem(itemId);
-  }, [removeItem]);
-
-  // Handler for tag click
-  const handleTagClick = useCallback((tag: Tag) => {
-    setSelectedTags(prevTags => {
-      const isSelected = prevTags.some(t => t.id === tag.id);
-      if (isSelected) {
-        return prevTags.filter(t => t.id !== tag.id);
-      } else {
-        return [...prevTags, tag];
-      }
-    });
-  }, []);
-
-  // Function to format duration from seconds to mm:ss
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Display loading state or no results message
-  const renderContent = () => {
-    if (loading) {
   return (
-        <div className="flex flex-col items-center justify-center h-64">
-          <div className="w-12 h-12 border-4 border-[#1DF7CE] border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-400">Loading tracks...</p>
-        </div>
-      );
-    }
-
-    if (filteredTracks.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center h-64 text-center">
-          <h3 className="text-lg text-gray-300 mb-2">No tracks found</h3>
-          <p className="text-sm text-gray-500 max-w-md">
-            Try adjusting your filters or search query
-          </p>
-          {tracks.length === 0 && (
-            <div className="mt-4 p-4 bg-red-900/20 rounded-md text-left w-full max-w-md">
-              <h4 className="text-red-300 mb-2">API Connection Issue</h4>
-              <p className="text-sm text-gray-400 mb-2">
-                No tracks were loaded from the API. This might be due to:
-              </p>
-              <ul className="list-disc pl-5 text-sm text-gray-400">
-                <li>Strapi server not running at http://localhost:1337</li>
-                <li>API permissions not set correctly in Strapi</li>
-                <li>CORS issues preventing API access</li>
-                <li>Data schema mismatch between frontend and API</li>
-              </ul>
-              <p className="text-sm text-gray-400 mt-2">
-                Check the browser console for detailed error messages.
-              </p>
-              <button
-                onClick={() => {
-                  console.log('Retrying connection to API...');
-                  // Reset the fetched flag so we can try again
-                  dataFetchedRef.current = false;
-                  // Show loading state
-                  setLoading(true);
-                  // Re-fetch data
-                  fetchData();
-                }}
-                className="mt-4 px-4 py-2 bg-[#1DF7CE]/20 hover:bg-[#1DF7CE]/30 text-[#1DF7CE] rounded transition-colors text-sm"
-              >
-                Retry Connection
-              </button>
-          </div>
-          )}
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex flex-col w-full">
-        {/* Track row */}
-        {filteredTracks.map(track => (
-          <div key={track.id} className="mb-0 max-w-[1464px] mx-auto w-full">
-            <AudioPlayerComponent 
-              track={track} 
-              isPlaying={playingTrackId === track.id}
-              onPlay={() => setPlayingTrackId(track.id)}
-              onStop={() => setPlayingTrackId(null)}
-              onTagClick={handleTagClick}
-              openStemsTrackId={openStemsTrackId}
-              setOpenStemsTrackId={setOpenStemsTrackId}
-            />
-          </div>
-            ))}
-          </div>
-    );
-  };
-
-  return (
-    <div className="flex flex-col min-h-screen bg-[#121212] text-white">
+    <main className="min-h-screen bg-[#0a0c0f]">
       <Header />
       
-      <main className="flex flex-1">
-        {/* Sidebar with filter controls */}
-      <FilterSidebar
-          selectedTags={selectedTags}
-        genres={genres}
-        moods={moods}
-        instruments={instruments}
-        bpmRange={bpmRange}
-        durationRange={durationRange}
-          onTagToggle={handleTagToggle}
-          onBpmChange={handleBpmChange}
-          onDurationChange={handleDurationChange}
-          onSearch={handleSearch}
-        />
-        
-        {/* Main content area with tracks list */}
-        <div className="ml-[295px] flex-1">
-          <div className="p-8 pt-24">
-            
-            {/* Fixed height container for selected tags */}
-            <div className="h-[40px] mb-4">
-              {/* Selected tags display with clear button */}
-              {(selectedTags.length > 0 || searchQuery) && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {selectedTags.map(tag => (
-                    <TagFilter
-                      key={tag.id}
-                      tag={tag} 
-                      selected={true} 
-                      onClick={() => handleTagToggle(tag)}
-                    />
-                  ))}
-                  
-                  {/* Display search query as a tag-like filter */}
-                  {searchQuery && (
-                    <div className="flex items-center space-x-1 text-xs font-normal px-3 py-1 rounded-full bg-[#303030] text-[#1DF7CE] border border-[#1DF7CE]">
-                      <span>Search: {searchQuery}</span>
-                      <button 
-                        onClick={() => setSearchQuery('')}
-                        className="ml-1 text-[#1DF7CE] hover:text-white"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      {/* Hero Section */}
+      <section className="relative w-full px-4 py-16 md:py-24 lg:py-32">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center">
+          <div className="w-full md:w-1/2 mb-8 md:mb-0 md:pr-8">
+            <h1 className="text-5xl md:text-6xl font-bold text-white mb-4">
+              Discover the <span className="text-[#0FE6B8]">Soundtrack</span> to Your <span className="text-[#0FE6B8]">Story</span>
+            </h1>
+            <p className="text-xl text-gray-300 mb-8">
+              High-quality, royalty-free music for your creative projects
+            </p>
+            <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+              <div className="relative w-full sm:w-96">
+                <input 
+                  type="text" 
+                  placeholder="Search tracks..." 
+                  className="w-full px-4 py-3 bg-[#1E1E1E] border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-[#0FE6B8] focus:border-transparent" 
+                />
+                <svg className="absolute right-3 top-3 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <Link href="/explore" className="flex items-center justify-center px-6 py-3 bg-[#0FE6B8] hover:bg-opacity-80 text-black font-medium rounded-md transition duration-200">
+                Browse Library
+              </Link>
+            </div>
+          </div>
+          <div className="w-full md:w-1/2 relative">
+            <Image
+              src="/images/studio.jpg"
+              alt="Recording studio"
+              width={700}
+              height={500}
+              className="rounded-lg shadow-2xl"
+              priority
+            />
+          </div>
+        </div>
+      </section>
+      
+      {/* Featured Tracks Section */}
+      <section className="py-16 px-4 bg-[#0a0c0f]">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-3xl font-bold text-white">Featured Tracks</h2>
+            <Link href="/explore" className="text-[#0FE6B8] hover:underline flex items-center">
+              View All
+              <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {loading ? (
+              // Loading skeletons
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="bg-[#1E1E1E] rounded-lg overflow-hidden animate-pulse">
+                  <div className="w-full h-48 bg-gray-800"></div>
+                  <div className="p-4">
+                    <div className="h-5 bg-gray-800 rounded w-3/4 mb-2"></div>
+                    <div className="h-4 bg-gray-800 rounded w-1/2 mb-4"></div>
+                    <div className="h-4 bg-gray-800 rounded w-1/4"></div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              featuredTracks.map(track => (
+                <div key={track.id} className="bg-[#1E1E1E] rounded-lg overflow-hidden transition-transform hover:scale-[1.02] duration-200">
+                  <div className="relative w-full h-48 bg-gray-900 flex items-center justify-center">
+                    {track.imageUrl ? (
+                      <Image
+                        src={track.imageUrl}
+                        alt={track.title}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-[#282828] flex items-center justify-center">
+                        <svg className="w-8 h-8 text-[#0FE6B8]" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <h3 className="text-white font-medium text-lg mb-1">{track.title}</h3>
+                    <p className="text-gray-400 text-sm">{track.tags[0]?.name}</p>
+                    <div className="flex items-center justify-between mt-3">
+                      <span className="text-gray-400 text-sm">{formatDuration(track.duration)} • {track.tags[0]?.name}</span>
+                      <button className="text-white">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
                       </button>
                     </div>
-                  )}
-                  
-                  <button 
-                    onClick={() => {
-                      handleClearTags();
-                      setSearchQuery('');
-                    }}
-                    className="text-sm text-white bg-transparent hover:text-[#1DF7CE] transition-colors ml-2 flex items-center"
-                  >
-                    Clear All <span className="ml-1">×</span>
-                  </button>
+                  </div>
                 </div>
-              )}
-            </div>
-              
-            {/* Tracks list */}
-            {renderContent()}
+              ))
+            )}
           </div>
         </div>
-      </main>
+      </section>
+      
+      {/* Browse by Genre Section */}
+      <section className="py-16 px-4 bg-[#0d1116]">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-3xl font-bold text-white">Browse by Genre</h2>
+            <Link href="/genres" className="text-[#0FE6B8] hover:underline flex items-center">
+              All Genres
+              <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {loading ? (
+              // Loading skeletons for genres
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-lg h-48 animate-pulse"></div>
+              ))
+            ) : (
+              genres.map(genre => (
+                <Link key={genre.id} href={`/genres/${genre.id}`} className="relative block overflow-hidden rounded-lg h-48 group">
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black opacity-70"></div>
+                  <div className="absolute inset-0 flex flex-col justify-end p-6">
+                    <h3 className="text-white font-bold text-xl mb-1">{genre.name}</h3>
+                    <p className="text-gray-300 text-sm">{genre.count || 0} tracks</p>
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
+      
+      {/* Featured Projects Section */}
+      <section className="py-16 px-4 bg-[#0a0c0f]">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col mb-8">
+            <h2 className="text-3xl font-bold text-white mb-2">Featured Projects</h2>
+            <p className="text-gray-400">See how creators are using our music</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {featuredProjects.map(project => (
+              <div key={project.id} className="bg-[#1E1E1E] rounded-lg overflow-hidden">
+                <div className="relative w-full h-48 bg-gray-900">
+                  <Image
+                    src={project.image}
+                    alt={project.title}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <div className="p-6">
+                  <h3 className="text-white font-bold text-xl mb-2">{project.title}</h3>
+                  <p className="text-gray-400 mb-4">{project.description}</p>
+                  <button className="flex items-center text-[#0FE6B8] hover:underline">
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    </svg>
+                    Watch Project
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="mt-8 text-center">
+            <Link href="/submit-project" className="inline-flex items-center px-6 py-3 border border-[#0FE6B8] text-[#0FE6B8] hover:bg-[#0FE6B8] hover:bg-opacity-10 rounded-md font-medium transition duration-200">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Submit Your Project
+            </Link>
+          </div>
+        </div>
+      </section>
+      
+      {/* Newsletter Section */}
+      <section className="py-16 px-4 bg-[#0d1116]">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-3xl font-bold text-white mb-4">Stay in the Loop</h2>
+          <p className="text-gray-300 mb-8">Subscribe to get the latest updates on new tracks and exclusive offers</p>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-2">
+            <input 
+              type="email" 
+              placeholder="Enter your email" 
+              className="w-full sm:w-96 px-4 py-3 bg-[#1E1E1E] border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-[#0FE6B8] focus:border-transparent" 
+            />
+            <button className="w-full sm:w-auto whitespace-nowrap px-6 py-3 bg-[#0FE6B8] hover:bg-opacity-80 text-black font-medium rounded-md transition duration-200">
+              Subscribe
+            </button>
+          </div>
+        </div>
+      </section>
+      
       <Footer />
-    </div>
+    </main>
   );
+}
+
+// Helper function to format duration
+function formatDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 } 
 
