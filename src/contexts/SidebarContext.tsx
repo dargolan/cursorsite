@@ -15,48 +15,65 @@ const SidebarContext = createContext<SidebarContextProps | undefined>(undefined)
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [isFirstVisit, setIsFirstVisit] = useState(true);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true); // Default to collapsed
+  const [isInitialized, setIsInitialized] = useState(false);
   
   // Initialize the sidebar state based on localStorage and current path
   useEffect(() => {
-    // Check if this is the first render
-    if (isFirstVisit) {
-      setIsFirstVisit(false);
+    if (!isInitialized) {
+      const isHomepage = pathname === '/';
       
-      // Get saved state from localStorage
-      const savedState = localStorage.getItem(SIDEBAR_STATE_KEY);
-      
-      if (savedState !== null) {
-        // User has a saved preference, use it
-        setIsCollapsed(savedState === 'collapsed');
-      } else {
-        // No saved preference - collapse by default if on homepage
-        const isHomepage = pathname === '/';
+      try {
+        // Get saved state from localStorage if available
+        const savedState = typeof window !== 'undefined' ? localStorage.getItem(SIDEBAR_STATE_KEY) : null;
+        
+        if (savedState !== null) {
+          // User has a saved preference, use it
+          console.log('Using saved sidebar state:', savedState);
+          setIsCollapsed(savedState === 'collapsed');
+        } else if (isHomepage) {
+          // No saved preference and on homepage - collapse by default
+          console.log('On homepage with no saved state - collapsing sidebar');
+          setIsCollapsed(true);
+        } else {
+          // Not on homepage and no saved preference
+          console.log('Not on homepage and no saved state - expanding sidebar');
+          setIsCollapsed(false);
+        }
+      } catch (error) {
+        console.error('Error accessing localStorage:', error);
+        // Default behavior if localStorage fails
         setIsCollapsed(isHomepage);
       }
+      
+      setIsInitialized(true);
     }
-  }, [pathname, isFirstVisit]);
+  }, [pathname, isInitialized]);
 
-  // Save sidebar state to localStorage whenever it changes
+  // Save sidebar state to localStorage whenever it changes after initialization
   useEffect(() => {
-    if (!isFirstVisit) {
-      localStorage.setItem(SIDEBAR_STATE_KEY, isCollapsed ? 'collapsed' : 'expanded');
-      console.log('Saved sidebar state:', isCollapsed ? 'collapsed' : 'expanded');
+    if (isInitialized) {
+      try {
+        localStorage.setItem(SIDEBAR_STATE_KEY, isCollapsed ? 'collapsed' : 'expanded');
+        console.log('Saved sidebar state:', isCollapsed ? 'collapsed' : 'expanded');
+      } catch (error) {
+        console.error('Error saving to localStorage:', error);
+      }
     }
-  }, [isCollapsed, isFirstVisit]);
+  }, [isCollapsed, isInitialized]);
   
   // Debug logging
   useEffect(() => {
-    console.log('Sidebar state:', isCollapsed ? 'collapsed' : 'expanded');
-  }, [isCollapsed]);
+    console.log('Current sidebar state:', isCollapsed ? 'collapsed' : 'expanded', 'Path:', pathname);
+  }, [isCollapsed, pathname]);
 
   const toggleCollapse = () => {
-    console.log('Toggle collapse clicked');
+    console.log('Toggle collapse clicked, current state:', isCollapsed);
     setIsCollapsed(prevState => !prevState);
   };
   
   const setCollapsed = (value: boolean) => {
+    console.log('Setting sidebar collapsed state to:', value);
     setIsCollapsed(value);
   };
 
