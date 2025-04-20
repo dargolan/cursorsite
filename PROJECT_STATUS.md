@@ -56,6 +56,7 @@
 - ⬜ Documentation for API endpoints and component library
 
 ## Recent Updates
+- Standardized search bar design between hero section and sidebar
 - Fixed slider persistence to maintain positions when navigating between pages
 - Made sidebar functionality consistent across website by redirecting filters to Music page
 - Updated top menu to adjust position based on sidebar state
