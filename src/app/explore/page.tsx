@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import { useSearchParams } from 'next/navigation';
 import FilterSidebar from '../../components/FilterSidebar/index';
 import ContentWrapper from '../../components/ContentWrapper';
 import TagFilter from '../../components/TagFilter';
@@ -21,6 +22,9 @@ const AudioPlayerComponent = dynamic(() => import('../../components/AudioPlayer'
 });
 
 export default function MusicLibrary() {
+  // Get search params from URL
+  const searchParams = useSearchParams();
+  
   // State for tracks data
   const [tracks, setTracks] = useState<Track[]>([]);
   const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
@@ -125,6 +129,10 @@ export default function MusicLibrary() {
       setGenres(genresList);
       setMoods(moodsList);
       setInstruments(instrumentsList);
+      
+      // Apply URL filters after data is loaded
+      applyFiltersFromURL(tagsData);
+      
     } catch (error) {
       console.error('Error fetching data:', error);
       // If API fails, use an empty state
@@ -139,6 +147,43 @@ export default function MusicLibrary() {
       dataFetchedRef.current = true;
     }
   };
+
+  // Apply filters from URL parameters
+  const applyFiltersFromURL = useCallback((allTags: Tag[]) => {
+    // Get tags from URL
+    const tagsParam = searchParams.get('tags');
+    if (tagsParam) {
+      const tagIds = tagsParam.split(',');
+      const matchedTags = allTags.filter(tag => tagIds.includes(tag.id));
+      setSelectedTags(matchedTags);
+    }
+    
+    // Get BPM range from URL
+    const bpmMinParam = searchParams.get('bpmMin');
+    const bpmMaxParam = searchParams.get('bpmMax');
+    if (bpmMinParam && bpmMaxParam) {
+      setBpmRange([
+        parseInt(bpmMinParam) || 0, 
+        parseInt(bpmMaxParam) || 200
+      ]);
+    }
+    
+    // Get duration range from URL
+    const durationMinParam = searchParams.get('durationMin');
+    const durationMaxParam = searchParams.get('durationMax');
+    if (durationMinParam && durationMaxParam) {
+      setDurationRange([
+        parseInt(durationMinParam) || 0, 
+        parseInt(durationMaxParam) || 600
+      ]);
+    }
+    
+    // Get search query from URL
+    const searchParam = searchParams.get('search');
+    if (searchParam) {
+      setSearchQuery(searchParam);
+    }
+  }, [searchParams]);
 
   // Fetch data from Strapi
   useEffect(() => {

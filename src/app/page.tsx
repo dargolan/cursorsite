@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import FilterSidebar from '../components/FilterSidebar/index';
@@ -11,6 +12,7 @@ import { getTracks, getTags } from '../services/strapi';
 import { Track, Tag } from '../types';
 
 export default function HomePage() {
+  const router = useRouter();
   const [featuredTracks, setFeaturedTracks] = useState<Track[]>([]);
   const [genres, setGenres] = useState<Tag[]>([]);
   const [moods, setMoods] = useState<Tag[]>([]);
@@ -44,28 +46,99 @@ export default function HomePage() {
   
   const [loading, setLoading] = useState(true);
 
+  // Navigate to explore page with filters
+  const navigateToExploreWithFilters = (params: {
+    tags?: string[];
+    bpmMin?: number;
+    bpmMax?: number;
+    durationMin?: number;
+    durationMax?: number;
+    search?: string;
+  }) => {
+    // Create URL search params
+    const searchParams = new URLSearchParams();
+    
+    // Add selected tags
+    if (params.tags && params.tags.length > 0) {
+      searchParams.append('tags', params.tags.join(','));
+    }
+    
+    // Add BPM range if not default
+    if (params.bpmMin !== 0 || params.bpmMax !== 200) {
+      searchParams.append('bpmMin', params.bpmMin?.toString() || '0');
+      searchParams.append('bpmMax', params.bpmMax?.toString() || '200');
+    }
+    
+    // Add duration range if not default
+    if (params.durationMin !== 0 || params.durationMax !== 600) {
+      searchParams.append('durationMin', params.durationMin?.toString() || '0');
+      searchParams.append('durationMax', params.durationMax?.toString() || '600');
+    }
+    
+    // Add search query if provided
+    if (params.search) {
+      searchParams.append('search', params.search);
+    }
+    
+    // Navigate to explore page with filters
+    const queryString = searchParams.toString();
+    router.push(`/explore${queryString ? '?' + queryString : ''}`);
+  };
+
   const handleTagToggle = (tag: Tag) => {
-    setSelectedTags(prev => {
-      const exists = prev.some(t => t.id === tag.id);
-      if (exists) {
-        return prev.filter(t => t.id !== tag.id);
-      } else {
-        return [...prev, tag];
-      }
+    // Update local state
+    const newSelectedTags = selectedTags.some(t => t.id === tag.id)
+      ? selectedTags.filter(t => t.id !== tag.id)
+      : [...selectedTags, tag];
+    
+    setSelectedTags(newSelectedTags);
+    
+    // Navigate to explore page with updated tags
+    navigateToExploreWithFilters({
+      tags: newSelectedTags.map(tag => tag.id),
+      bpmMin: bpmRange[0],
+      bpmMax: bpmRange[1],
+      durationMin: durationRange[0],
+      durationMax: durationRange[1]
     });
   };
 
   const handleBpmChange = (range: [number, number]) => {
     setBpmRange(range);
+    
+    // Navigate to explore page with BPM range
+    navigateToExploreWithFilters({
+      tags: selectedTags.map(tag => tag.id),
+      bpmMin: range[0],
+      bpmMax: range[1],
+      durationMin: durationRange[0],
+      durationMax: durationRange[1]
+    });
   };
 
   const handleDurationChange = (range: [number, number]) => {
     setDurationRange(range);
+    
+    // Navigate to explore page with duration range
+    navigateToExploreWithFilters({
+      tags: selectedTags.map(tag => tag.id),
+      bpmMin: bpmRange[0],
+      bpmMax: bpmRange[1],
+      durationMin: range[0],
+      durationMax: range[1]
+    });
   };
 
   const handleSearch = (query: string) => {
-    console.log('Searching for:', query);
-    // Implement search functionality
+    // Navigate to explore page with search query
+    navigateToExploreWithFilters({
+      tags: selectedTags.map(tag => tag.id),
+      bpmMin: bpmRange[0],
+      bpmMax: bpmRange[1],
+      durationMin: durationRange[0],
+      durationMax: durationRange[1],
+      search: query
+    });
   };
 
   useEffect(() => {
@@ -129,14 +202,24 @@ export default function HomePage() {
               </p>
               <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
                 <div className="relative w-full sm:w-80">
-                  <input 
-                    type="text" 
-                    placeholder="Search tracks..." 
-                    className="w-full px-3 py-2 bg-[#1E1E1E] border border-gray-700 rounded-full text-white focus:outline-none focus:ring-1 focus:ring-[#1DF7CE] focus:border-transparent" 
-                  />
-                  <svg className="absolute right-3 top-2.5 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    const input = e.currentTarget.querySelector('input');
+                    if (input && input.value.trim()) {
+                      handleSearch(input.value.trim());
+                    }
+                  }}>
+                    <input 
+                      type="text" 
+                      placeholder="Search tracks..." 
+                      className="w-full px-3 py-2 bg-[#1E1E1E] border border-gray-700 rounded-full text-white focus:outline-none focus:ring-1 focus:ring-[#1DF7CE] focus:border-transparent" 
+                    />
+                    <button type="submit" className="absolute right-3 top-2.5">
+                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </button>
+                  </form>
                 </div>
                 <Link href="/explore" className="flex items-center justify-center px-4 py-2 bg-[#1DF7CE] hover:bg-[#1DF7CE]/90 text-black font-medium rounded-full transition-colors text-sm">
                   Browse Library
