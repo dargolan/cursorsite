@@ -56,6 +56,7 @@
 - ⬜ Documentation for API endpoints and component library
 
 ## Recent Updates
+- Fixed unwanted space on right side of homepage and corrected sidebar default state
 - Improved sidebar behavior: initially collapsed on homepage, persists user preference across pages
 - Standardized search bar design between hero section and sidebar
 - Fixed slider persistence to maintain positions when navigating between pages
