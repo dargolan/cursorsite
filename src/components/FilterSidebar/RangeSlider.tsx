@@ -98,12 +98,24 @@ export default function RangeSlider({
     
     // Attach move and up handlers
     const handleMove = (moveEvent: MouseEvent) => {
-      // Get current dimensions (in case of window resize)
-      const currentRect = trackRef.current?.getBoundingClientRect();
-      if (!currentRect) return;
+      if (!trackRef.current) return;
       
-      // Calculate the offset within the track, clamped between 0 and width
-      const offsetX = Math.max(0, Math.min(currentRect.width, moveEvent.clientX - currentRect.left));
+      // Get current dimensions (in case of window resize)
+      const currentRect = trackRef.current.getBoundingClientRect();
+      
+      // Calculate the offset, clamping if mouse is outside the track bounds
+      let offsetX;
+      if (moveEvent.clientX < currentRect.left) {
+        // If mouse is to the left of the track, set to minimum (0%)
+        offsetX = 0;
+      } else if (moveEvent.clientX > currentRect.right) {
+        // If mouse is to the right of the track, set to maximum (100%)
+        // but still respect the max thumb position
+        offsetX = Math.min(currentRect.width, maxPercentage * currentRect.width / 100);
+      } else {
+        // Normal case: mouse is within track bounds
+        offsetX = moveEvent.clientX - currentRect.left;
+      }
       
       // Calculate percentage (0-100)
       const percentage = (offsetX / currentRect.width) * 100;
@@ -149,12 +161,24 @@ export default function RangeSlider({
     
     // Attach move and up handlers
     const handleMove = (moveEvent: MouseEvent) => {
-      // Get current dimensions (in case of window resize)
-      const currentRect = trackRef.current?.getBoundingClientRect();
-      if (!currentRect) return;
+      if (!trackRef.current) return;
       
-      // Calculate the offset within the track, clamped between 0 and width
-      const offsetX = Math.max(0, Math.min(currentRect.width, moveEvent.clientX - currentRect.left));
+      // Get current dimensions (in case of window resize)
+      const currentRect = trackRef.current.getBoundingClientRect();
+      
+      // Calculate the offset, clamping if mouse is outside the track bounds
+      let offsetX;
+      if (moveEvent.clientX < currentRect.left) {
+        // If mouse is to the left of the track, set to minimum
+        // but still respect the min thumb position
+        offsetX = Math.max(0, minPercentage * currentRect.width / 100);
+      } else if (moveEvent.clientX > currentRect.right) {
+        // If mouse is to the right of the track, set to maximum (100%)
+        offsetX = currentRect.width;
+      } else {
+        // Normal case: mouse is within track bounds
+        offsetX = moveEvent.clientX - currentRect.left;
+      }
       
       // Calculate percentage (0-100)
       const percentage = (offsetX / currentRect.width) * 100;
