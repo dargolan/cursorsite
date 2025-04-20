@@ -119,12 +119,12 @@ export default function HomePage() {
         
         {/* Hero Section */}
         <section className="relative w-full px-8 py-4 md:py-6 mt-16">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start">
-            <div className="w-full md:w-1/2 mb-4 md:mb-0 md:pr-8">
-              <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center">
+            <div className="w-full md:w-1/2 mb-4 md:mb-0 md:pr-8 flex flex-col justify-center">
+              <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-6">
                 Discover the <span className="text-[#1DF7CE]">Soundtrack</span> to Your <span className="text-[#1DF7CE]">Story</span>
               </h1>
-              <p className="text-lg text-gray-300 mb-4">
+              <p className="text-xl text-gray-300 mb-8">
                 High-quality, royalty-free music for your creative projects
               </p>
               <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
