@@ -118,13 +118,13 @@ export default function HomePage() {
         <Header />
         
         {/* Hero Section */}
-        <section className="relative w-full px-8 py-16 md:py-24 lg:py-32 mt-16">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center">
-            <div className="w-full md:w-1/2 mb-8 md:mb-0 md:pr-8">
-              <h1 className="text-5xl md:text-6xl font-bold text-white mb-4">
+        <section className="relative w-full px-8 py-8 md:py-12 mt-12">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start">
+            <div className="w-full md:w-1/2 mb-6 md:mb-0 md:pr-8 pt-2">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-3">
                 Discover the <span className="text-[#1DF7CE]">Soundtrack</span> to Your <span className="text-[#1DF7CE]">Story</span>
               </h1>
-              <p className="text-xl text-gray-300 mb-8">
+              <p className="text-lg text-gray-300 mb-6">
                 High-quality, royalty-free music for your creative projects
               </p>
               <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
@@ -144,14 +144,16 @@ export default function HomePage() {
               </div>
             </div>
             <div className="w-full md:w-1/2 relative">
-              <Image
-                src="/images/herotest.jpg"
-                alt="Music studio workspace"
-                width={700}
-                height={500}
-                className="rounded-lg shadow-2xl"
-                priority
-              />
+              <div className="aspect-[16/9]">
+                <Image
+                  src="/images/herotest.jpg"
+                  alt="Music studio workspace"
+                  width={700}
+                  height={300}
+                  className="rounded-lg shadow-2xl object-cover"
+                  priority
+                />
+              </div>
             </div>
           </div>
         </section>
