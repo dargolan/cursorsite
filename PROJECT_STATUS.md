@@ -56,6 +56,7 @@
 - ⬜ Documentation for API endpoints and component library
 
 ## Recent Updates
+- Made sidebar functionality consistent across website by redirecting filters to Music page
 - Updated top menu to adjust position based on sidebar state
 - Fixed RangeSlider component to correct edge dragging issues
 - Enhanced top menu with proper color states (gray idle, accent color on hover/active)
