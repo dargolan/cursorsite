@@ -4,10 +4,12 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useCart } from '@/contexts/CartContext';
+import { useSidebar } from '@/contexts/SidebarContext';
 
 export default function Header(): React.ReactElement {
   const [showCart, setShowCart] = useState(false);
   const { items: cartItems, removeItem, getTotalPrice } = useCart();
+  const { isCollapsed } = useSidebar();
   
   // Format the cart total to show two decimal places
   const formattedCartTotal = getTotalPrice().toFixed(2);
@@ -34,7 +36,12 @@ export default function Header(): React.ReactElement {
   }, []);
 
   return (
-    <header className="fixed top-0 right-0 left-[363px] bg-[#121212] z-10">
+    <header 
+      className="fixed top-0 right-0 bg-[#121212] z-10 transition-all duration-300"
+      style={{ 
+        left: isCollapsed ? '80px' : '295px'
+      }}
+    >
       <div className="w-full relative px-8">
         <div className="flex h-16 relative justify-between">
           {/* Main navigation */}

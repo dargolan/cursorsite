@@ -2,6 +2,9 @@ import '../styles/globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { CartProvider } from '@/contexts/CartContext';
+import { SidebarProvider } from '@/contexts/SidebarContext';
+import SidebarToggle from '@/components/SidebarToggle';
+import SidebarOverlay from '@/components/SidebarOverlay';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -32,9 +35,13 @@ export default function RootLayout({
       </head>
       <body className="bg-[#121212]">
         <CartProvider>
-          <main className="min-h-screen">
-            {children}
-          </main>
+          <SidebarProvider>
+            <SidebarToggle />
+            <SidebarOverlay />
+            <main className="min-h-screen">
+              {children}
+            </main>
+          </SidebarProvider>
         </CartProvider>
       </body>
     </html>

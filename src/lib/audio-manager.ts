@@ -1,3 +1,8 @@
+/**
+ * Global audio manager to handle playback control across the application
+ * Ensures only one audio source plays at a time and provides events for UI sync
+ */
+
 'use client';
 
 interface AudioPlayOptions {
@@ -15,10 +20,15 @@ export interface AudioEvent {
 
 type AudioEventListener = (event: AudioEvent) => void;
 
-class GlobalAudioManager {
-  private currentlyPlaying: HTMLAudioElement | null = null;
-  private currentTrackId: string | null = null;
-  private currentStemId: string | null = null;
+type PlayInfo = {
+  stemId?: string;
+  trackId?: string;
+};
+
+class AudioManager {
+  activeAudio: HTMLAudioElement | null = null;
+  activeStemId: string | null = null;
+  activeTrackId: string | null = null;
   private stateListeners: Set<(trackId: string | null) => void> = new Set();
   private eventListeners: Set<AudioEventListener> = new Set();
   private updateInterval: NodeJS.Timeout | null = null;
@@ -36,132 +46,105 @@ class GlobalAudioManager {
 
     // Set up interval to emit time updates
     this.updateInterval = setInterval(() => {
-      if (this.currentlyPlaying && !this.currentlyPlaying.paused) {
+      if (this.activeAudio && !this.activeAudio.paused) {
         this.dispatchEvent({
           type: 'timeupdate',
-          trackId: this.currentTrackId,
-          stemId: this.currentStemId,
-          time: this.currentlyPlaying.currentTime
+          trackId: this.activeTrackId,
+          stemId: this.activeStemId,
+          time: this.activeAudio.currentTime
         });
       }
     }, 250); // Update every 250ms for efficiency
   }
 
-  play(audio: HTMLAudioElement, options: AudioPlayOptions = {}): void {
-    // If we're already playing this audio, just update seek time if provided
-    if (this.currentlyPlaying === audio) {
-      if (options.seekTime !== undefined) {
-        this.currentlyPlaying.currentTime = options.seekTime;
+  /**
+   * Play an audio element and stop any currently playing audio
+   */
+  play(audio: HTMLAudioElement, info?: PlayInfo): Promise<void> {
+    // Stop any currently playing audio
+    if (this.activeAudio && this.activeAudio !== audio && !this.activeAudio.paused) {
+      console.log('Stopping previously playing audio');
+      this.activeAudio.pause();
+      
+      // Reset currentTime
+      this.activeAudio.currentTime = 0;
+      
+      // Dispatch custom event for stem stopped
+      if (this.activeStemId) {
+        this.dispatchStemStoppedEvent(this.activeStemId, this.activeTrackId);
       }
-      return;
     }
-
-    // If something else is playing, stop it
-    if (this.currentlyPlaying) {
-      this.stop();
-    }
-
-    // Set the current audio and options
-    this.currentlyPlaying = audio;
-    this.currentTrackId = options.trackId || null;
-    this.currentStemId = options.stemId || null;
     
-    // Set seek time if provided
-    if (options.seekTime !== undefined) {
-      this.currentlyPlaying.currentTime = options.seekTime;
-    }
-
-    // Notify listeners before playing
-    this.notifyStateListeners();
+    // Set new active audio
+    this.activeAudio = audio;
+    this.activeStemId = info?.stemId || null;
+    this.activeTrackId = info?.trackId || null;
     
-    // Play the audio
-    audio.play().catch(error => {
-      console.error('Error playing audio:', error);
-      this.currentlyPlaying = null;
-      this.currentTrackId = null;
-      this.currentStemId = null;
-      this.notifyStateListeners();
+    // Play the new audio
+    return audio.play().catch(err => {
+      console.error('Error playing audio:', err);
     });
-
-    // Dispatch play event
-    this.dispatchEvent({
-      type: 'play',
-      trackId: this.currentTrackId,
-      stemId: this.currentStemId
-    });
-
-    // Set up event listeners
-    audio.addEventListener('ended', this.handleAudioEnded);
   }
-
-  pause(): void {
-    if (this.currentlyPlaying) {
-      this.currentlyPlaying.pause();
-      
-      // Dispatch pause event
-      this.dispatchEvent({
-        type: 'pause',
-        trackId: this.currentTrackId,
-        stemId: this.currentStemId
-      });
-    }
-  }
-
+  
+  /**
+   * Stop the currently playing audio
+   */
   stop(): void {
-    if (this.currentlyPlaying) {
-      this.currentlyPlaying.pause();
-      this.currentlyPlaying.currentTime = 0;
-      this.currentlyPlaying.removeEventListener('ended', this.handleAudioEnded);
+    if (this.activeAudio && !this.activeAudio.paused) {
+      this.activeAudio.pause();
       
-      const trackId = this.currentTrackId;
-      const stemId = this.currentStemId;
-      
-      this.currentlyPlaying = null;
-      this.currentTrackId = null;
-      this.currentStemId = null;
-      
-      // Notify listeners
-      this.notifyStateListeners();
-      
-      // Dispatch stop event
-      this.dispatchEvent({
-        type: 'stop',
-        trackId,
-        stemId
-      });
+      // Dispatch custom event if it's a stem
+      if (this.activeStemId) {
+        this.dispatchStemStoppedEvent(this.activeStemId, this.activeTrackId);
+      }
     }
+    
+    this.activeAudio = null;
+    this.activeStemId = null;
+    this.activeTrackId = null;
   }
 
-  seek(time: number): void {
-    if (this.currentlyPlaying) {
-      this.currentlyPlaying.currentTime = time;
-    }
-  }
-
-  getCurrentTrackId(): string | null {
-    return this.currentTrackId;
-  }
-
-  getCurrentStemId(): string | null {
-    return this.currentStemId;
-  }
-
-  isPlaying(trackId?: string, stemId?: string): boolean {
-    if (trackId && stemId) {
-      return this.currentTrackId === trackId && this.currentStemId === stemId && this.currentlyPlaying !== null && !this.currentlyPlaying.paused;
-    }
-    if (trackId) {
-      return this.currentTrackId === trackId && this.currentlyPlaying !== null && !this.currentlyPlaying.paused;
-    }
-    return this.currentlyPlaying !== null && !this.currentlyPlaying.paused;
-  }
-
+  /**
+   * Get current playback time
+   */
   getCurrentTime(): number {
-    return this.currentlyPlaying?.currentTime || 0;
+    return this.activeAudio?.currentTime || 0;
   }
 
+  /**
+   * Get total duration of current audio
+   */
   getDuration(): number {
-    return this.currentlyPlaying?.duration || 0;
+    return this.activeAudio?.duration || 0;
+  }
+
+  /**
+   * Check if audio is currently playing
+   */
+  isPlaying(): boolean {
+    return this.activeAudio ? !this.activeAudio.paused : false;
+  }
+
+  /**
+   * Set current time for active audio
+   */
+  setCurrentTime(time: number): void {
+    if (this.activeAudio) {
+      this.activeAudio.currentTime = time;
+    }
+  }
+
+  /**
+   * Helper to dispatch stem stopped event
+   */
+  private dispatchStemStoppedEvent(stemId: string | null, trackId: string | null): void {
+    const event = new CustomEvent('stem-stopped', {
+      detail: {
+        stemId,
+        trackId
+      }
+    });
+    document.dispatchEvent(event);
   }
 
   // Legacy subscribe method for backward compatibility
@@ -184,32 +167,9 @@ class GlobalAudioManager {
     };
   }
 
-  private handleAudioEnded = (): void => {
-    if (this.currentlyPlaying) {
-      this.currentlyPlaying.removeEventListener('ended', this.handleAudioEnded);
-      
-      const trackId = this.currentTrackId;
-      const stemId = this.currentStemId;
-      
-      this.currentlyPlaying = null;
-      this.currentTrackId = null;
-      this.currentStemId = null;
-      
-      // Notify listeners
-      this.notifyStateListeners();
-      
-      // Dispatch ended event
-      this.dispatchEvent({
-        type: 'ended',
-        trackId,
-        stemId
-      });
-    }
-  };
-
   private notifyStateListeners(): void {
     this.stateListeners.forEach(listener => {
-      listener(this.currentTrackId);
+      listener(this.activeTrackId);
     });
   }
 
@@ -232,5 +192,5 @@ class GlobalAudioManager {
   }
 }
 
-// Create a singleton instance
-export const globalAudioManager = new GlobalAudioManager(); 
+// Export a singleton instance
+export const audioManager = new AudioManager(); 

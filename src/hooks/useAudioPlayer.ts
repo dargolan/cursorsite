@@ -1,222 +1,153 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { globalAudioManager, AudioEvent } from '../lib/audio-manager';
-import { createAudio, preloadAudio, convertUrlToProxyUrl } from '../lib/audio';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { audioManager } from '../lib/audio-manager';
 
-interface UseAudioPlayerOptions {
-  trackId?: string;
-  stemId?: string;
-  url?: string;
+interface UseAudioPlayerProps {
+  src?: string;
   autoPlay?: boolean;
-  volume?: number;
+  loop?: boolean;
+  onEnded?: () => void;
+  onTimeUpdate?: (currentTime: number, duration: number) => void;
+  stemId?: string;
+  trackId?: string;
 }
 
-interface AudioPlayerState {
-  isPlaying: boolean;
-  isLoading: boolean;
-  isError: boolean;
-  duration: number;
-  currentTime: number;
-  progress: number;
-}
-
-export function useAudioPlayer(options: UseAudioPlayerOptions = {}) {
-  const { trackId, stemId, url, autoPlay = false, volume = 1.0 } = options;
-  
-  const [state, setState] = useState<AudioPlayerState>({
-    isPlaying: false,
-    isLoading: false,
-    isError: false,
-    duration: 0,
-    currentTime: 0,
-    progress: 0
-  });
+export function useAudioPlayer({
+  src,
+  autoPlay = false,
+  loop = false,
+  onEnded,
+  onTimeUpdate,
+  stemId,
+  trackId,
+}: UseAudioPlayerProps = {}) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const urlRef = useRef<string | undefined>(url);
   
-  // Load audio when URL changes
-  const loadAudio = useCallback(async (audioUrl: string) => {
-    setState(prev => ({ ...prev, isLoading: true, isError: false }));
-    
-    try {
-      // Use proxy URL for better CORS handling
-      const proxyUrl = convertUrlToProxyUrl(audioUrl);
-      
-      // Preload audio and create element
-      const audio = await preloadAudio(proxyUrl);
-      
-      // Set volume
-      audio.volume = volume;
-      
-      // Store audio in ref
-      audioRef.current = audio;
-      
-      // Update state
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        duration: audio.duration,
-        isError: false
-      }));
-      
-      // If autoPlay is enabled, play the audio
-      if (autoPlay) {
-        play();
-      }
-    } catch (error) {
-      console.error('Error loading audio:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        isError: true
-      }));
-    }
-  }, [autoPlay, volume]);
-  
-  // Initialize audio when URL changes
-  useEffect(() => {
-    if (url && url !== urlRef.current) {
-      urlRef.current = url;
-      loadAudio(url);
-    }
-    
-    // Cleanup function
-    return () => {
-      if (audioRef.current) {
-        // If this component's audio is currently playing, stop it
-        if (globalAudioManager.isPlaying(trackId, stemId)) {
-          globalAudioManager.stop();
-        }
-      }
-    };
-  }, [url, loadAudio, trackId, stemId]);
-  
-  // Listen for audio events
-  useEffect(() => {
-    const handleAudioEvent = (event: AudioEvent) => {
-      // Only respond to events for this track/stem
-      if ((trackId && event.trackId !== trackId) || 
-          (stemId && event.stemId !== stemId)) {
-        return;
-      }
-      
-      switch (event.type) {
-        case 'play':
-          setState(prev => ({ ...prev, isPlaying: true }));
-          break;
-        case 'pause':
-        case 'stop':
-          setState(prev => ({ ...prev, isPlaying: false }));
-          break;
-        case 'ended':
-          setState(prev => ({ ...prev, isPlaying: false, currentTime: 0, progress: 0 }));
-          break;
-        case 'timeupdate':
-          if (event.time !== undefined && audioRef.current) {
-            const duration = audioRef.current.duration || 0;
-            const progress = duration > 0 ? (event.time / duration) * 100 : 0;
-            setState(prev => ({ 
-              ...prev, 
-              currentTime: event.time || 0, 
-              progress,
-              duration
-            }));
-          }
-          break;
-      }
-    };
-    
-    // Subscribe to audio events
-    const unsubscribe = globalAudioManager.addEventListener(handleAudioEvent);
-    
-    // Clean up subscription
-    return unsubscribe;
-  }, [trackId, stemId]);
-  
-  // Play function
+  // Play/pause functions
   const play = useCallback(() => {
     if (!audioRef.current) return;
     
-    globalAudioManager.play(audioRef.current, {
-      trackId,
-      stemId
-    });
-  }, [trackId, stemId]);
+    audioManager.play(audioRef.current, { stemId, trackId })
+      .then(() => setIsPlaying(true))
+      .catch(err => {
+        setError(err);
+        setIsPlaying(false);
+      });
+  }, [stemId, trackId]);
   
-  // Pause function
   const pause = useCallback(() => {
     if (!audioRef.current) return;
     
-    if (globalAudioManager.isPlaying(trackId, stemId)) {
-      globalAudioManager.pause();
-    }
-  }, [trackId, stemId]);
+    audioRef.current.pause();
+    setIsPlaying(false);
+  }, []);
   
-  // Toggle play/pause
   const toggle = useCallback(() => {
-    if (state.isPlaying) {
+    if (isPlaying) {
       pause();
     } else {
       play();
     }
-  }, [state.isPlaying, play, pause]);
+  }, [isPlaying, pause, play]);
   
-  // Seek to a specific time
   const seek = useCallback((time: number) => {
     if (!audioRef.current) return;
     
-    // Ensure time is within valid range
-    const safeTime = Math.max(0, Math.min(time, audioRef.current.duration || 0));
+    audioRef.current.currentTime = Math.min(Math.max(0, time), duration);
+    setCurrentTime(audioRef.current.currentTime);
+  }, [duration]);
+  
+  // Initialize audio element
+  useEffect(() => {
+    if (!src) return;
     
-    // If this is the current playing track, use the audio manager to seek
-    if (globalAudioManager.isPlaying(trackId, stemId)) {
-      globalAudioManager.seek(safeTime);
-    } else {
-      // Otherwise just update the audio element's time
-      audioRef.current.currentTime = safeTime;
-      
-      // Update state
-      setState(prev => ({
-        ...prev,
-        currentTime: safeTime,
-        progress: (safeTime / (audioRef.current?.duration || 1)) * 100
-      }));
+    // Create audio element if it doesn't exist
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
     }
-  }, [trackId, stemId]);
-  
-  // Seek by percentage
-  const seekByPercentage = useCallback((percentage: number) => {
-    if (!audioRef.current) return;
     
-    // Ensure percentage is within valid range
-    const safePercentage = Math.max(0, Math.min(percentage, 100));
+    const audio = audioRef.current;
     
-    // Calculate time from percentage
-    const time = (safePercentage / 100) * (audioRef.current.duration || 0);
+    // Set properties
+    audio.src = src;
+    audio.loop = loop;
     
-    // Seek to that time
-    seek(time);
-  }, [seek]);
-  
-  // Set volume
-  const setVolume = useCallback((newVolume: number) => {
-    if (!audioRef.current) return;
+    // Set up listeners
+    const handleLoadStart = () => setIsLoading(true);
+    const handleLoadedData = () => {
+      setIsLoading(false);
+      setDuration(audio.duration);
+      if (autoPlay) {
+        play();
+      }
+    };
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+      onTimeUpdate?.(audio.currentTime, audio.duration);
+    };
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+      onEnded?.();
+    };
+    const handleError = (e: ErrorEvent) => {
+      setIsLoading(false);
+      setError(e.error || new Error('Failed to load audio'));
+    };
     
-    // Ensure volume is within valid range
-    const safeVolume = Math.max(0, Math.min(newVolume, 1));
+    // Add event listeners
+    audio.addEventListener('loadstart', handleLoadStart);
+    audio.addEventListener('loadeddata', handleLoadedData);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError as EventListener);
     
-    // Update audio element's volume
-    audioRef.current.volume = safeVolume;
-  }, []);
+    // Clean up on unmount
+    return () => {
+      audio.removeEventListener('loadstart', handleLoadStart);
+      audio.removeEventListener('loadeddata', handleLoadedData);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError as EventListener);
+      
+      // Stop and unload
+      audio.pause();
+      audio.src = '';
+    };
+  }, [src, autoPlay, loop, onTimeUpdate, onEnded, play]);
+
+  // Listen for global stop events for this stem
+  useEffect(() => {
+    if (!stemId) return;
+    
+    const handleStemStopped = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail?.stemId === stemId) {
+        setIsPlaying(false);
+      }
+    };
+    
+    document.addEventListener('stem-stopped', handleStemStopped);
+    return () => {
+      document.removeEventListener('stem-stopped', handleStemStopped);
+    };
+  }, [stemId]);
   
   return {
-    ...state,
+    isPlaying,
+    duration,
+    currentTime,
+    isLoading,
+    error,
     play,
     pause,
     toggle,
     seek,
-    seekByPercentage,
-    setVolume,
-    audio: audioRef.current
+    audioRef,
   };
 } 

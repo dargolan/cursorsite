@@ -5,7 +5,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import FilterSidebar from '../components/FilterSidebar';
+import FilterSidebar from '../components/FilterSidebar/index';
+import ContentWrapper from '../components/ContentWrapper';
 import { getTracks, getTags } from '../services/strapi';
 import { Track, Tag } from '../types';
 
@@ -101,19 +102,19 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-[#121212] text-white pb-8">
       <FilterSidebar
-          selectedTags={selectedTags}
+        selectedTags={selectedTags}
         genres={genres}
         moods={moods}
         instruments={instruments}
         bpmRange={bpmRange}
         durationRange={durationRange}
-          onTagToggle={handleTagToggle}
-          onBpmChange={handleBpmChange}
-          onDurationChange={handleDurationChange}
-          onSearch={handleSearch}
-        />
-        
-      <div className="ml-[295px]">
+        onTagToggle={handleTagToggle}
+        onBpmChange={handleBpmChange}
+        onDurationChange={handleDurationChange}
+        onSearch={handleSearch}
+      />
+      
+      <ContentWrapper>
         <Header />
         
         {/* Hero Section */}
@@ -318,7 +319,7 @@ export default function HomePage() {
         </section>
         
       <Footer />
-    </div>
+    </ContentWrapper>
     </main>
   );
 }

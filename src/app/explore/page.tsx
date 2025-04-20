@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import FilterSidebar from '../../components/FilterSidebar';
+import FilterSidebar from '../../components/FilterSidebar/index';
+import ContentWrapper from '../../components/ContentWrapper';
 import TagFilter from '../../components/TagFilter';
 import { Tag, Stem, Track, CartItem } from '../../types';
 import Header from '../../components/Header';
@@ -261,7 +262,7 @@ export default function MusicLibrary() {
         <div className="flex flex-col items-center justify-center h-64">
           <div className="w-12 h-12 border-4 border-[#1DF7CE] border-t-transparent rounded-full animate-spin mb-4"></div>
           <p className="text-gray-400">Loading tracks...</p>
-        </div>
+              </div>
       );
     }
 
@@ -322,17 +323,16 @@ export default function MusicLibrary() {
               setOpenStemsTrackId={setOpenStemsTrackId}
             />
           </div>
-          ))}
-      </div>
+                ))}
+              </div>
     );
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#121212] text-white">
+    <div className="min-h-screen bg-[#121212] text-white overflow-x-hidden">
       <Header />
       
-      <main className="flex flex-1">
-        {/* Sidebar with filter controls */}
+      <main className="relative min-h-screen">
         <FilterSidebar
           selectedTags={selectedTags}
           genres={genres}
@@ -346,8 +346,7 @@ export default function MusicLibrary() {
           onSearch={handleSearch}
         />
         
-        {/* Main content area with tracks list */}
-        <div className="ml-[295px] flex-1">
+        <ContentWrapper>
           <div className="p-8 pt-24">
             
             {/* Fixed height container for selected tags */}
@@ -375,8 +374,8 @@ export default function MusicLibrary() {
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
-                      </button>
-                    </div>
+                    </button>
+                  </div>
                   )}
                   
                   <button 
@@ -391,11 +390,11 @@ export default function MusicLibrary() {
                 </div>
               )}
             </div>
-            
+          
             {/* Tracks list */}
             {renderContent()}
           </div>
-        </div>
+        </ContentWrapper>
       </main>
       <Footer />
     </div>
