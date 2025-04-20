@@ -56,6 +56,12 @@
 - ⬜ Documentation for API endpoints and component library
 
 ## Recent Updates
+- Updated top menu to adjust position based on sidebar state
+- Fixed RangeSlider component to correct edge dragging issues
+- Enhanced top menu with proper color states (gray idle, accent color on hover/active)
+- Adjusted hero section: doubled title font size and improved text alignment
+- Added more spacing between hero elements for better visual hierarchy
+- Updated sidebar to initialize with proper slider ranges
 - Added Home button to top navigation
 - Added sidebar to homepage matching explore page
 - Updated UI elements with rounded corners for consistency
