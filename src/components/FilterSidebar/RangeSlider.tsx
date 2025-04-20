@@ -21,18 +21,37 @@ export default function RangeSlider({
   height = 4,
   hideLabels = true
 }: RangeSliderProps) {
-  const [localMin, setLocalMin] = useState(value[0]);
-  const [localMax, setLocalMax] = useState(value[1]);
+  const [localMin, setLocalMin] = useState(min);
+  const [localMax, setLocalMax] = useState(max);
   const [isDraggingMin, setIsDraggingMin] = useState(false);
   const [isDraggingMax, setIsDraggingMax] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   
   const trackRef = useRef<HTMLDivElement>(null);
-  
-  // Update local values when props change
+
+  // Initialize with the full range if no values are provided
   useEffect(() => {
-    setLocalMin(value[0]);
-    setLocalMax(value[1]);
-  }, [value]);
+    if (!isInitialized) {
+      // Only set full range on first render if values are at defaults
+      if (value[0] === value[1] || (value[0] === 0 && value[1] === 0)) {
+        onChange([min, max]);
+        setLocalMin(min);
+        setLocalMax(max);
+      } else {
+        setLocalMin(value[0]);
+        setLocalMax(value[1]);
+      }
+      setIsInitialized(true);
+    }
+  }, [min, max, value, onChange, isInitialized]);
+  
+  // Update local values when props change (after initialization)
+  useEffect(() => {
+    if (isInitialized) {
+      setLocalMin(value[0]);
+      setLocalMax(value[1]);
+    }
+  }, [value, isInitialized]);
   
   // Handle track click
   const handleTrackClick = (e: React.MouseEvent) => {
@@ -77,12 +96,16 @@ export default function RangeSlider({
       const trackWidth = rect.width;
       const offsetX = moveEvent.clientX - rect.left;
       
-      // Calculate percentage and value
+      // Calculate percentage (clamped to 0-100%)
       const percentage = Math.max(0, Math.min(100, (offsetX / trackWidth) * 100));
+      
+      // Calculate value from percentage
       const newValue = Math.round(min + (percentage / 100) * (max - min));
       
-      // Ensure min doesn't exceed max - 1
+      // Allow full range, including min value
+      // But don't exceed max handle position
       const newMin = Math.min(newValue, localMax - 1);
+      
       setLocalMin(newMin);
     };
     
@@ -92,7 +115,7 @@ export default function RangeSlider({
       document.removeEventListener('mouseup', handleMouseUp);
       setIsDraggingMin(false);
       
-      // Trigger onChange
+      // Trigger onChange with final values
       onChange([localMin, localMax]);
     };
     
@@ -114,12 +137,16 @@ export default function RangeSlider({
       const trackWidth = rect.width;
       const offsetX = moveEvent.clientX - rect.left;
       
-      // Calculate percentage and value
+      // Calculate percentage (clamped to 0-100%)
       const percentage = Math.max(0, Math.min(100, (offsetX / trackWidth) * 100));
+      
+      // Calculate value from percentage
       const newValue = Math.round(min + (percentage / 100) * (max - min));
       
-      // Ensure max doesn't go below min + 1
+      // Allow full range, including max value
+      // But don't go below min handle
       const newMax = Math.max(newValue, localMin + 1);
+      
       setLocalMax(newMax);
     };
     
@@ -129,7 +156,7 @@ export default function RangeSlider({
       document.removeEventListener('mouseup', handleMouseUp);
       setIsDraggingMax(false);
       
-      // Trigger onChange
+      // Trigger onChange with final values
       onChange([localMin, localMax]);
     };
     
@@ -144,7 +171,7 @@ export default function RangeSlider({
   return (
     <div className="py-2">
       {!hideLabels && (
-        <div className="flex justify-between mb-2 text-base text-white">
+        <div className="flex justify-between mb-2 text-sm text-white">
           <span>{formatLabel(localMin)}</span>
           <span>{formatLabel(localMax)}</span>
         </div>
@@ -184,7 +211,13 @@ export default function RangeSlider({
           onMouseDown={handleMinMouseDown}
           onTouchStart={(e) => {
             e.preventDefault();
-            // Handle touch events similarly to mouse events
+            // Handle touch events
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousedown', {
+              clientX: touch.clientX,
+              clientY: touch.clientY
+            });
+            handleMinMouseDown(mouseEvent as unknown as React.MouseEvent);
           }}
         />
         
@@ -199,7 +232,13 @@ export default function RangeSlider({
           onMouseDown={handleMaxMouseDown}
           onTouchStart={(e) => {
             e.preventDefault();
-            // Handle touch events similarly to mouse events
+            // Handle touch events
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousedown', {
+              clientX: touch.clientX,
+              clientY: touch.clientY
+            });
+            handleMaxMouseDown(mouseEvent as unknown as React.MouseEvent);
           }}
         />
       </div>

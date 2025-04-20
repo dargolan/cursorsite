@@ -27,8 +27,8 @@ export default function FilterSidebar({
   genres,
   moods,
   instruments,
-  bpmRange,
-  durationRange,
+  bpmRange = [0, 200],
+  durationRange = [0, 600],
   onTagToggle,
   onBpmChange,
   onDurationChange,
@@ -37,6 +37,8 @@ export default function FilterSidebar({
   const [genreExpanded, setGenreExpanded] = useState(true);
   const [moodExpanded, setMoodExpanded] = useState(true);
   const [instrumentsExpanded, setInstrumentsExpanded] = useState(true);
+  const [localBpmRange, setLocalBpmRange] = useState<[number, number]>([0, 200]);
+  const [localDurationRange, setLocalDurationRange] = useState<[number, number]>([0, 600]);
   const { isCollapsed, toggleCollapse } = useSidebar();
   
   // Format duration for display
@@ -44,6 +46,52 @@ export default function FilterSidebar({
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+  
+  // Set initial values when component mounts
+  useEffect(() => {
+    // Initialize with full range if not already set
+    if (bpmRange[0] === bpmRange[1] || (bpmRange[0] === 0 && bpmRange[1] === 0)) {
+      const initialBpmRange: [number, number] = [0, 200];
+      setLocalBpmRange(initialBpmRange);
+      onBpmChange(initialBpmRange);
+    } else {
+      setLocalBpmRange(bpmRange);
+    }
+    
+    if (durationRange[0] === durationRange[1] || (durationRange[0] === 0 && durationRange[1] === 0)) {
+      const initialDurationRange: [number, number] = [0, 600];
+      setLocalDurationRange(initialDurationRange);
+      onDurationChange(initialDurationRange);
+    } else {
+      setLocalDurationRange(durationRange);
+    }
+  }, []);
+  
+  // Update local ranges when props change (but only if component is already mounted)
+  useEffect(() => {
+    const hasChanged = 
+      bpmRange[0] !== localBpmRange[0] || 
+      bpmRange[1] !== localBpmRange[1] ||
+      durationRange[0] !== localDurationRange[0] ||
+      durationRange[1] !== localDurationRange[1];
+      
+    if (hasChanged) {
+      setLocalBpmRange(bpmRange);
+      setLocalDurationRange(durationRange);
+    }
+  }, [bpmRange, durationRange]);
+  
+  // Handle BPM range changes
+  const handleBpmChange = (range: [number, number]) => {
+    setLocalBpmRange(range);
+    onBpmChange(range);
+  };
+  
+  // Handle Duration range changes
+  const handleDurationChange = (range: [number, number]) => {
+    setLocalDurationRange(range);
+    onDurationChange(range);
   };
   
   // Check if tag is selected
@@ -363,14 +411,14 @@ export default function FilterSidebar({
             <div className="mb-8">
               <h3 className="text-white font-normal text-sm mb-3">BPM Range</h3>
               <div className="flex justify-between mb-2">
-                <span className="text-white text-base font-medium">0</span>
-                <span className="text-white text-base font-medium">200+</span>
+                <span className="text-white text-sm font-normal">{localBpmRange[0]}</span>
+                <span className="text-white text-sm font-normal">{localBpmRange[1] === 200 ? "200+" : localBpmRange[1]}</span>
               </div>
               <RangeSlider
                 min={0}
                 max={200}
-                value={bpmRange}
-                onChange={onBpmChange}
+                value={localBpmRange}
+                onChange={handleBpmChange}
                 accentColor="#1DF7CE"
                 height={3}
                 hideLabels={true}
@@ -381,14 +429,14 @@ export default function FilterSidebar({
             <div className="mb-6">
               <h3 className="text-white font-normal text-sm mb-3">Duration</h3>
               <div className="flex justify-between mb-2">
-                <span className="text-white text-base font-medium">00:00</span>
-                <span className="text-white text-base font-medium">10:00+</span>
+                <span className="text-white text-sm font-normal">{formatDurationForDisplay(localDurationRange[0])}</span>
+                <span className="text-white text-sm font-normal">{localDurationRange[1] === 600 ? "10:00+" : formatDurationForDisplay(localDurationRange[1])}</span>
               </div>
               <RangeSlider
                 min={0}
                 max={600}
-                value={durationRange}
-                onChange={onDurationChange}
+                value={localDurationRange}
+                onChange={handleDurationChange}
                 formatLabel={formatDurationForDisplay}
                 accentColor="#1DF7CE"
                 height={3}
