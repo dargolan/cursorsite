@@ -50,48 +50,43 @@ export default function FilterSidebar({
   
   // Set initial values when component mounts
   useEffect(() => {
-    // Initialize with full range if not already set
-    if (bpmRange[0] === bpmRange[1] || (bpmRange[0] === 0 && bpmRange[1] === 0)) {
-      const initialBpmRange: [number, number] = [0, 200];
-      setLocalBpmRange(initialBpmRange);
+    // Initialize with full range regardless of incoming props
+    const initialBpmRange: [number, number] = [0, 200];
+    const initialDurationRange: [number, number] = [0, 600];
+    
+    setLocalBpmRange(initialBpmRange);
+    setLocalDurationRange(initialDurationRange);
+    
+    // Only trigger parent callbacks if values are different
+    if (bpmRange[0] !== 0 || bpmRange[1] !== 200) {
       onBpmChange(initialBpmRange);
-    } else {
-      setLocalBpmRange(bpmRange);
     }
     
-    if (durationRange[0] === durationRange[1] || (durationRange[0] === 0 && durationRange[1] === 0)) {
-      const initialDurationRange: [number, number] = [0, 600];
-      setLocalDurationRange(initialDurationRange);
+    if (durationRange[0] !== 0 || durationRange[1] !== 600) {
       onDurationChange(initialDurationRange);
-    } else {
-      setLocalDurationRange(durationRange);
     }
   }, []);
   
-  // Update local ranges when props change (but only if component is already mounted)
-  useEffect(() => {
-    const hasChanged = 
-      bpmRange[0] !== localBpmRange[0] || 
-      bpmRange[1] !== localBpmRange[1] ||
-      durationRange[0] !== localDurationRange[0] ||
-      durationRange[1] !== localDurationRange[1];
-      
-    if (hasChanged) {
-      setLocalBpmRange(bpmRange);
-      setLocalDurationRange(durationRange);
-    }
-  }, [bpmRange, durationRange]);
-  
-  // Handle BPM range changes
+  // Handle BPM range changes (final changes)
   const handleBpmChange = (range: [number, number]) => {
     setLocalBpmRange(range);
     onBpmChange(range);
   };
   
-  // Handle Duration range changes
+  // Handle BPM range drags (real-time updates)
+  const handleBpmDrag = (range: [number, number]) => {
+    setLocalBpmRange(range);
+  };
+  
+  // Handle Duration range changes (final changes)
   const handleDurationChange = (range: [number, number]) => {
     setLocalDurationRange(range);
     onDurationChange(range);
+  };
+  
+  // Handle Duration range drags (real-time updates)
+  const handleDurationDrag = (range: [number, number]) => {
+    setLocalDurationRange(range);
   };
   
   // Check if tag is selected
@@ -419,6 +414,7 @@ export default function FilterSidebar({
                 max={200}
                 value={localBpmRange}
                 onChange={handleBpmChange}
+                onDrag={handleBpmDrag}
                 accentColor="#1DF7CE"
                 height={3}
                 hideLabels={true}
@@ -437,6 +433,7 @@ export default function FilterSidebar({
                 max={600}
                 value={localDurationRange}
                 onChange={handleDurationChange}
+                onDrag={handleDurationDrag}
                 formatLabel={formatDurationForDisplay}
                 accentColor="#1DF7CE"
                 height={3}

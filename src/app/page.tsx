@@ -16,8 +16,8 @@ export default function HomePage() {
   const [moods, setMoods] = useState<Tag[]>([]);
   const [instruments, setInstruments] = useState<Tag[]>([]);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
-  const [bpmRange, setBpmRange] = useState<[number, number]>([60, 180]);
-  const [durationRange, setDurationRange] = useState<[number, number]>([30, 600]);
+  const [bpmRange, setBpmRange] = useState<[number, number]>([0, 200]);
+  const [durationRange, setDurationRange] = useState<[number, number]>([0, 600]);
   const [featuredProjects, setFeaturedProjects] = useState([
     {
       id: '1',
