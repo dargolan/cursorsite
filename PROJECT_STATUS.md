@@ -56,6 +56,7 @@
 - ⬜ Documentation for API endpoints and component library
 
 ## Recent Updates
+- Improved sidebar behavior: initially collapsed on homepage, persists user preference across pages
 - Standardized search bar design between hero section and sidebar
 - Fixed slider persistence to maintain positions when navigating between pages
 - Made sidebar functionality consistent across website by redirecting filters to Music page
