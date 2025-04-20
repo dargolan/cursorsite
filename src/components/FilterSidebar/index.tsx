@@ -222,10 +222,7 @@ export default function FilterSidebar({
                 onClick={() => toggleSection('genre')}
                 type="button"
               >
-                <div className="flex items-center">
-                  <span className="material-symbols-outlined text-white mr-2" style={{ fontSize: '16px' }}>album</span>
-                  <h3 className="text-white font-normal text-sm mb-2">Genre</h3>
-                </div>
+                <h3 className="text-white font-normal text-sm mb-2">Genre</h3>
                 <span className="text-sm text-gray-400">
                   <svg 
                     xmlns="http://www.w3.org/2000/svg" 
@@ -273,10 +270,7 @@ export default function FilterSidebar({
                 onClick={() => toggleSection('mood')}
                 type="button"
               >
-                <div className="flex items-center">
-                  <span className="material-symbols-outlined text-white mr-2" style={{ fontSize: '16px' }}>sentiment_calm</span>
-                  <h3 className="text-white font-normal text-sm mb-2">Mood</h3>
-                </div>
+                <h3 className="text-white font-normal text-sm mb-2">Mood</h3>
                 <span className="text-sm text-gray-400">
                   <svg 
                     xmlns="http://www.w3.org/2000/svg" 
@@ -324,10 +318,7 @@ export default function FilterSidebar({
                 onClick={() => toggleSection('instruments')}
                 type="button"
               >
-                <div className="flex items-center">
-                  <span className="material-symbols-outlined text-white mr-2" style={{ fontSize: '16px' }}>piano</span>
-                  <h3 className="text-white font-normal text-sm mb-2">Instruments</h3>
-                </div>
+                <h3 className="text-white font-normal text-sm mb-2">Instruments</h3>
                 <span className="text-sm text-gray-400">
                   <svg 
                     xmlns="http://www.w3.org/2000/svg" 
@@ -370,49 +361,10 @@ export default function FilterSidebar({
             
             {/* BPM Range Slider */}
             <div className="mb-8">
-              <div className="flex items-center mb-3">
-                <svg
-                  className="text-white mr-2" 
-                  width="16" 
-                  height="16" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path 
-                    d="M12 3.5L5 20H19L12 3.5Z" 
-                    stroke="currentColor" 
-                    strokeWidth="2" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round"
-                  />
-                  <path 
-                    d="M12 3.5V14" 
-                    stroke="currentColor" 
-                    strokeWidth="2" 
-                    strokeLinecap="round" 
-                  />
-                  <circle 
-                    cx="17" 
-                    cy="7" 
-                    r="2" 
-                    stroke="currentColor" 
-                    strokeWidth="2" 
-                  />
-                  <line 
-                    x1="6" 
-                    y1="13" 
-                    x2="18" 
-                    y2="13" 
-                    stroke="currentColor" 
-                    strokeWidth="1.5" 
-                  />
-                </svg>
-                <h3 className="text-white font-normal text-sm">BPM Range</h3>
-              </div>
+              <h3 className="text-white font-normal text-sm mb-3">BPM Range</h3>
               <div className="flex justify-between mb-2">
-                <span className="text-gray-400 text-xs">0</span>
-                <span className="text-gray-400 text-xs">200+</span>
+                <span className="text-white text-base font-medium">0</span>
+                <span className="text-white text-base font-medium">200+</span>
               </div>
               <RangeSlider
                 min={0}
@@ -426,20 +378,18 @@ export default function FilterSidebar({
             </div>
             
             {/* Duration Range Slider */}
-            <div className="mb-8">
-              <div className="flex items-center mb-3">
-                <span className="material-symbols-outlined text-white mr-2" style={{ fontSize: '16px' }}>schedule</span>
-                <h3 className="text-white font-normal text-sm">Duration</h3>
-              </div>
+            <div className="mb-6">
+              <h3 className="text-white font-normal text-sm mb-3">Duration</h3>
               <div className="flex justify-between mb-2">
-                <span className="text-gray-400 text-xs">00:00</span>
-                <span className="text-gray-400 text-xs">10:00+</span>
+                <span className="text-white text-base font-medium">00:00</span>
+                <span className="text-white text-base font-medium">10:00+</span>
               </div>
               <RangeSlider
                 min={0}
                 max={600}
                 value={durationRange}
                 onChange={onDurationChange}
+                formatLabel={formatDurationForDisplay}
                 accentColor="#1DF7CE"
                 height={3}
                 hideLabels={true}
@@ -458,10 +408,9 @@ interface FilterSectionProps {
   isExpanded: boolean;
   onToggle: () => void;
   children: React.ReactNode;
-  icon?: React.ReactNode;
 }
 
-function FilterSection({ title, isExpanded, onToggle, children, icon }: FilterSectionProps) {
+function FilterSection({ title, isExpanded, onToggle, children }: FilterSectionProps) {
   return (
     <div className="mb-6">
       <button 
@@ -469,10 +418,7 @@ function FilterSection({ title, isExpanded, onToggle, children, icon }: FilterSe
         onClick={onToggle}
         type="button"
       >
-        <div className="flex items-center">
-          {icon}
-          <h3 className="text-white font-normal text-sm mb-2">{title}</h3>
-        </div>
+        <h3 className="text-white font-normal text-sm mb-2">{title}</h3>
         <span className="text-sm text-gray-400">
           <svg 
             xmlns="http://www.w3.org/2000/svg" 

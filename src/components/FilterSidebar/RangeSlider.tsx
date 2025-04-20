@@ -34,9 +34,39 @@ export default function RangeSlider({
     setLocalMax(value[1]);
   }, [value]);
   
+  // Handle track click
+  const handleTrackClick = (e: React.MouseEvent) => {
+    if (!trackRef.current) return;
+    
+    const rect = trackRef.current.getBoundingClientRect();
+    const trackWidth = rect.width;
+    const offsetX = e.clientX - rect.left;
+    
+    // Calculate percentage and value
+    const percentage = Math.max(0, Math.min(100, (offsetX / trackWidth) * 100));
+    const newValue = Math.round(min + (percentage / 100) * (max - min));
+    
+    // Decide which handle to move based on proximity
+    const distToMin = Math.abs(newValue - localMin);
+    const distToMax = Math.abs(newValue - localMax);
+    
+    if (distToMin <= distToMax) {
+      // Move min handle if it's closest
+      const updatedMin = Math.min(newValue, localMax - 1);
+      setLocalMin(updatedMin);
+      onChange([updatedMin, localMax]);
+    } else {
+      // Move max handle if it's closest
+      const updatedMax = Math.max(newValue, localMin + 1);
+      setLocalMax(updatedMax);
+      onChange([localMin, updatedMax]);
+    }
+  };
+  
   // Handle min thumb drag
   const handleMinMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDraggingMin(true);
     
     // Attach move and up handlers
@@ -73,6 +103,7 @@ export default function RangeSlider({
   // Handle max thumb drag
   const handleMaxMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDraggingMax(true);
     
     // Attach move and up handlers
@@ -113,7 +144,7 @@ export default function RangeSlider({
   return (
     <div className="py-2">
       {!hideLabels && (
-        <div className="flex justify-between mb-2 text-xs text-gray-400">
+        <div className="flex justify-between mb-2 text-base text-white">
           <span>{formatLabel(localMin)}</span>
           <span>{formatLabel(localMax)}</span>
         </div>
@@ -123,6 +154,7 @@ export default function RangeSlider({
         ref={trackRef}
         className="relative w-full cursor-pointer mt-4"
         style={{ height: `${height}px` }}
+        onClick={handleTrackClick}
       >
         {/* Background track */}
         <div 
@@ -150,6 +182,10 @@ export default function RangeSlider({
             border: '2px solid #1B1B1B'
           }}
           onMouseDown={handleMinMouseDown}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            // Handle touch events similarly to mouse events
+          }}
         />
         
         {/* Max thumb */}
@@ -161,6 +197,10 @@ export default function RangeSlider({
             border: '2px solid #1B1B1B'
           }}
           onMouseDown={handleMaxMouseDown}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            // Handle touch events similarly to mouse events
+          }}
         />
       </div>
     </div>
