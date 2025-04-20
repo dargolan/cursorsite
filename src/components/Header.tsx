@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
 import { useCart } from '@/contexts/CartContext';
 import { useSidebar } from '@/contexts/SidebarContext';
 
@@ -10,6 +11,7 @@ export default function Header(): React.ReactElement {
   const [showCart, setShowCart] = useState(false);
   const { items: cartItems, removeItem, getTotalPrice } = useCart();
   const { isCollapsed } = useSidebar();
+  const pathname = usePathname();
   
   // Format the cart total to show two decimal places
   const formattedCartTotal = getTotalPrice().toFixed(2);
@@ -50,7 +52,7 @@ export default function Header(): React.ReactElement {
               <li>
                 <Link 
                   href="/" 
-                  className="text-[#1DF7CE] font-normal"
+                  className={`${pathname === '/' ? 'text-[#1DF7CE]' : 'text-[#999999]'} hover:text-[#1DF7CE] active:text-[#1DF7CE] transition-colors font-normal`}
                 >
                   Home
                 </Link>
@@ -58,7 +60,7 @@ export default function Header(): React.ReactElement {
               <li>
                 <Link 
                   href="/explore" 
-                  className="text-[#999999] hover:text-[#1DF7CE] transition-colors font-normal"
+                  className={`${pathname === '/explore' ? 'text-[#1DF7CE]' : 'text-[#999999]'} hover:text-[#1DF7CE] active:text-[#1DF7CE] transition-colors font-normal`}
                 >
                   Music
                 </Link>
@@ -66,7 +68,7 @@ export default function Header(): React.ReactElement {
               <li>
                 <Link 
                   href="/sound-effects" 
-                  className="text-[#999999] hover:text-[#1DF7CE] transition-colors font-normal"
+                  className={`${pathname === '/sound-effects' ? 'text-[#1DF7CE]' : 'text-[#999999]'} hover:text-[#1DF7CE] active:text-[#1DF7CE] transition-colors font-normal`}
                 >
                   Sound Effects
                 </Link>
@@ -74,7 +76,7 @@ export default function Header(): React.ReactElement {
               <li>
                 <Link 
                   href="/video" 
-                  className="text-[#999999] hover:text-[#1DF7CE] transition-colors font-normal"
+                  className={`${pathname === '/video' ? 'text-[#1DF7CE]' : 'text-[#999999]'} hover:text-[#1DF7CE] active:text-[#1DF7CE] transition-colors font-normal`}
                 >
                   Video
                 </Link>
@@ -82,7 +84,7 @@ export default function Header(): React.ReactElement {
               <li>
                 <Link 
                   href="/about" 
-                  className="text-[#999999] hover:text-[#1DF7CE] transition-colors font-normal"
+                  className={`${pathname === '/about' ? 'text-[#1DF7CE]' : 'text-[#999999]'} hover:text-[#1DF7CE] active:text-[#1DF7CE] transition-colors font-normal`}
                 >
                   About
                 </Link>
@@ -90,7 +92,7 @@ export default function Header(): React.ReactElement {
               <li>
                 <Link 
                   href="/contact"
-                  className="text-[#999999] hover:text-[#1DF7CE] transition-colors font-normal"
+                  className={`${pathname === '/contact' ? 'text-[#1DF7CE]' : 'text-[#999999]'} hover:text-[#1DF7CE] active:text-[#1DF7CE] transition-colors font-normal`}
                 >
                   Contact
                 </Link>
@@ -102,7 +104,7 @@ export default function Header(): React.ReactElement {
           <div className="flex items-center space-x-6 pr-24">
             <Link 
               href="/signin"
-              className="text-[#999999] hover:text-[#1DF7CE] transition-colors font-normal hidden md:block" 
+              className={`${pathname === '/signin' ? 'text-[#1DF7CE]' : 'text-[#999999]'} hover:text-[#1DF7CE] active:text-[#1DF7CE] transition-colors font-normal hidden md:block`}
             >
               Sign In
             </Link>
