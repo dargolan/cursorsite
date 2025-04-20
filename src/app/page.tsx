@@ -118,7 +118,7 @@ export default function HomePage() {
         <Header />
         
         {/* Hero Section */}
-        <section className="relative w-full px-8 py-4 md:py-6 mt-10">
+        <section className="relative w-full px-8 py-4 md:py-6 mt-16">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start">
             <div className="w-full md:w-1/2 mb-4 md:mb-0 md:pr-8">
               <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
@@ -144,7 +144,7 @@ export default function HomePage() {
               </div>
             </div>
             <div className="w-full md:w-1/2 relative">
-              <div className="aspect-[21/9] h-[180px] md:h-[200px]">
+              <div className="aspect-[21/9] h-[360px] md:h-[400px]">
                 <Image
                   src="/images/herotest.jpg"
                   alt="Music studio workspace"
