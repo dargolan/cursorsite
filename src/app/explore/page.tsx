@@ -161,21 +161,23 @@ export default function MusicLibrary() {
     // Get BPM range from URL
     const bpmMinParam = searchParams.get('bpmMin');
     const bpmMaxParam = searchParams.get('bpmMax');
-    if (bpmMinParam && bpmMaxParam) {
-      setBpmRange([
-        parseInt(bpmMinParam) || 0, 
-        parseInt(bpmMaxParam) || 200
-      ]);
+    if (bpmMinParam !== null && bpmMaxParam !== null) {
+      const bpmMin = parseInt(bpmMinParam) || 0;
+      const bpmMax = parseInt(bpmMaxParam) || 200;
+      
+      console.log(`Setting BPM range from URL: [${bpmMin}, ${bpmMax}]`);
+      setBpmRange([bpmMin, bpmMax]);
     }
     
     // Get duration range from URL
     const durationMinParam = searchParams.get('durationMin');
     const durationMaxParam = searchParams.get('durationMax');
-    if (durationMinParam && durationMaxParam) {
-      setDurationRange([
-        parseInt(durationMinParam) || 0, 
-        parseInt(durationMaxParam) || 600
-      ]);
+    if (durationMinParam !== null && durationMaxParam !== null) {
+      const durationMin = parseInt(durationMinParam) || 0;
+      const durationMax = parseInt(durationMaxParam) || 600;
+      
+      console.log(`Setting duration range from URL: [${durationMin}, ${durationMax}]`);
+      setDurationRange([durationMin, durationMax]);
     }
     
     // Get search query from URL
@@ -183,7 +185,7 @@ export default function MusicLibrary() {
     if (searchParam) {
       setSearchQuery(searchParam);
     }
-  }, [searchParams]);
+  }, [searchParams, setBpmRange, setDurationRange, setSelectedTags, setSearchQuery]);
 
   // Fetch data from Strapi
   useEffect(() => {

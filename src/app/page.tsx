@@ -63,17 +63,13 @@ export default function HomePage() {
       searchParams.append('tags', params.tags.join(','));
     }
     
-    // Add BPM range if not default
-    if (params.bpmMin !== 0 || params.bpmMax !== 200) {
-      searchParams.append('bpmMin', params.bpmMin?.toString() || '0');
-      searchParams.append('bpmMax', params.bpmMax?.toString() || '200');
-    }
+    // Add BPM range - always include these to preserve slider positions
+    searchParams.append('bpmMin', params.bpmMin?.toString() || '0');
+    searchParams.append('bpmMax', params.bpmMax?.toString() || '200');
     
-    // Add duration range if not default
-    if (params.durationMin !== 0 || params.durationMax !== 600) {
-      searchParams.append('durationMin', params.durationMin?.toString() || '0');
-      searchParams.append('durationMax', params.durationMax?.toString() || '600');
-    }
+    // Add duration range - always include these to preserve slider positions
+    searchParams.append('durationMin', params.durationMin?.toString() || '0');
+    searchParams.append('durationMax', params.durationMax?.toString() || '600');
     
     // Add search query if provided
     if (params.search) {

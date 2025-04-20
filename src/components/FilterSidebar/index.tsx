@@ -37,8 +37,8 @@ export default function FilterSidebar({
   const [genreExpanded, setGenreExpanded] = useState(true);
   const [moodExpanded, setMoodExpanded] = useState(true);
   const [instrumentsExpanded, setInstrumentsExpanded] = useState(true);
-  const [localBpmRange, setLocalBpmRange] = useState<[number, number]>([0, 200]);
-  const [localDurationRange, setLocalDurationRange] = useState<[number, number]>([0, 600]);
+  const [localBpmRange, setLocalBpmRange] = useState<[number, number]>(bpmRange);
+  const [localDurationRange, setLocalDurationRange] = useState<[number, number]>(durationRange);
   const { isCollapsed, toggleCollapse } = useSidebar();
   
   // Format duration for display
@@ -48,24 +48,14 @@ export default function FilterSidebar({
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
   
-  // Set initial values when component mounts
+  // Update local state when props change (e.g., when URL parameters are applied)
   useEffect(() => {
-    // Initialize with full range regardless of incoming props
-    const initialBpmRange: [number, number] = [0, 200];
-    const initialDurationRange: [number, number] = [0, 600];
-    
-    setLocalBpmRange(initialBpmRange);
-    setLocalDurationRange(initialDurationRange);
-    
-    // Only trigger parent callbacks if values are different
-    if (bpmRange[0] !== 0 || bpmRange[1] !== 200) {
-      onBpmChange(initialBpmRange);
-    }
-    
-    if (durationRange[0] !== 0 || durationRange[1] !== 600) {
-      onDurationChange(initialDurationRange);
-    }
-  }, []);
+    setLocalBpmRange(bpmRange);
+  }, [bpmRange]);
+  
+  useEffect(() => {
+    setLocalDurationRange(durationRange);
+  }, [durationRange]);
   
   // Handle BPM range changes (final changes)
   const handleBpmChange = (range: [number, number]) => {
