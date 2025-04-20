@@ -118,38 +118,37 @@ export default function HomePage() {
         <Header />
         
         {/* Hero Section */}
-        <section className="relative w-full px-8 py-8 md:py-12 mt-12">
+        <section className="relative w-full px-8 py-4 md:py-6 mt-10">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start">
-            <div className="w-full md:w-1/2 mb-6 md:mb-0 md:pr-8 pt-2">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-3">
+            <div className="w-full md:w-1/2 mb-4 md:mb-0 md:pr-8">
+              <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
                 Discover the <span className="text-[#1DF7CE]">Soundtrack</span> to Your <span className="text-[#1DF7CE]">Story</span>
               </h1>
-              <p className="text-lg text-gray-300 mb-6">
+              <p className="text-lg text-gray-300 mb-4">
                 High-quality, royalty-free music for your creative projects
               </p>
-              <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-                <div className="relative w-full sm:w-96">
+              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+                <div className="relative w-full sm:w-80">
                   <input 
                     type="text" 
                     placeholder="Search tracks..." 
-                    className="w-full px-4 py-3 bg-[#1E1E1E] border border-gray-700 rounded-full text-white focus:outline-none focus:ring-1 focus:ring-[#1DF7CE] focus:border-transparent" 
+                    className="w-full px-3 py-2 bg-[#1E1E1E] border border-gray-700 rounded-full text-white focus:outline-none focus:ring-1 focus:ring-[#1DF7CE] focus:border-transparent" 
                   />
-                  <svg className="absolute right-3 top-3.5 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <svg className="absolute right-3 top-2.5 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
-                <Link href="/explore" className="flex items-center justify-center px-6 py-3 bg-[#1DF7CE] hover:bg-[#1DF7CE]/90 text-black font-medium rounded-full transition-colors text-sm">
+                <Link href="/explore" className="flex items-center justify-center px-4 py-2 bg-[#1DF7CE] hover:bg-[#1DF7CE]/90 text-black font-medium rounded-full transition-colors text-sm">
                   Browse Library
                 </Link>
               </div>
             </div>
             <div className="w-full md:w-1/2 relative">
-              <div className="aspect-[16/9]">
+              <div className="aspect-[21/9] h-[180px] md:h-[200px]">
                 <Image
                   src="/images/herotest.jpg"
                   alt="Music studio workspace"
-                  width={700}
-                  height={300}
+                  fill
                   className="rounded-lg shadow-2xl object-cover"
                   priority
                 />
