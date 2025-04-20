@@ -45,6 +45,14 @@ export default function Header(): React.ReactElement {
                   href="/" 
                   className="text-[#1DF7CE] font-normal"
                 >
+                  Home
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  href="/explore" 
+                  className="text-[#999999] hover:text-[#1DF7CE] transition-colors font-normal"
+                >
                   Music
                 </Link>
               </li>
