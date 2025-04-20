@@ -30,18 +30,23 @@ export default function RangeSlider({
   const [isInitialized, setIsInitialized] = useState(false);
   
   const trackRef = useRef<HTMLDivElement>(null);
+  const lastValidMinValue = useRef(min);
+  const lastValidMaxValue = useRef(max);
 
   // Initialize with the full range if no values are provided
   useEffect(() => {
     if (!isInitialized) {
-      // Only set full range on first render if values are at defaults
       if (value[0] === value[1] || (value[0] === 0 && value[1] === 0)) {
         onChange([min, max]);
         setLocalMin(min);
         setLocalMax(max);
+        lastValidMinValue.current = min;
+        lastValidMaxValue.current = max;
       } else {
         setLocalMin(value[0]);
         setLocalMax(value[1]);
+        lastValidMinValue.current = value[0];
+        lastValidMaxValue.current = value[1];
       }
       setIsInitialized(true);
     }
@@ -52,20 +57,38 @@ export default function RangeSlider({
     if (isInitialized) {
       setLocalMin(value[0]);
       setLocalMax(value[1]);
+      lastValidMinValue.current = value[0];
+      lastValidMaxValue.current = value[1];
     }
   }, [value, isInitialized]);
   
+  // Convert page position to slider value
+  const positionToValue = (positionX: number): number => {
+    if (!trackRef.current) return min;
+    
+    const rect = trackRef.current.getBoundingClientRect();
+    const trackWidth = rect.width;
+    
+    // Clamp position to track bounds
+    let clampedX;
+    if (positionX < rect.left) {
+      clampedX = 0;
+    } else if (positionX > rect.right) {
+      clampedX = trackWidth;
+    } else {
+      clampedX = positionX - rect.left;
+    }
+    
+    // Convert to percentage then to value
+    const percentage = (clampedX / trackWidth);
+    return Math.round(min + percentage * (max - min));
+  };
+
   // Handle track click
   const handleTrackClick = (e: React.MouseEvent) => {
     if (!trackRef.current) return;
     
-    const rect = trackRef.current.getBoundingClientRect();
-    const trackWidth = rect.width;
-    const offsetX = Math.max(0, Math.min(trackWidth, e.clientX - rect.left));
-    
-    // Calculate percentage and value
-    const percentage = (offsetX / trackWidth) * 100;
-    const newValue = Math.round(min + (percentage / 100) * (max - min));
+    const newValue = positionToValue(e.clientX);
     
     // Decide which handle to move based on proximity
     const distToMin = Math.abs(newValue - localMin);
@@ -75,11 +98,13 @@ export default function RangeSlider({
       // Move min handle if it's closest
       const updatedMin = Math.min(newValue, localMax - 1);
       setLocalMin(updatedMin);
+      lastValidMinValue.current = updatedMin;
       onDrag([updatedMin, localMax]);
     } else {
       // Move max handle if it's closest
       const updatedMax = Math.max(newValue, localMin + 1);
       setLocalMax(updatedMax);
+      lastValidMaxValue.current = updatedMax;
       onDrag([localMin, updatedMax]);
     }
   };
@@ -90,57 +115,36 @@ export default function RangeSlider({
     e.stopPropagation();
     setIsDraggingMin(true);
     
-    // Get initial dimensions
-    const rect = trackRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    
-    const trackWidth = rect.width;
-    
-    // Attach move and up handlers
     const handleMove = (moveEvent: MouseEvent) => {
-      if (!trackRef.current) return;
+      const newValue = positionToValue(moveEvent.clientX);
       
-      // Get current dimensions (in case of window resize)
-      const currentRect = trackRef.current.getBoundingClientRect();
+      // Handle boundary conditions
+      let finalValue;
       
-      // Calculate the offset, clamping if mouse is outside the track bounds
-      let offsetX;
-      if (moveEvent.clientX < currentRect.left) {
-        // If mouse is to the left of the track, set to minimum (0%)
-        offsetX = 0;
-      } else if (moveEvent.clientX > currentRect.right) {
-        // If mouse is to the right of the track, set to maximum (100%)
-        // but still respect the max thumb position
-        offsetX = Math.min(currentRect.width, maxPercentage * currentRect.width / 100);
+      if (moveEvent.clientX < (trackRef.current?.getBoundingClientRect().left || 0)) {
+        // Left edge - set to minimum
+        finalValue = min;
+      } else if (moveEvent.clientX > (trackRef.current?.getBoundingClientRect().right || 0)) {
+        // Right edge - constrained by max thumb
+        finalValue = Math.min(max, localMax - 1);
       } else {
-        // Normal case: mouse is within track bounds
-        offsetX = moveEvent.clientX - currentRect.left;
+        // Within track - normal behavior
+        finalValue = Math.min(newValue, localMax - 1);
       }
       
-      // Calculate percentage (0-100)
-      const percentage = (offsetX / currentRect.width) * 100;
-      
-      // Calculate new value in the range [min, max]
-      const newValue = Math.round(min + (percentage / 100) * (max - min));
-      
-      // Ensure new min is not greater than max-1
-      const newMin = Math.min(newValue, localMax - 1);
-      
-      // Update local state
-      setLocalMin(newMin);
-      
-      // Emit real-time updates to parent
-      onDrag([newMin, localMax]);
+      // Update state and remember valid value
+      setLocalMin(finalValue);
+      lastValidMinValue.current = finalValue;
+      onDrag([finalValue, localMax]);
     };
     
     const handleMouseUp = () => {
-      // Release handlers
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleMouseUp);
       setIsDraggingMin(false);
       
-      // Trigger onChange with final values
-      onChange([localMin, localMax]);
+      // Apply the final change - important for when mouse is released outside the track
+      onChange([lastValidMinValue.current, localMax]);
     };
     
     document.addEventListener('mousemove', handleMove);
@@ -153,57 +157,36 @@ export default function RangeSlider({
     e.stopPropagation();
     setIsDraggingMax(true);
     
-    // Get initial dimensions
-    const rect = trackRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    
-    const trackWidth = rect.width;
-    
-    // Attach move and up handlers
     const handleMove = (moveEvent: MouseEvent) => {
-      if (!trackRef.current) return;
+      const newValue = positionToValue(moveEvent.clientX);
       
-      // Get current dimensions (in case of window resize)
-      const currentRect = trackRef.current.getBoundingClientRect();
+      // Handle boundary conditions
+      let finalValue;
       
-      // Calculate the offset, clamping if mouse is outside the track bounds
-      let offsetX;
-      if (moveEvent.clientX < currentRect.left) {
-        // If mouse is to the left of the track, set to minimum
-        // but still respect the min thumb position
-        offsetX = Math.max(0, minPercentage * currentRect.width / 100);
-      } else if (moveEvent.clientX > currentRect.right) {
-        // If mouse is to the right of the track, set to maximum (100%)
-        offsetX = currentRect.width;
+      if (moveEvent.clientX < (trackRef.current?.getBoundingClientRect().left || 0)) {
+        // Left edge - constrained by min thumb
+        finalValue = Math.max(min, localMin + 1);
+      } else if (moveEvent.clientX > (trackRef.current?.getBoundingClientRect().right || 0)) {
+        // Right edge - set to maximum
+        finalValue = max;
       } else {
-        // Normal case: mouse is within track bounds
-        offsetX = moveEvent.clientX - currentRect.left;
+        // Within track - normal behavior
+        finalValue = Math.max(newValue, localMin + 1);
       }
       
-      // Calculate percentage (0-100)
-      const percentage = (offsetX / currentRect.width) * 100;
-      
-      // Calculate new value in the range [min, max]
-      const newValue = Math.round(min + (percentage / 100) * (max - min));
-      
-      // Ensure new max is not less than min+1
-      const newMax = Math.max(newValue, localMin + 1);
-      
-      // Update local state
-      setLocalMax(newMax);
-      
-      // Emit real-time updates to parent
-      onDrag([localMin, newMax]);
+      // Update state and remember valid value
+      setLocalMax(finalValue);
+      lastValidMaxValue.current = finalValue;
+      onDrag([localMin, finalValue]);
     };
     
     const handleMouseUp = () => {
-      // Release handlers
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleMouseUp);
       setIsDraggingMax(false);
       
-      // Trigger onChange with final values
-      onChange([localMin, localMax]);
+      // Apply the final change - important for when mouse is released outside the track
+      onChange([localMin, lastValidMaxValue.current]);
     };
     
     document.addEventListener('mousemove', handleMove);
@@ -257,7 +240,6 @@ export default function RangeSlider({
           onMouseDown={handleMinMouseDown}
           onTouchStart={(e) => {
             e.preventDefault();
-            // Handle touch events
             const touch = e.touches[0];
             const mouseEvent = new MouseEvent('mousedown', {
               clientX: touch.clientX,
@@ -278,7 +260,6 @@ export default function RangeSlider({
           onMouseDown={handleMaxMouseDown}
           onTouchStart={(e) => {
             e.preventDefault();
-            // Handle touch events
             const touch = e.touches[0];
             const mouseEvent = new MouseEvent('mousedown', {
               clientX: touch.clientX,
