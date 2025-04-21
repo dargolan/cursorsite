@@ -5,6 +5,14 @@ import { CartProvider } from '@/contexts/CartContext';
 import { SidebarProvider } from '@/contexts/SidebarContext';
 import SidebarToggle from '@/components/SidebarToggle';
 import SidebarOverlay from '@/components/SidebarOverlay';
+import dynamic from 'next/dynamic';
+
+// Dynamically import AudioStatusIndicator to avoid hydration issues
+// since it relies on browser-only APIs
+const AudioStatusIndicator = dynamic(
+  () => import('@/components/AudioStatusIndicator'),
+  { ssr: false }
+);
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -41,6 +49,9 @@ export default function RootLayout({
             <main className="min-h-screen">
               {children}
             </main>
+            
+            {/* Global audio indicator */}
+            <AudioStatusIndicator />
           </SidebarProvider>
         </CartProvider>
       </body>

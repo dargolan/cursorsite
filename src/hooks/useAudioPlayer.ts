@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { audioManager } from '../lib/audio-manager';
+import { globalAudioController } from '../lib/global-audio-controller';
 
 interface UseAudioPlayerProps {
   src?: string;
@@ -32,18 +33,25 @@ export function useAudioPlayer({
   const play = useCallback(() => {
     if (!audioRef.current) return;
     
-    audioManager.play(audioRef.current, { stemId, trackId })
+    // Use our new global audio controller instead of audioManager
+    globalAudioController.play(audioRef.current)
       .then(() => setIsPlaying(true))
       .catch(err => {
         setError(err);
         setIsPlaying(false);
       });
+      
+    // Still use audioManager for event dispatching if needed  
+    audioManager.activeAudio = audioRef.current;
+    audioManager.activeStemId = stemId || null;
+    audioManager.activeTrackId = trackId || null;
   }, [stemId, trackId]);
   
   const pause = useCallback(() => {
     if (!audioRef.current) return;
     
-    audioRef.current.pause();
+    // Use our global controller for pausing
+    globalAudioController.pause();
     setIsPlaying(false);
   }, []);
   
@@ -107,6 +115,14 @@ export function useAudioPlayer({
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('error', handleError as EventListener);
     
+    // Subscribe to global audio controller
+    const unsubscribe = globalAudioController.subscribe((playingState) => {
+      // If global state says not playing but we think we are, update our state
+      if (!playingState && isPlaying && audio === globalAudioController['currentAudio']) {
+        setIsPlaying(false);
+      }
+    });
+    
     // Clean up on unmount
     return () => {
       audio.removeEventListener('loadstart', handleLoadStart);
@@ -115,11 +131,14 @@ export function useAudioPlayer({
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('error', handleError as EventListener);
       
+      // Unsubscribe from global controller
+      unsubscribe();
+      
       // Stop and unload
       audio.pause();
       audio.src = '';
     };
-  }, [src, autoPlay, loop, onTimeUpdate, onEnded, play]);
+  }, [src, autoPlay, loop, onTimeUpdate, onEnded, play, isPlaying]);
 
   // Listen for global stop events for this stem
   useEffect(() => {
