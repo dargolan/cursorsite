@@ -361,16 +361,34 @@ export default function HomePage() {
             <p className="text-gray-300 mb-8 text-sm">Subscribe to get the latest updates on new tracks and exclusive offers</p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-2">
-              <input 
-                type="email" 
-                placeholder="Enter your email" 
-                className="w-full sm:w-96 px-4 py-2 bg-[#1E1E1E] border border-gray-700 rounded-full text-white focus:outline-none focus:ring-1 focus:ring-[#1DF7CE] focus:border-transparent text-sm" 
-              />
+              <div className="relative w-full sm:w-96">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                  <svg 
+                    className="w-5 h-5 text-white" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24" 
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth="2" 
+                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                    />
+                  </svg>
+                </div>
+                <input 
+                  type="email" 
+                  placeholder="Enter your email" 
+                  className="block w-full py-2 pl-12 pr-4 text-base rounded-full bg-[#1E1E1E] border border-[#CDCDCD] text-white focus:outline-none focus:ring-1 focus:ring-[#1DF7CE]" 
+                />
+              </div>
               <button className="w-full sm:w-auto whitespace-nowrap px-5 py-2 bg-[#1DF7CE] hover:bg-[#1DF7CE]/90 text-black font-medium rounded-full transition-colors text-sm">
                 Subscribe
               </button>
+            </div>
           </div>
-        </div>
         </section>
         
       <Footer />

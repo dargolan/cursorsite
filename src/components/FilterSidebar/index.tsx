@@ -141,7 +141,12 @@ export default function FilterSidebar({
             onClick={toggleCollapse}
             aria-label="Expand sidebar to show genres"
           >
-            <span className="material-symbols-outlined text-white mb-1" style={{ fontSize: '24px' }}>album</span>
+            <svg className="w-6 h-6 text-white mb-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+              <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="1.5" />
+              <circle cx="12" cy="12" r="2" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M12 12L18 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
             <span className="text-white text-[10px]">Genre</span>
           </button>
           
@@ -244,20 +249,8 @@ export default function FilterSidebar({
           <div className="px-6 pb-6">
             <SearchBar onSearch={onSearch} />
             
-            <div className="mb-6 flex items-center justify-between">
-              <h3 className="text-[#1DF7CE] font-normal text-sm">Filters</h3>
-              <button 
-                onClick={toggleCollapse}
-                className="bg-[#282828] rounded-full w-8 h-8 flex items-center justify-center hover:bg-[#333] transition-colors"
-                aria-label="Collapse sidebar"
-              >
-                <span 
-                  className="material-symbols-outlined text-[#1DF7CE]"
-                  style={{ fontSize: '20px' }}
-                >
-                  dock_to_right
-                </span>
-              </button>
+            <div className="mb-6">
+              <h3 className="text-[#1DF7CE] font-normal text-sm mb-4">Filters</h3>
             </div>
 
             {/* Genre Filter */}

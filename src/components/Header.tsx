@@ -93,7 +93,7 @@ export default function Header(): React.ReactElement {
           </nav>
           
           {/* Right side content area - sign in and cart */}
-          <div className="flex items-center space-x-6 pr-[54px]">
+          <div className="flex items-center space-x-6 pr-[84px]">
             <Link 
               href="/signin"
               className={`${pathname === '/signin' ? 'text-[#1DF7CE]' : 'text-[#999999]'} hover:text-[#1DF7CE] active:text-[#1DF7CE] transition-colors font-normal hidden md:block`}
