@@ -197,8 +197,8 @@ export default function HomePage() {
                 High-quality, royalty-free music for your creative projects
               </p>
               <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
-                <Link href="/explore" className="flex items-center justify-center px-6 py-3 bg-[#1DF7CE] hover:bg-[#1DF7CE]/90 text-black font-medium rounded-full transition-colors text-sm">
-                  Explore Music Collection
+                <Link href="/explore" className="flex items-center justify-center px-6 py-3 bg-[#1DF7CE] hover:bg-[#1DF7CE]/90 text-black font-medium rounded-full transition-colors text-lg">
+                  Browse Music
                 </Link>
               </div>
             </div>
@@ -220,7 +220,7 @@ export default function HomePage() {
         <section className="py-16 px-8 bg-[#121212]">
           <div className="max-w-7xl mx-auto">
             <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-bold text-white">Featured Tracks</h2>
+              <h2 className="text-2xl font-bold text-white">Trending Tracks</h2>
               <Link href="/explore" className="text-[#1DF7CE] hover:text-[#1DF7CE]/80 flex items-center text-sm font-medium">
                 View All
                 <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -247,12 +247,14 @@ export default function HomePage() {
                   <div key={track.id} className="bg-[#1E1E1E] rounded-lg overflow-hidden transition-transform hover:scale-[1.02] duration-200">
                     <div className="relative w-full h-48 bg-gray-900 flex items-center justify-center">
                       {track.imageUrl ? (
-                        <Image
-                          src={track.imageUrl}
-                          alt={track.title}
-                          fill
-                          className="object-cover"
-                        />
+                        <Link href={`/explore?track=${track.id}`}>
+                          <Image
+                            src={track.imageUrl}
+                            alt={track.title}
+                            fill
+                            className="object-cover"
+                          />
+                        </Link>
                       ) : (
                         <div className="w-16 h-16 rounded-full bg-[#282828] flex items-center justify-center">
                           <svg className="w-8 h-8 text-[#1DF7CE]" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -262,18 +264,20 @@ export default function HomePage() {
                         </div>
                       )}
                     </div>
-                    <div className="p-4">
-                      <h3 className="text-white font-medium text-lg mb-1">{track.title}</h3>
-                      <p className="text-gray-400 text-sm">{track.tags[0]?.name}</p>
-                      <div className="flex items-center justify-between mt-3">
-                        <span className="text-gray-400 text-sm">{formatDuration(track.duration)} • {track.tags[0]?.name}</span>
-                        <button className="text-white hover:text-[#1DF7CE] transition-colors">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      </button>
+                    <Link href={`/explore?track=${track.id}`}>
+                      <div className="p-4">
+                        <h3 className="text-white font-medium text-lg mb-1">{track.title}</h3>
+                        <p className="text-gray-400 text-sm">{track.tags[0]?.name}</p>
+                        <div className="flex items-center justify-between mt-3">
+                          <span className="text-gray-400 text-sm">{formatDuration(track.duration)} • {track.tags[0]?.name}</span>
+                          <button className="text-white hover:text-[#1DF7CE] transition-colors">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </button>
+                        </div>
                       </div>
-                    </div>
+                    </Link>
                   </div>
                 ))
               )}
@@ -346,15 +350,6 @@ export default function HomePage() {
                   </div>
                 </div>
               ))}
-            </div>
-              
-            <div className="mt-8 text-center">
-              <Link href="/submit-project" className="inline-flex items-center px-5 py-2 border border-[#1DF7CE] text-[#1DF7CE] hover:bg-[#1DF7CE]/10 rounded-md font-medium transition-colors text-sm">
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Submit Your Project
-              </Link>
             </div>
           </div>
         </section>

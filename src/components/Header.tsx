@@ -67,14 +67,6 @@ export default function Header(): React.ReactElement {
               </li>
               <li>
                 <Link 
-                  href="/sound-effects" 
-                  className={`${pathname === '/sound-effects' ? 'text-[#1DF7CE]' : 'text-[#999999]'} hover:text-[#1DF7CE] active:text-[#1DF7CE] transition-colors font-normal`}
-                >
-                  Sound Effects
-                </Link>
-              </li>
-              <li>
-                <Link 
                   href="/video" 
                   className={`${pathname === '/video' ? 'text-[#1DF7CE]' : 'text-[#999999]'} hover:text-[#1DF7CE] active:text-[#1DF7CE] transition-colors font-normal`}
                 >
@@ -101,7 +93,7 @@ export default function Header(): React.ReactElement {
           </nav>
           
           {/* Right side content area - sign in and cart */}
-          <div className="flex items-center space-x-6 pr-24">
+          <div className="flex items-center space-x-6 pr-[54px]">
             <Link 
               href="/signin"
               className={`${pathname === '/signin' ? 'text-[#1DF7CE]' : 'text-[#999999]'} hover:text-[#1DF7CE] active:text-[#1DF7CE] transition-colors font-normal hidden md:block`}
