@@ -191,14 +191,14 @@ export default function HomePage() {
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center">
             <div className="w-full md:w-1/2 mb-4 md:mb-0 md:pr-8 flex flex-col justify-center">
               <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-6">
-                Discover the <span className="text-[#1DF7CE]">Soundtrack</span> to Your <span className="text-[#1DF7CE]">Story</span>
+                You've Just Discovered the <span className="text-[#1DF7CE]">Secret Stash</span>
               </h1>
               <p className="text-xl text-gray-300 mb-8">
-                High-quality, royalty-free music for your creative projects
+                Yes, it's free. Yes, really. High-quality, royalty-free music, ready for whatever you're making.
               </p>
               <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
                 <Link href="/explore" className="flex items-center justify-center px-6 py-3 bg-[#1DF7CE] hover:bg-[#1DF7CE]/90 text-black font-medium rounded-full transition-colors text-lg">
-                  Browse Music
+                  Click the Thing
                 </Link>
               </div>
             </div>
