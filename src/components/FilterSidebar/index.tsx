@@ -244,8 +244,20 @@ export default function FilterSidebar({
           <div className="px-6 pb-6">
             <SearchBar onSearch={onSearch} />
             
-            <div className="mb-6">
-              <h3 className="text-[#1DF7CE] font-normal text-sm mb-4">Filters</h3>
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="text-[#1DF7CE] font-normal text-sm">Filters</h3>
+              <button 
+                onClick={toggleCollapse}
+                className="bg-[#282828] rounded-full w-8 h-8 flex items-center justify-center hover:bg-[#333] transition-colors"
+                aria-label="Collapse sidebar"
+              >
+                <span 
+                  className="material-symbols-outlined text-[#1DF7CE]"
+                  style={{ fontSize: '20px' }}
+                >
+                  dock_to_right
+                </span>
+              </button>
             </div>
 
             {/* Genre Filter */}
