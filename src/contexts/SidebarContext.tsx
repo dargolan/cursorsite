@@ -15,21 +15,24 @@ const SidebarContext = createContext<SidebarContextProps | undefined>(undefined)
 
 export const SidebarProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
+  // Default to expanded (false means expanded)
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
-    // On initial render, check localStorage for saved preference
-    const savedIsCollapsed = localStorage.getItem('sidebarCollapsed');
-    
-    if (savedIsCollapsed !== null) {
-      // Use saved preference if available
-      setIsCollapsed(savedIsCollapsed === 'true');
-      console.log('Using saved sidebar preference:', savedIsCollapsed === 'true' ? 'collapsed' : 'expanded');
+    // Always default to expanded sidebar (false) on the homepage
+    if (pathname === '/' || pathname === '/explore') {
+      setIsCollapsed(false);
     } else {
-      // Default behavior: expanded for homepage, collapsed for other pages
-      const shouldBeCollapsed = pathname !== '/' && pathname !== '/explore';
-      setIsCollapsed(shouldBeCollapsed);
-      console.log('No saved preference. Setting sidebar to:', shouldBeCollapsed ? 'collapsed' : 'expanded');
+      // For other pages, check localStorage
+      const savedIsCollapsed = localStorage.getItem('sidebarCollapsed');
+      
+      if (savedIsCollapsed !== null) {
+        // Use saved preference if available (but not on homepage)
+        setIsCollapsed(savedIsCollapsed === 'true');
+      } else {
+        // Default behavior: collapsed for other pages
+        setIsCollapsed(true);
+      }
     }
   }, [pathname]);
 
@@ -39,12 +42,10 @@ export const SidebarProvider = ({ children }: { children: ReactNode }) => {
   }, [isCollapsed]);
 
   const toggleCollapse = () => {
-    console.log('Toggle collapse clicked, current state:', isCollapsed);
     setIsCollapsed(prevState => !prevState);
   };
   
   const setCollapsed = (value: boolean) => {
-    console.log('Setting sidebar collapsed state to:', value);
     setIsCollapsed(value);
   };
 
