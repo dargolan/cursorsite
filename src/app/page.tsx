@@ -197,41 +197,8 @@ export default function HomePage() {
                 High-quality, royalty-free music for your creative projects
               </p>
               <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
-                <div className="relative w-full sm:w-80">
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    const input = e.currentTarget.querySelector('input');
-                    if (input && input.value.trim()) {
-                      handleSearch(input.value.trim());
-                    }
-                  }}>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                        <svg 
-                          className="w-5 h-5 text-white" 
-                          fill="none" 
-                          stroke="currentColor" 
-                          viewBox="0 0 24 24" 
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round" 
-                            strokeWidth="2" 
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                          />
-                        </svg>
-                      </div>
-                      <input 
-                        type="search" 
-                        placeholder="Search Tracks..." 
-                        className="block w-full py-2 pl-12 pr-4 text-base rounded-full bg-[#1E1E1E] border border-[#CDCDCD] text-white focus:outline-none focus:ring-1 focus:ring-[#1DF7CE]" 
-                      />
-                    </div>
-                  </form>
-                </div>
-                <Link href="/explore" className="flex items-center justify-center px-4 py-2 bg-[#1DF7CE] hover:bg-[#1DF7CE]/90 text-black font-medium rounded-full transition-colors text-sm">
-                  Browse Library
+                <Link href="/explore" className="flex items-center justify-center px-6 py-3 bg-[#1DF7CE] hover:bg-[#1DF7CE]/90 text-black font-medium rounded-full transition-colors text-sm">
+                  Explore Music Collection
                 </Link>
               </div>
             </div>
