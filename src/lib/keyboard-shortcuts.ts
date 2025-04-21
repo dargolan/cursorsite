@@ -1,6 +1,6 @@
 'use client';
 
-import { globalAudioController } from './global-audio-controller';
+import { unifiedAudioManager } from './unified-audio-manager';
 
 /**
  * Keyboard shortcuts for audio control
@@ -46,27 +46,25 @@ class KeyboardShortcuts {
       return;
     }
     
-    const currentAudio = globalAudioController['currentAudio'];
-    
     switch (event.code) {
       case 'Space': // Play/pause
         event.preventDefault();
-        globalAudioController.toggle();
+        unifiedAudioManager.toggle();
         break;
         
       case 'ArrowLeft': // Rewind 5 seconds
-        if (currentAudio) {
+        if (unifiedAudioManager.isPlaying()) {
           event.preventDefault();
-          const newTime = Math.max(0, currentAudio.currentTime - 5);
-          currentAudio.currentTime = newTime;
+          const newTime = Math.max(0, unifiedAudioManager.getCurrentTime() - 5);
+          unifiedAudioManager.seek(newTime);
         }
         break;
         
       case 'ArrowRight': // Forward 5 seconds
-        if (currentAudio) {
+        if (unifiedAudioManager.isPlaying()) {
           event.preventDefault();
-          const newTime = Math.min(currentAudio.duration, currentAudio.currentTime + 5);
-          currentAudio.currentTime = newTime;
+          const newTime = Math.min(unifiedAudioManager.getDuration(), unifiedAudioManager.getCurrentTime() + 5);
+          unifiedAudioManager.seek(newTime);
         }
         break;
     }

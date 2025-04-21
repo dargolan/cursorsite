@@ -8,7 +8,6 @@ import SidebarOverlay from '@/components/SidebarOverlay';
 import dynamic from 'next/dynamic';
 
 // Dynamically import AudioStatusIndicator to avoid hydration issues
-// since it relies on browser-only APIs
 const AudioStatusIndicator = dynamic(
   () => import('@/components/AudioStatusIndicator'),
   { ssr: false }
@@ -50,7 +49,7 @@ export default function RootLayout({
               {children}
             </main>
             
-            {/* Global audio indicator */}
+            {/* Global audio status indicator */}
             <AudioStatusIndicator />
           </SidebarProvider>
         </CartProvider>

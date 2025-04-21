@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { audioManager, AudioEvent } from '../lib/audio-manager';
-import { globalAudioController } from '../lib/global-audio-controller';
+import { unifiedAudioManager, AudioEvent } from '../lib/unified-audio-manager';
 import { keyboardShortcuts } from '../lib/keyboard-shortcuts';
 
 interface AudioStatusIndicatorProps {
@@ -24,9 +23,9 @@ export default function AudioStatusIndicator({
     return () => keyboardShortcuts.destroy();
   }, []);
   
-  // Subscribe to global audio controller
+  // Subscribe to unified audio manager for playback state
   useEffect(() => {
-    const unsubscribe = globalAudioController.subscribe((playing) => {
+    const unsubscribe = unifiedAudioManager.subscribe((playing) => {
       setIsPlaying(playing);
     });
     
@@ -65,18 +64,18 @@ export default function AudioStatusIndicator({
     };
     
     // Listen for audio events
-    const unsubscribe = audioManager.addEventListener(handleAudioEvents);
+    const unsubscribe = unifiedAudioManager.addEventListener(handleAudioEvents);
     
     // Show keyboard tips after a delay
     if (showKeyboardTips) {
       const timer = setTimeout(() => setShowTips(true), 2000);
       return () => {
-        unsubscribe(); // Use the unsubscribe function returned by addEventListener
+        unsubscribe();
         clearTimeout(timer);
       };
     }
     
-    return () => unsubscribe(); // Use the unsubscribe function
+    return () => unsubscribe();
   }, [showKeyboardTips]);
   
   // No need to render if nothing is playing and no tips to show
@@ -92,7 +91,7 @@ export default function AudioStatusIndicator({
             <div className="text-xs text-gray-300 truncate">{trackInfo.artist || 'Unknown artist'}</div>
           </div>
           <button 
-            onClick={() => globalAudioController.pause()}
+            onClick={() => unifiedAudioManager.pause()}
             className="ml-3 p-1 hover:bg-white hover:bg-opacity-20 rounded"
             aria-label="Pause"
           >
