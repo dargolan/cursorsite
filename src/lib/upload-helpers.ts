@@ -42,13 +42,36 @@ export function validateFileType(file: File, acceptedTypes: string[] = ['audio/m
  */
 export function getExtensionFromMimeType(mimeType: string): string {
   const mimeToExt: Record<string, string> = {
+    // Audio
     'audio/mpeg': 'mp3',
     'audio/mp3': 'mp3',
     'audio/wav': 'wav',
     'audio/x-wav': 'wav',
     'audio/flac': 'flac',
     'audio/ogg': 'ogg',
+    
+    // Images
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif'
   };
   
-  return mimeToExt[mimeType] || 'mp3';
+  // If mime type is unknown, try to guess from file extension
+  return mimeToExt[mimeType] || 'bin';
+}
+
+/**
+ * Get common image formats
+ */
+export function getAcceptedImageTypes(): string[] {
+  return ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+}
+
+/**
+ * Get common audio formats
+ */
+export function getAcceptedAudioTypes(): string[] {
+  return ['audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/x-wav'];
 } 

@@ -17,11 +17,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file type
-    const validTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3'];
+    // Validate file type based on fileType
+    let validTypes: string[];
+    if (fileType === 'image') {
+      validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    } else {
+      validTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3'];
+    }
+    
     if (!validateFileType(file, validTypes)) {
+      const formatList = fileType === 'image' 
+        ? 'JPEG, PNG, WebP, GIF' 
+        : 'MP3, WAV';
+        
       return NextResponse.json(
-        { error: 'Invalid file type. Only MP3 and WAV files are allowed.' },
+        { error: `Invalid file type. Only ${formatList} files are allowed.` },
         { status: 400 }
       );
     }
@@ -32,10 +42,17 @@ export async function POST(request: NextRequest) {
 
     // Create unique filename
     const originalName = file.name;
-    const extension = getExtensionFromMimeType(file.type);
+    let extension: string;
+    let prefix: string;
     
-    // Add prefix based on file type
-    const prefix = fileType === 'main' ? 'main_' : 'stem_';
+    if (fileType === 'image') {
+      extension = file.name.split('.').pop() || 'jpg';
+      prefix = 'cover_';
+    } else {
+      extension = getExtensionFromMimeType(file.type);
+      prefix = fileType === 'main' ? 'main_' : 'stem_';
+    }
+    
     const uniqueFilename = `${prefix}${uuidv4()}.${extension}`;
 
     // Create appropriate directory structure
