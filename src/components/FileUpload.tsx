@@ -2,19 +2,26 @@
 
 import React, { useState, useRef, ChangeEvent, DragEvent } from 'react';
 import { CloudArrowUpIcon, DocumentIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { analyzeBPM } from '@/lib/audio-analyzer';
 
 interface FileUploadProps {
   onFileUploaded?: (fileData: any) => void;
   acceptedTypes?: string;
   maxSizeMB?: number;
   label?: string;
+  analyzeBpm?: boolean;
+  onBpmDetected?: (bpm: number) => void;
+  fileType?: 'main' | 'stem';
 }
 
 export default function FileUpload({
   onFileUploaded,
   acceptedTypes = "audio/mpeg,audio/wav,audio/mp3",
   maxSizeMB = 50,
-  label = "Upload audio file"
+  label = "Upload audio file",
+  analyzeBpm = false,
+  onBpmDetected,
+  fileType = 'main'
 }: FileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -22,6 +29,7 @@ export default function FileUpload({
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -52,6 +60,21 @@ export default function FileUpload({
     
     // Set preview information
     setPreview(selectedFile.name);
+    
+    // Analyze BPM if needed
+    if (analyzeBpm && onBpmDetected) {
+      setIsAnalyzing(true);
+      analyzeBPM(selectedFile)
+        .then(bpm => {
+          onBpmDetected(bpm);
+        })
+        .catch(err => {
+          console.error('BPM analysis error:', err);
+        })
+        .finally(() => {
+          setIsAnalyzing(false);
+        });
+    }
   };
 
   const handleDragOver = (e: DragEvent) => {
@@ -84,6 +107,7 @@ export default function FileUpload({
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('fileType', fileType); // Add file type to indicate if it's a main track or stem
       
       const response = await fetch('/api/upload', {
         method: 'POST',
@@ -99,7 +123,10 @@ export default function FileUpload({
       
       // Call the callback with upload data
       if (onFileUploaded) {
-        onFileUploaded(data);
+        onFileUploaded({
+          ...data,
+          fileType
+        });
       }
       
       setProgress(100);
@@ -171,6 +198,11 @@ export default function FileUpload({
                   ? `${(file.size / 1024).toFixed(2)} KB`
                   : `${(file.size / (1024 * 1024)).toFixed(2)} MB`}
               </p>
+              {isAnalyzing && (
+                <p className="text-xs text-blue-500 animate-pulse">
+                  Analyzing BPM...
+                </p>
+              )}
             </div>
             <button
               type="button"

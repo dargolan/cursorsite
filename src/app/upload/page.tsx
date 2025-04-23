@@ -4,39 +4,56 @@ import React, { useState } from 'react';
 import FileUpload from '@/components/FileUpload';
 import PageContainer from '@/components/PageContainer';
 import ContentWrapper from '@/components/ContentWrapper';
-import { PlusCircleIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusCircleIcon, TrashIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 
 interface UploadedFile {
   filename: string;
   originalName: string;
   size: number;
   url: string;
+  fileType: 'main' | 'stem';
 }
 
 export default function UploadPage() {
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [mainTrack, setMainTrack] = useState<UploadedFile | null>(null);
+  const [stems, setStems] = useState<UploadedFile[]>([]);
   const [trackTitle, setTrackTitle] = useState('');
   const [genre, setGenre] = useState('');
   const [bpm, setBpm] = useState('');
   const [price, setPrice] = useState('');
-  const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showStemUpload, setShowStemUpload] = useState(false);
 
-  const handleFileUploaded = (fileData: UploadedFile) => {
-    setUploadedFiles(prev => [...prev, fileData]);
+  const handleMainTrackUploaded = (fileData: UploadedFile) => {
+    setMainTrack(fileData);
+    setShowStemUpload(true);
   };
 
-  const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  const handleStemUploaded = (fileData: UploadedFile) => {
+    setStems(prev => [...prev, fileData]);
+  };
+
+  const handleBpmDetected = (detectedBpm: number) => {
+    setBpm(detectedBpm.toString());
+  };
+
+  const removeStem = (index: number) => {
+    setStems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeMainTrack = () => {
+    setMainTrack(null);
+    setShowStemUpload(false);
+    setBpm('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (uploadedFiles.length === 0) {
-      setSubmitError('Please upload at least one audio file');
+    if (!mainTrack) {
+      setSubmitError('Please upload a main track');
       return;
     }
 
@@ -51,8 +68,8 @@ export default function UploadPage() {
         genre,
         bpm: parseInt(bpm),
         price: parseFloat(price),
-        description,
-        files: uploadedFiles
+        mainTrack,
+        stems
       });
       
       // Simulate API call
@@ -63,12 +80,13 @@ export default function UploadPage() {
       
       // Reset form after 3 seconds
       setTimeout(() => {
-        setUploadedFiles([]);
+        setMainTrack(null);
+        setStems([]);
         setTrackTitle('');
         setGenre('');
         setBpm('');
         setPrice('');
-        setDescription('');
+        setShowStemUpload(false);
         setSubmitSuccess(false);
       }, 3000);
       
@@ -135,7 +153,7 @@ export default function UploadPage() {
                     
                     <div>
                       <label htmlFor="bpm" className="block text-sm font-medium text-gray-700">
-                        BPM
+                        BPM{mainTrack ? ' (Auto-detected)' : ''}
                       </label>
                       <input
                         type="number"
@@ -145,6 +163,7 @@ export default function UploadPage() {
                         min="1"
                         placeholder="120"
                         className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm"
+                        readOnly={!!mainTrack}
                       />
                     </div>
                     
@@ -164,60 +183,90 @@ export default function UploadPage() {
                         className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm"
                       />
                     </div>
-                    
-                    <div className="col-span-2">
-                      <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                        Description
-                      </label>
-                      <textarea
-                        id="description"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        rows={3}
-                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm"
-                        placeholder="Describe your track..."
-                      />
-                    </div>
                   </div>
                 </div>
                 
                 <div className="bg-white shadow rounded-lg p-6">
-                  <h2 className="text-lg font-medium text-gray-900 mb-4">Audio Files</h2>
+                  <h2 className="text-lg font-medium text-gray-900 mb-4">Main Track</h2>
                   <p className="text-sm text-gray-500 mb-4">
-                    Upload stems or the full track. Accepted formats: MP3, WAV
+                    Upload the full track. BPM will be automatically detected.
                   </p>
                   
                   <div className="space-y-4">
-                    <FileUpload onFileUploaded={handleFileUploaded} />
-                    
-                    {uploadedFiles.length > 0 && (
-                      <div className="mt-4">
-                        <h3 className="text-sm font-medium text-gray-700 mb-2">Uploaded Files:</h3>
-                        <ul className="divide-y divide-gray-200 border border-gray-200 rounded-md overflow-hidden">
-                          {uploadedFiles.map((file, index) => (
-                            <li key={index} className="px-4 py-3 flex items-center justify-between bg-white">
-                              <div className="flex items-center min-w-0">
-                                <span className="text-sm font-medium text-gray-900 truncate">
-                                  {file.originalName}
-                                </span>
-                                <span className="ml-2 text-xs text-gray-500">
-                                  ({(file.size / (1024 * 1024)).toFixed(2)} MB)
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => removeFile(index)}
-                                className="ml-2 p-1 text-gray-500 hover:text-red-500"
-                              >
-                                <TrashIcon className="h-5 w-5" />
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
+                    {!mainTrack ? (
+                      <FileUpload 
+                        onFileUploaded={handleMainTrackUploaded} 
+                        analyzeBpm={true}
+                        onBpmDetected={handleBpmDetected}
+                        label="Upload main track"
+                        fileType="main"
+                      />
+                    ) : (
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <div className="flex items-center">
+                          <ArrowDownTrayIcon className="h-10 w-10 text-accent flex-shrink-0" />
+                          <div className="ml-3 flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{mainTrack.originalName}</p>
+                            <p className="text-xs text-gray-500">
+                              {(mainTrack.size / (1024 * 1024)).toFixed(2)} MB
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={removeMainTrack}
+                            className="flex-shrink-0 ml-2 p-1 rounded-full hover:bg-gray-200"
+                          >
+                            <TrashIcon className="h-5 w-5 text-gray-500" />
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
+                
+                {showStemUpload && (
+                  <div className="bg-white shadow rounded-lg p-6">
+                    <h2 className="text-lg font-medium text-gray-900 mb-4">Stems</h2>
+                    <p className="text-sm text-gray-500 mb-4">
+                      Upload individual stems for the track (drums, bass, etc.)
+                    </p>
+                    
+                    <div className="space-y-4">
+                      <FileUpload 
+                        onFileUploaded={handleStemUploaded}
+                        label="Upload a stem"
+                        fileType="stem"
+                      />
+                      
+                      {stems.length > 0 && (
+                        <div className="mt-4">
+                          <h3 className="text-sm font-medium text-gray-700 mb-2">Uploaded Stems:</h3>
+                          <ul className="divide-y divide-gray-200 border border-gray-200 rounded-md overflow-hidden">
+                            {stems.map((stem, index) => (
+                              <li key={index} className="px-4 py-3 flex items-center justify-between bg-white">
+                                <div className="flex items-center min-w-0">
+                                  <span className="text-sm font-medium text-gray-900 truncate">
+                                    {stem.originalName}
+                                  </span>
+                                  <span className="ml-2 text-xs text-gray-500">
+                                    ({(stem.size / (1024 * 1024)).toFixed(2)} MB)
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeStem(index)}
+                                  className="ml-2 p-1 text-gray-500 hover:text-red-500"
+                                >
+                                  <TrashIcon className="h-5 w-5" />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 
                 {submitError && (
                   <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded">
@@ -228,7 +277,7 @@ export default function UploadPage() {
                 <div className="flex justify-end">
                   <button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !mainTrack}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-gray-900 bg-accent hover:bg-accent/80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent disabled:opacity-50"
                   >
                     {isSubmitting ? 'Submitting...' : 'Upload Track'}

@@ -8,6 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
+    const fileType = formData.get('fileType') as string || 'main';
     
     if (!file) {
       return NextResponse.json(
@@ -32,9 +33,12 @@ export async function POST(request: NextRequest) {
     // Create unique filename
     const originalName = file.name;
     const extension = getExtensionFromMimeType(file.type);
-    const uniqueFilename = `${uuidv4()}.${extension}`;
+    
+    // Add prefix based on file type
+    const prefix = fileType === 'main' ? 'main_' : 'stem_';
+    const uniqueFilename = `${prefix}${uuidv4()}.${extension}`;
 
-    // Ensure the uploads directory exists
+    // Create appropriate directory structure
     const uploadsDir = ensureUploadsDirectory();
     const filepath = join(uploadsDir, uniqueFilename);
 
@@ -48,6 +52,7 @@ export async function POST(request: NextRequest) {
       originalName,
       size: file.size,
       url: `/uploads/${uniqueFilename}`,
+      fileType
     });
   } catch (error: any) {
     console.error('Upload error:', error);
