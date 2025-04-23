@@ -75,6 +75,14 @@ export default function Header(): React.ReactElement {
               </li>
               <li>
                 <Link 
+                  href="/upload" 
+                  className={`${pathname === '/upload' ? 'text-[#1DF7CE]' : 'text-[#999999]'} hover:text-[#1DF7CE] active:text-[#1DF7CE] transition-colors font-normal`}
+                >
+                  Upload
+                </Link>
+              </li>
+              <li>
+                <Link 
                   href="/about" 
                   className={`${pathname === '/about' ? 'text-[#1DF7CE]' : 'text-[#999999]'} hover:text-[#1DF7CE] active:text-[#1DF7CE] transition-colors font-normal`}
                 >
