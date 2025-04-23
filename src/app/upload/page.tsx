@@ -49,6 +49,18 @@ export default function UploadPage() {
     setStems(prev => [...prev, fileData]);
   };
 
+  const handleMultipleStemsUploaded = (filesData: UploadedFile[]) => {
+    // Initialize prices for all new stems
+    const newPrices = { ...stemPrices };
+    filesData.forEach(file => {
+      newPrices[file.filename] = '4.99'; // Default price
+    });
+    setStemPrices(newPrices);
+    
+    // Add all stems to the list
+    setStems(prev => [...prev, ...filesData]);
+  };
+
   const handleStemPriceChange = (stemFilename: string, price: string) => {
     setStemPrices(prev => ({
       ...prev,
@@ -309,14 +321,16 @@ export default function UploadPage() {
                   <div className="bg-white shadow rounded-lg p-6">
                     <h2 className="text-lg font-medium text-gray-900 mb-4">Stems (For Sale)</h2>
                     <p className="text-sm text-gray-500 mb-4">
-                      Upload individual stems for the track (drums, bass, etc.)
+                      Upload individual stems for the track (drums, bass, etc.). You can select multiple files at once.
                     </p>
                     
                     <div className="space-y-4">
                       <FileUpload 
                         onFileUploaded={handleStemUploaded}
-                        label="Upload a stem"
+                        onMultipleFilesUploaded={handleMultipleStemsUploaded}
+                        label="Upload stems"
                         fileType="stem"
+                        multiple={true}
                       />
                       
                       {stems.length > 0 && (
@@ -337,7 +351,7 @@ export default function UploadPage() {
                                   <div className="w-24">
                                     <div className="relative rounded-md shadow-sm">
                                       <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2">
-                                        <span className="text-gray-500 sm:text-sm">$</span>
+                                        <span className="text-gray-500 sm:text-sm">€</span>
                                       </div>
                                       <input
                                         type="number"
