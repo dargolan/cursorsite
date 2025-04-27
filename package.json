@@ -17,6 +17,8 @@
     "extract-real-waveforms2": "node scripts/extract-waveforms-with-wavefile.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.787.0",
+    "@aws-sdk/s3-request-presigner": "^3.787.0",
     "@heroicons/react": "^2.0.18",
     "audio-decode": "^2.2.2",
     "audiobuffer-to-wav": "^1.0.0",
