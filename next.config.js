@@ -26,16 +26,32 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'placehold.co',
         pathname: '**'
+      },
+      {
+        protocol: 'https',
+        hostname: 'd1r94114aksajj.cloudfront.net',
+        pathname: '**'
       }
     ]
   },
-  // Add headers for cross-origin audio playback
   async headers() {
     return [
       {
-        // For all routes, including API routes
+        // For all routes
         source: '/(.*)',
         headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*'
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, HEAD, OPTIONS'
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: '*'
+          },
           {
             key: 'Cross-Origin-Opener-Policy',
             value: 'same-origin'
@@ -47,28 +63,6 @@ const nextConfig = {
           {
             key: 'Cross-Origin-Resource-Policy',
             value: 'cross-origin'
-          }
-        ]
-      },
-      {
-        // Specific headers for the proxy API route
-        source: '/api/proxy/:path*',
-        headers: [
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: '*'
-          },
-          {
-            key: 'Access-Control-Allow-Methods',
-            value: 'GET, OPTIONS'
-          },
-          {
-            key: 'Access-Control-Allow-Headers',
-            value: 'Content-Type, Authorization'
-          },
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=3600'
           }
         ]
       }

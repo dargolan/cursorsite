@@ -10,6 +10,7 @@ import { Tag, Stem, Track, CartItem } from '../../types';
 import Header from '../../components/Header';
 import Image from 'next/image';
 import { getTracks, getTags, getTracksByTags, searchTracks } from '../../services/strapi';
+import { STRAPI_URL } from '../../config/strapi';
 import { useCart } from '../../contexts/CartContext';
 import AudioPlayer from '../../components/AudioPlayer';
 import Footer from '../../components/Footer';
@@ -60,19 +61,15 @@ export default function MusicLibrary() {
     try {
       console.log('Fetching tracks and tags...');
       
-      // Test direct fetch to check API connection - with more detailed debug info
+      // Add more detailed logging
+      console.log('Environment variables:');
+      console.log('STRAPI_API_URL:', process.env.NEXT_PUBLIC_STRAPI_API_URL);
+      console.log('Has API Token:', !!process.env.NEXT_PUBLIC_STRAPI_API_TOKEN);
+      
+      // Test direct fetch to check API connection
       try {
         const testUrl = 'http://localhost:1337/api/tracks?populate=*';
         console.log('Testing API connection directly to:', testUrl);
-        
-        // Test if we can reach the Strapi server at all
-        try {
-          const pingResponse = await fetch('http://localhost:1337/admin/ping');
-          const pingText = await pingResponse.text();
-          console.log('Ping response from Strapi server:', pingText);
-        } catch (e) {
-          console.error('Failed to ping Strapi server:', e);
-        }
         
         const testResponse = await fetch(testUrl, {
           method: 'GET',
@@ -84,11 +81,13 @@ export default function MusicLibrary() {
         
         if (!testResponse.ok) {
           console.error(`API test failed with status: ${testResponse.status} ${testResponse.statusText}`);
+          const errorText = await testResponse.text();
+          console.error('Error response:', errorText);
           throw new Error(`API returned ${testResponse.status}`);
         }
         
         const testData = await testResponse.json();
-        console.log('Direct API test successful. Response:', testData);
+        console.log('Direct API test successful. Full response:', JSON.stringify(testData, null, 2));
       } catch (e) {
         console.error('Direct API test failed:', e);
       }
@@ -96,6 +95,7 @@ export default function MusicLibrary() {
       // Fetch tracks
       const tracksData = await getTracks();
       console.log('Tracks fetched:', tracksData.length);
+      console.log('Track data:', JSON.stringify(tracksData, null, 2));
       setTracks(tracksData);
       setFilteredTracks(tracksData);
       

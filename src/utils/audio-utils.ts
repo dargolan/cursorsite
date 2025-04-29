@@ -1,5 +1,5 @@
 // Audio utility functions extracted from AudioPlayer.tsx
-import { STRAPI_URL } from '../services/strapi';
+import { STRAPI_URL } from '../config/strapi';
 
 // Format seconds into MM:SS format
 export function formatTime(time: number): string {

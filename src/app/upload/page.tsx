@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import FileUpload from '@/components/FileUpload';
 import ImageUpload from '@/components/ImageUpload';
 import TagSelector from '@/components/TagSelector';
 import PageContainer from '@/components/PageContainer';
 import ContentWrapper from '@/components/ContentWrapper';
 import { PlusCircleIcon, TrashIcon, ArrowDownTrayIcon, PhotoIcon } from '@heroicons/react/24/outline';
+import { v4 as uuidv4 } from 'uuid';
+import { Tag } from '../../types';
 
 interface UploadedFile {
   filename: string;
@@ -22,50 +24,106 @@ export default function UploadPage() {
   const [stems, setStems] = useState<UploadedFile[]>([]);
   const [stemPrices, setStemPrices] = useState<{[key: string]: string}>({});
   const [trackTitle, setTrackTitle] = useState('');
-  const [genreTags, setGenreTags] = useState<string[]>([]);
-  const [moodTags, setMoodTags] = useState<string[]>([]);
-  const [instrumentTags, setInstrumentTags] = useState<string[]>([]);
+  const [genreTags, setGenreTags] = useState<Tag[]>([]);
+  const [moodTags, setMoodTags] = useState<Tag[]>([]);
+  const [instrumentTags, setInstrumentTags] = useState<Tag[]>([]);
   const [bpm, setBpm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showStemUpload, setShowStemUpload] = useState(false);
+  const [trackId, setTrackId] = useState<string>(uuidv4());
+  const [selectedMainFile, setSelectedMainFile] = useState<File | null>(null);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [selectedStemFiles, setSelectedStemFiles] = useState<File[]>([]);
+  const [isUploadingMain, setIsUploadingMain] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isUploadingStems, setIsUploadingStems] = useState(false);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
 
-  const handleMainTrackUploaded = (fileData: UploadedFile) => {
-    setMainTrack(fileData);
-    setShowStemUpload(true);
-  };
+  useEffect(() => {
+    async function fetchTags() {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_API_URL || 'http://localhost:1337/api'}/tags?pagination[pageSize]=100`);
+        const data = await res.json();
+        // Strapi v4 returns { data: [ ... ] }
+        const tags = data.data ? data.data.map((item: any) => ({
+          id: item.id,
+          ...item.attributes
+        })) : [];
+        setAllTags(tags);
+      } catch (err) {
+        console.error('Failed to fetch tags from Strapi', err);
+      }
+    }
+    fetchTags();
+  }, []);
 
-  const handleImageUploaded = (fileData: UploadedFile) => {
-    setTrackImage(fileData);
-  };
-
-  const handleStemUploaded = (fileData: UploadedFile) => {
-    // Initialize price for this stem
-    setStemPrices(prev => ({
-      ...prev,
-      [fileData.filename]: '4.99' // Default price
-    }));
-    setStems(prev => [...prev, fileData]);
-  };
-
-  const handleMultipleStemsUploaded = (filesData: UploadedFile[]) => {
-    // Initialize prices for all new stems
-    const newPrices = { ...stemPrices };
-    filesData.forEach(file => {
-      newPrices[file.filename] = '4.99'; // Default price
+  // Helper to upload a file to /api/upload
+  const uploadFile = async (file: File, fileType: 'main' | 'stem' | 'image') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('fileType', fileType);
+    formData.append('trackId', trackId);
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
     });
-    setStemPrices(newPrices);
-    
-    // Add all stems to the list
-    setStems(prev => [...prev, ...filesData]);
+    if (!res.ok) throw new Error('Upload failed');
+    return res.json();
   };
 
-  const handleStemPriceChange = (stemFilename: string, price: string) => {
-    setStemPrices(prev => ({
-      ...prev,
-      [stemFilename]: price
-    }));
+  // New handlers for file selection
+  const handleMainFileSelected = (file: File) => setSelectedMainFile(file);
+  const handleImageFileSelected = (file: File) => setSelectedImageFile(file);
+  const handleStemFilesSelected = (files: File[]) => setSelectedStemFiles(files);
+
+  // Upload handlers
+  const handleUploadMainTrack = async () => {
+    if (!selectedMainFile) return;
+    setIsUploadingMain(true);
+    try {
+      const fileData = await uploadFile(selectedMainFile, 'main');
+      setMainTrack(fileData);
+      setShowStemUpload(true);
+      setSelectedMainFile(null);
+    } catch (err) {
+      setSubmitError('Failed to upload main track');
+    } finally {
+      setIsUploadingMain(false);
+    }
+  };
+  const handleUploadImage = async () => {
+    if (!selectedImageFile) return;
+    setIsUploadingImage(true);
+    try {
+      const fileData = await uploadFile(selectedImageFile, 'image');
+      setTrackImage(fileData);
+      setSelectedImageFile(null);
+    } catch (err) {
+      setSubmitError('Failed to upload cover image');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+  const handleUploadStems = async () => {
+    if (!selectedStemFiles.length) return;
+    setIsUploadingStems(true);
+    const uploadedStems: UploadedFile[] = [];
+    const newPrices = { ...stemPrices };
+    for (const file of selectedStemFiles) {
+      try {
+        const fileData = await uploadFile(file, 'stem');
+        uploadedStems.push(fileData);
+        newPrices[fileData.filename] = '1.99';
+      } catch (err) {
+        setSubmitError('Failed to upload one or more stems');
+      }
+    }
+    setStemPrices(newPrices);
+    setStems(prev => [...prev, ...uploadedStems]);
+    setSelectedStemFiles([]);
+    setIsUploadingStems(false);
   };
 
   const handleBpmDetected = (detectedBpm: number) => {
@@ -94,51 +152,54 @@ export default function UploadPage() {
     setTrackImage(null);
   };
 
+  const handleStemPriceChange = (stemFilename: string, price: string) => {
+    setStemPrices(prev => ({
+      ...prev,
+      [stemFilename]: price
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!mainTrack) {
       setSubmitError('Please upload a main track');
       return;
     }
-
     if (!trackImage) {
       setSubmitError('Please upload a cover image');
       return;
     }
-
     if (genreTags.length === 0) {
       setSubmitError('Please select at least one genre tag');
       return;
     }
-
     setIsSubmitting(true);
     setSubmitError(null);
-    
     try {
-      // For now, we'll just simulate a submission
-      // In a real app, you'd submit this data to your backend
-      console.log('Submitting track data:', {
-        title: trackTitle,
-        genres: genreTags,
-        moods: moodTags,
-        instruments: instrumentTags,
-        bpm: parseInt(bpm),
-        mainTrack,
-        trackImage,
-        stems: stems.map(stem => ({
-          ...stem,
-          price: parseFloat(stemPrices[stem.filename] || '0')
-        }))
+      // Prepare stems data for backend
+      const stemsData = stems.map(stem => ({
+        name: stem.originalName,
+        url: stem.url,
+        price: parseFloat(stemPrices[stem.filename] || '0'),
+        duration: 0 // You can add duration extraction if available
+      }));
+      // POST metadata to /api/tracks/create
+      const res = await fetch('/api/tracks/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: trackTitle,
+          bpm: parseInt(bpm),
+          duration: 0, // You can add duration extraction if available
+          tags: [...genreTags, ...moodTags, ...instrumentTags].map(tag => tag.id),
+          audioUrl: mainTrack.url,
+          imageUrl: trackImage.url,
+          stems: stemsData,
+          trackId,
+        })
       });
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Show success message
+      if (!res.ok) throw new Error('Failed to save track metadata');
       setSubmitSuccess(true);
-      
-      // Reset form after 3 seconds
       setTimeout(() => {
         setMainTrack(null);
         setTrackImage(null);
@@ -151,14 +212,18 @@ export default function UploadPage() {
         setBpm('');
         setShowStemUpload(false);
         setSubmitSuccess(false);
+        setTrackId(uuidv4());
       }, 3000);
-      
     } catch (error: any) {
       setSubmitError(error.message || 'Error submitting track');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const genreAvailableTags = allTags.filter(tag => tag.type === 'genre');
+  const moodAvailableTags = allTags.filter(tag => tag.type === 'mood');
+  const instrumentAvailableTags = allTags.filter(tag => tag.type === 'instrument');
 
   return (
     <PageContainer className="min-h-screen bg-gray-50">
@@ -215,6 +280,7 @@ export default function UploadPage() {
                         category="genre" 
                         selectedTags={genreTags} 
                         onChange={setGenreTags} 
+                        availableTags={genreAvailableTags}
                       />
                     </div>
                     
@@ -226,6 +292,7 @@ export default function UploadPage() {
                         category="mood" 
                         selectedTags={moodTags} 
                         onChange={setMoodTags} 
+                        availableTags={moodAvailableTags}
                       />
                     </div>
                     
@@ -237,6 +304,7 @@ export default function UploadPage() {
                         category="instrument" 
                         selectedTags={instrumentTags} 
                         onChange={setInstrumentTags} 
+                        availableTags={instrumentAvailableTags}
                       />
                     </div>
                   </div>
@@ -250,33 +318,17 @@ export default function UploadPage() {
                     </p>
                     
                     <div className="space-y-4">
-                      {!mainTrack ? (
-                        <FileUpload 
-                          onFileUploaded={handleMainTrackUploaded} 
-                          analyzeBpm={true}
-                          onBpmDetected={handleBpmDetected}
-                          label="Upload main track"
-                          fileType="main"
-                        />
-                      ) : (
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          <div className="flex items-center">
-                            <ArrowDownTrayIcon className="h-10 w-10 text-accent flex-shrink-0" />
-                            <div className="ml-3 flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">{mainTrack.originalName}</p>
-                              <p className="text-xs text-gray-500">
-                                {(mainTrack.size / (1024 * 1024)).toFixed(2)} MB
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={removeMainTrack}
-                              className="flex-shrink-0 ml-2 p-1 rounded-full hover:bg-gray-200"
-                            >
-                              <TrashIcon className="h-5 w-5 text-gray-500" />
-                            </button>
-                          </div>
-                        </div>
+                      <FileUpload 
+                        onFileSelected={handleMainFileSelected} 
+                        analyzeBpm={true}
+                        onBpmDetected={handleBpmDetected}
+                        label="Upload main track"
+                        fileType="main"
+                      />
+                      {selectedMainFile && (
+                        <button onClick={handleUploadMainTrack} disabled={isUploadingMain} className="mt-2 bg-accent text-white rounded px-4 py-2">
+                          {isUploadingMain ? 'Uploading...' : 'Upload Main Track'}
+                        </button>
                       )}
                     </div>
                   </div>
@@ -288,30 +340,14 @@ export default function UploadPage() {
                     </p>
                     
                     <div className="space-y-4">
-                      {!trackImage ? (
-                        <ImageUpload 
-                          onImageUploaded={handleImageUploaded} 
-                          label="Upload cover image"
-                        />
-                      ) : (
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          <div className="flex items-center">
-                            <PhotoIcon className="h-10 w-10 text-accent flex-shrink-0" />
-                            <div className="ml-3 flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">{trackImage.originalName}</p>
-                              <p className="text-xs text-gray-500">
-                                {(trackImage.size / (1024 * 1024)).toFixed(2)} MB
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={removeTrackImage}
-                              className="flex-shrink-0 ml-2 p-1 rounded-full hover:bg-gray-200"
-                            >
-                              <TrashIcon className="h-5 w-5 text-gray-500" />
-                            </button>
-                          </div>
-                        </div>
+                      <ImageUpload 
+                        onImageSelected={handleImageFileSelected} 
+                        label="Upload cover image"
+                      />
+                      {selectedImageFile && (
+                        <button onClick={handleUploadImage} disabled={isUploadingImage} className="mt-2 bg-accent text-white rounded px-4 py-2">
+                          {isUploadingImage ? 'Uploading...' : 'Upload Cover Image'}
+                        </button>
                       )}
                     </div>
                   </div>
@@ -326,12 +362,16 @@ export default function UploadPage() {
                     
                     <div className="space-y-4">
                       <FileUpload 
-                        onFileUploaded={handleStemUploaded}
-                        onMultipleFilesUploaded={handleMultipleStemsUploaded}
+                        onMultipleFilesSelected={handleStemFilesSelected}
                         label="Upload stems"
                         fileType="stem"
                         multiple={true}
                       />
+                      {selectedStemFiles.length > 0 && (
+                        <button onClick={handleUploadStems} disabled={isUploadingStems} className="mt-2 bg-accent text-white rounded px-4 py-2">
+                          {isUploadingStems ? 'Uploading...' : `Upload ${selectedStemFiles.length} Stems`}
+                        </button>
+                      )}
                       
                       {stems.length > 0 && (
                         <div className="mt-4">
@@ -355,7 +395,7 @@ export default function UploadPage() {
                                       </div>
                                       <input
                                         type="number"
-                                        value={stemPrices[stem.filename] || ''}
+                                        value={stemPrices[stem.filename] || '1.99'}
                                         onChange={(e) => handleStemPriceChange(stem.filename, e.target.value)}
                                         min="0"
                                         step="0.01"

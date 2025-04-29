@@ -1,4 +1,4 @@
-import { STRAPI_URL } from '../services/strapi';
+import { STRAPI_URL } from '../config/strapi';
 
 // Cache for storing discovered stem URLs to avoid repeated API calls
 const stemUrlCache: Record<string, string> = {};

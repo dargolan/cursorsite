@@ -3,7 +3,8 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Tag, Stem, Track, CartItem } from '../types';
-import { findFileInStrapiByName, STRAPI_URL } from '../services/strapi';
+import { STRAPI_URL } from '../config/strapi';
+import { findFileInStrapiByName } from '../utils/strapi-helpers';
 import { findStemFileUrl as helperFindStemFileUrl } from '../utils/audio-helpers';
 import { createAudio, convertUrlToProxyUrl } from '../lib/audio';
 import { useCart } from '../contexts/CartContext';
@@ -834,63 +835,60 @@ export default function AudioPlayer({
   // Initialize audio element
   useEffect(() => {
     if (!audioRef.current) {
-      // Use the convertUrlToProxyUrl function to handle CORS
-      const proxyUrl = convertUrlToProxyUrl(track.audioUrl);
-      console.log(`Converting main track URL from ${track.audioUrl} to ${proxyUrl}`);
-      
       // Create audio with cross-origin settings
-      audioRef.current = new Audio();
-      audioRef.current.crossOrigin = 'anonymous';
-      audioRef.current.src = proxyUrl;
+      const audio = new Audio();
+      audio.crossOrigin = "anonymous";
+      
+      // Use the CloudFront URL directly
+      const audioUrl = track.audioUrl;
+      console.log(`Initializing audio with URL: ${audioUrl}`);
+      audio.src = audioUrl;
       
       // Add data attributes for identification
-      if (audioRef.current) {
-        audioRef.current.dataset.track = track.title;
-        audioRef.current.dataset.trackId = track.id;
-        audioRef.current.dataset.isMainTrack = 'true';
-      }
+      audio.dataset.track = track.title;
+      audio.dataset.trackId = track.id;
+      audio.dataset.isMainTrack = 'true';
       
       // Add event listeners
-      audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
-      audioRef.current.addEventListener('ended', handleAudioEnded);
+      audio.addEventListener('timeupdate', handleTimeUpdate);
+      audio.addEventListener('ended', handleAudioEnded);
       
-      // Add error and canplaythrough handlers
-      audioRef.current.addEventListener('error', () => {
-        console.error(`Error loading main audio: ${proxyUrl} (original: ${track.audioUrl})`);
+      // Add error and canplaythrough handlers with detailed logging
+      audio.addEventListener('error', (e) => {
+        const error = e.target as HTMLAudioElement;
+        console.error(`Error loading main audio: ${audioUrl}`, {
+          error: error.error,
+          networkState: error.networkState,
+          readyState: error.readyState
+        });
         setMainAudioError(true);
       });
       
-      audioRef.current.addEventListener('canplaythrough', () => {
-        console.log(`Main audio loaded successfully: ${proxyUrl}`);
+      audio.addEventListener('canplaythrough', () => {
+        console.log(`Main audio loaded successfully: ${audioUrl}`);
         setMainAudioLoaded(true);
       });
+
+      audioRef.current = audio;
     } else {
-      // Use the convertUrlToProxyUrl function for updates too
-      const proxyUrl = convertUrlToProxyUrl(track.audioUrl);
-      console.log(`Updating main track URL from ${track.audioUrl} to ${proxyUrl}`);
-      audioRef.current.src = proxyUrl;
+      // Update existing audio element
+      console.log(`Updating audio source to: ${track.audioUrl}`);
+      audioRef.current.src = track.audioUrl;
       
       // Update data attributes
       audioRef.current.dataset.track = track.title;
       audioRef.current.dataset.trackId = track.id;
       audioRef.current.dataset.isMainTrack = 'true';
     }
-    
-      return () => {
+
+    // Cleanup function
+    return () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
         audioRef.current.removeEventListener('ended', handleAudioEnded);
-        
-        // If this audio element is the active one in the global manager, remove it
-        if (globalAudioManager.activeAudio === audioRef.current) {
-          globalAudioManager.stop();
-        }
-        
-        audioRef.current.pause();
-        audioRef.current = null;
       }
     };
-  }, [track.id, track.audioUrl, track.title]);
+  }, [track.audioUrl, track.title, track.id]);
   
   // Handle time updates from audio element
   const handleTimeUpdate = () => {

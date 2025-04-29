@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { STRAPI_URL } from '../../../services/strapi';
+import { STRAPI_URL } from '../../../config/strapi';
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {

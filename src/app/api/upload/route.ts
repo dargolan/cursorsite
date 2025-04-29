@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
+import { uploadToS3 } from '@/lib/s3';
 import { v4 as uuidv4 } from 'uuid';
 import { ensureUploadsDirectory, validateFileType, getExtensionFromMimeType } from '@/lib/upload-helpers';
 
@@ -40,35 +39,42 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Create unique filename
+    // Get or generate trackId
+    let trackId = formData.get('trackId') as string | null;
+    if (!trackId) {
+      trackId = uuidv4();
+    }
+
+    // Create unique filename and S3 key
     const originalName = file.name;
     let extension: string;
-    let prefix: string;
-    
+    let s3Key: string;
+    let filename: string;
     if (fileType === 'image') {
       extension = file.name.split('.').pop() || 'jpg';
-      prefix = 'cover_';
+      filename = `cover.${extension}`;
+      s3Key = `tracks/${trackId}/${filename}`;
+    } else if (fileType === 'main') {
+      extension = getExtensionFromMimeType(file.type);
+      filename = `main.${extension}`;
+      s3Key = `tracks/${trackId}/${filename}`;
     } else {
       extension = getExtensionFromMimeType(file.type);
-      prefix = fileType === 'main' ? 'main_' : 'stem_';
+      filename = `${originalName.replace(/\s+/g, '_')}`;
+      s3Key = `tracks/${trackId}/stems/${filename}`;
     }
-    
-    const uniqueFilename = `${prefix}${uuidv4()}.${extension}`;
 
-    // Create appropriate directory structure
-    const uploadsDir = ensureUploadsDirectory();
-    const filepath = join(uploadsDir, uniqueFilename);
+    // Upload file to S3
+    const s3Url = await uploadToS3(buffer, s3Key, file.type);
 
-    // Save file to disk
-    await writeFile(filepath, buffer);
-
-    // Return response with file details
+    // Return response with file details and trackId
     return NextResponse.json({
       success: true,
-      filename: uniqueFilename,
+      trackId,
+      filename,
       originalName,
       size: file.size,
-      url: `/uploads/${uniqueFilename}`,
+      url: s3Url,
       fileType
     });
   } catch (error: any) {

@@ -5,8 +5,8 @@ import { CloudArrowUpIcon, DocumentIcon, XMarkIcon } from '@heroicons/react/24/o
 import { analyzeBPM } from '@/lib/audio-analyzer';
 
 interface FileUploadProps {
-  onFileUploaded?: (fileData: any) => void;
-  onMultipleFilesUploaded?: (filesData: any[]) => void;
+  onFileSelected?: (file: File) => void;
+  onMultipleFilesSelected?: (files: File[]) => void;
   acceptedTypes?: string;
   maxSizeMB?: number;
   label?: string;
@@ -17,8 +17,8 @@ interface FileUploadProps {
 }
 
 export default function FileUpload({
-  onFileUploaded,
-  onMultipleFilesUploaded,
+  onFileSelected,
+  onMultipleFilesSelected,
   acceptedTypes = "audio/mpeg,audio/wav,audio/mp3",
   maxSizeMB = 50,
   label = "Upload audio file",
@@ -31,19 +31,15 @@ export default function FileUpload({
   const [files, setFiles] = useState<File[]>([]);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (multiple && e.target.files && e.target.files.length > 0) {
-      // Handle multiple files
       const selectedFiles = Array.from(e.target.files);
       handleMultipleFiles(selectedFiles);
     } else {
-      // Handle single file
       const selectedFile = e.target.files?.[0];
       if (!selectedFile) return;
       validateAndSetFile(selectedFile);
@@ -52,27 +48,18 @@ export default function FileUpload({
 
   const validateAndSetFile = (selectedFile: File) => {
     setError(null);
-    
-    // Check file type
     const validTypes = acceptedTypes.split(',');
     if (!validTypes.includes(selectedFile.type)) {
       setError(`Invalid file type. Accepted formats: ${validTypes.map(t => t.split('/')[1]).join(', ')}`);
       return;
     }
-    
-    // Check file size
     const maxSizeBytes = maxSizeMB * 1024 * 1024;
     if (selectedFile.size > maxSizeBytes) {
       setError(`File is too large. Maximum size: ${maxSizeMB}MB`);
       return;
     }
-    
     setFile(selectedFile);
-    
-    // Set preview information
     setPreview(selectedFile.name);
-    
-    // Analyze BPM if needed
     if (analyzeBpm && onBpmDetected) {
       setIsAnalyzing(true);
       analyzeBPM(selectedFile)
@@ -86,35 +73,32 @@ export default function FileUpload({
           setIsAnalyzing(false);
         });
     }
+    if (onFileSelected) {
+      onFileSelected(selectedFile);
+    }
   };
 
   const handleMultipleFiles = (selectedFiles: File[]) => {
     setError(null);
-    
-    // Validate all files
     const validTypes = acceptedTypes.split(',');
     const maxSizeBytes = maxSizeMB * 1024 * 1024;
-    
-    // Check if any file fails validation
     const invalidFile = selectedFiles.find(file => {
       if (!validTypes.includes(file.type)) {
         setError(`Invalid file type in "${file.name}". Accepted formats: ${validTypes.map(t => t.split('/')[1]).join(', ')}`);
         return true;
       }
-      
       if (file.size > maxSizeBytes) {
         setError(`"${file.name}" is too large. Maximum size: ${maxSizeMB}MB`);
         return true;
       }
-      
       return false;
     });
-    
     if (invalidFile) return;
-    
-    // All files are valid
     setFiles(selectedFiles);
     setPreview(`${selectedFiles.length} files selected`);
+    if (onMultipleFilesSelected) {
+      onMultipleFilesSelected(selectedFiles);
+    }
   };
 
   const handleDragOver = (e: DragEvent) => {
@@ -143,94 +127,11 @@ export default function FileUpload({
     }
   };
 
-  const uploadFile = async () => {
-    if (!file && files.length === 0) return;
-    
-    setUploading(true);
-    setProgress(0);
-    setError(null);
-    
-    try {
-      if (multiple && files.length > 0) {
-        // Upload multiple files
-        const uploadPromises = files.map(async (file, index) => {
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('fileType', fileType);
-          
-          const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Upload failed for ${file.name}`);
-          }
-          
-          // Update progress after each file
-          setProgress(Math.round((index + 1) / files.length * 100));
-          
-          return response.json();
-        });
-        
-        const results = await Promise.all(uploadPromises);
-        
-        // Call the callback with all uploaded file data
-        if (onMultipleFilesUploaded) {
-          onMultipleFilesUploaded(results);
-        }
-        
-      } else if (file) {
-        // Upload single file
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('fileType', fileType);
-        
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Upload failed');
-        }
-        
-        const data = await response.json();
-        
-        // Call the callback with upload data
-        if (onFileUploaded) {
-          onFileUploaded({
-            ...data,
-            fileType
-          });
-        }
-        
-        setProgress(100);
-      }
-      
-      // Clear file after successful upload
-      setTimeout(() => {
-        setFile(null);
-        setFiles([]);
-        setPreview(null);
-        setProgress(0);
-        setUploading(false);
-      }, 1500);
-      
-    } catch (err: any) {
-      setError(err.message || 'Error uploading file');
-      setUploading(false);
-    }
-  };
-
   const removeFile = () => {
     setFile(null);
     setFiles([]);
     setPreview(null);
     setError(null);
-    setProgress(0);
     
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -302,25 +203,6 @@ export default function FileUpload({
               <XMarkIcon className="h-5 w-5 text-gray-500" />
             </button>
           </div>
-          
-          {uploading ? (
-            <div className="mt-3">
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-accent h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                ></div>
-              </div>
-              <p className="text-xs text-center mt-1 text-gray-500">Uploading: {progress}%</p>
-            </div>
-          ) : (
-            <button
-              onClick={uploadFile}
-              className="mt-3 w-full py-2 px-4 bg-accent text-gray-900 rounded-md text-sm font-medium hover:bg-accent/80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
-            >
-              Upload {multiple && files.length > 0 ? `${files.length} Files` : 'File'}
-            </button>
-          )}
         </div>
       )}
       

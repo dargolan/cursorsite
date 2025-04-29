@@ -188,8 +188,8 @@ export default function HomePage() {
         
         {/* Hero Section */}
         <section className="relative w-full px-8 py-4 md:py-6 mt-16">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center">
-            <div className="w-full md:w-1/2 mb-4 md:mb-0 md:pr-8 flex flex-col justify-center">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch">
+            <div className="w-full md:w-1/2 flex flex-col justify-center">
               <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-6">
                 You've Just Discovered the <span className="text-[#1DF7CE]">Secret Stash</span>
               </h1>
@@ -202,13 +202,13 @@ export default function HomePage() {
                 </Link>
               </div>
             </div>
-            <div className="w-full md:w-1/2 relative">
-              <div className="aspect-[21/9] h-[360px] md:h-[400px]">
+            <div className="w-full md:w-1/2 flex items-stretch">
+              <div className="w-full h-full relative">
                 <Image
-                  src="/images/herotest.jpg"
+                  src="/images/herotest.png"
                   alt="Music studio workspace"
                   fill
-                  className="rounded-lg shadow-2xl object-cover"
+                  className="object-contain w-full h-full"
                   priority
                 />
               </div>

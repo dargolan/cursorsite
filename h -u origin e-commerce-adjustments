@@ -1,0 +1,9 @@
+  APRIL_10TH            [m c3c0dc9 [[34morigin/APRIL_10TH[m] Fix stem audio loading with proxy URLs and CORS handling
+  Store-Testing         [m 35bdd04 [[34morigin/Store-Testing[m] Fix remaining code issues and structure
+  code-restructure      [m 0cf23be Clean up code by removing excessive console.log statements and backup files
+  connecting-to-store   [m 31b23e1 [[34morigin/connecting-to-store[m] Project cleanup and organization: removed duplicates, improved code structure, extracted components
+* [32me-commerce-adjustments[m 208cff1 Save current progress from PC
+  main                  [m 8b5d169 [[34morigin/main[m] Fix proxy route handler by rebuilding file without duplications
+  new-feature           [m 1cc9529 [[34morigin/new-feature[m] Fix duplicate export of findStemFile and improve stem playback
+  stems-design          [m ca1ffc6 Implemented stem playback with solo/mute functionality and progress bars
+  waveform-test         [m e325221 Enhance UI: Adjusted layout spacing, improved filter sidebar, and fixed audio player layout

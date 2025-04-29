@@ -1,4 +1,4 @@
-import { STRAPI_URL } from "../../../../services/strapi";
+import { STRAPI_URL } from "../../../../config/strapi";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 

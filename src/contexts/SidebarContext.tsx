@@ -19,20 +19,15 @@ export const SidebarProvider = ({ children }: { children: ReactNode }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
-    // Always default to expanded sidebar (false) on the homepage
-    if (pathname === '/' || pathname === '/explore') {
-      setIsCollapsed(false);
+    // Check localStorage for saved preference
+    const savedIsCollapsed = localStorage.getItem('sidebarCollapsed');
+    
+    if (savedIsCollapsed !== null) {
+      // Use saved preference if available
+      setIsCollapsed(savedIsCollapsed === 'true');
     } else {
-      // For other pages, check localStorage
-      const savedIsCollapsed = localStorage.getItem('sidebarCollapsed');
-      
-      if (savedIsCollapsed !== null) {
-        // Use saved preference if available (but not on homepage)
-        setIsCollapsed(savedIsCollapsed === 'true');
-      } else {
-        // Default behavior: collapsed for other pages
-        setIsCollapsed(true);
-      }
+      // Default to expanded (false) if no preference is saved
+      setIsCollapsed(false);
     }
   }, [pathname]);
 

@@ -82,7 +82,7 @@ A marketplace platform for musicians to buy and sell individual stems from audio
 - 🔄 Building user profile pages
 
 #### Backend
-- 🔄 Finalizing S3 configuration for production
+- ✅ Finalizing S3 configuration for production
 - 🔄 Setting up Stripe payment integration
 - 🔄 Implementing analytics for track plays and downloads
 
@@ -99,18 +99,46 @@ A marketplace platform for musicians to buy and sell individual stems from audio
 - ⬜ Implement caching strategy for popular content
 - ⬜ Set up CI/CD pipeline for automated deployment
 - ⬜ Add email notification system for purchases and updates
-- ⬜ Set up S3/CDN integration (AWS setup pending)
-- ⬜ Create upload interface
+- ✅ Set up S3/CDN integration (AWS setup pending)
+- ✅ Create upload interface
 - ⬜ Implement metadata extraction
 - ⬜ Set up e-commerce integration
 
 #### General
+- ✅ Started the Next.js development server and Strapi backend
 - ⬜ Comprehensive testing (unit, integration, e2e)
 - ⬜ SEO optimization
 - ⬜ Analytics integration
 - ⬜ Documentation for API endpoints and component library
 
 ## Recent Updates
+
+### Progress Since Latest Environment Update (May 2025)
+
+- **Environment variables**: Updated `.env.local` to set Strapi API and Media URLs, which are now used by the app and proxy for all media and API requests.
+- **AWS S3 Configuration**: Set up multiple S3 buckets for the project:
+  - `dargo-music-library`: Initial music library storage
+  - `dargo-strapi-media`: Strapi CMS media storage
+  - `wave-cave-audio`: Production audio files (selected as primary bucket)
+  - `wave-cave-audio-dev`: Development environment audio files
+- **S3 Integration Steps**:
+  - Created and configured S3 buckets with appropriate permissions
+  - Selected `wave-cave-audio` as the production bucket
+  - Added bucket name to `.env.local` for use by the application
+  - Updated environment variables to point to the correct S3 endpoints
+- **Tag system refactor**: Migrated the tag system to use Tag objects throughout the codebase. The `TagSelector` component and all tag-related state now use `Tag` objects (`id`, `name`, `type`) instead of strings. This improves filtering, display, and backend integration for tags. The upload page and any future tag-related features now expect and handle Tag objects.
+- **Documentation**: Updated both `README.md` and `DOCUMENTATION.md` to reflect the tag system migration and environment changes.
+- **Migration plan**: Added a comprehensive website overview and executed a step-by-step migration plan for the tag system.
+- **Development servers**: Started the Next.js development server and Strapi backend. The app is running and proxying requests to Strapi. Proxy errors for missing media files were observed, but the main application and tag system refactor are functioning as intended.
+
+### Tag System Refactor (May 2025)
+
+The tag selection system has been refactored to use Tag objects throughout the codebase:
+
+- The `TagSelector` component and all tag-related state now use `Tag` objects (with `id`, `name`, and `type`) instead of plain strings.
+- This change improves filtering, display, and backend integration for tags.
+- The upload page and any future tag-related features now expect and handle Tag objects.
+- Predefined tags are now objects, and custom tags are supported with full metadata.
 
 ### Cart System Update (April 20, 2025)
 
@@ -280,9 +308,10 @@ The codebase has undergone significant performance improvements with a focus on 
 
 #### S3/CDN Integration
 1. AWS S3 Configuration
-   - Bucket configuration
-   - Access credentials
-   - Region settings
+   - Bucket configuration: Selected `wave-cave-audio` as the production bucket
+   - Created additional buckets for development (`wave-cave-audio-dev`) and other purposes
+   - Access credentials configured in environment variables
+   - Region settings optimized for content delivery
 
 2. Upload Service
    - File validation
@@ -319,4 +348,18 @@ npm run build
 
 ## License
 
-This project is licensed under the MIT License. 
+This project is licensed under the MIT License.
+
+### AWS & CDN Environment Variables
+
+The following environment variables are required for media upload and delivery, and should be set in your `.env.local` file:
+
+```
+AWS_ACCESS_KEY_ID=A****B
+AWS_SECRET_ACCESS_KEY=G****Mg
+AWS_REGION=eu-north-1
+AWS_BUCKET_NAME=wave-cave-audio
+CDN_DOMAIN=d1r94114aksajj.cloudfront.net
+```
+
+These configure the app to use the production S3 bucket (`wave-cave-audio`) and the associated CloudFront CDN for fast, global media delivery. 

@@ -58,88 +58,41 @@ The codebase has undergone significant performance improvements with a focus on 
 
 These changes have significantly improved the codebase maintainability and application performance.
 
-## Getting Started
+## Tag System Refactor (May 2025)
 
-```bash
-# Install dependencies
-npm install
+The tag selection system has been refactored to use Tag objects throughout the codebase:
 
-# Start the development server
-npm run dev
+- The `TagSelector` component and all tag-related state now use `Tag` objects (with `id`, `name`, and `type`) instead of plain strings.
+- This change improves filtering, display, and backend integration for tags.
+- The upload page and any future tag-related features now expect and handle Tag objects.
+- Predefined tags are now objects, and custom tags are supported with full metadata.
 
-# Build for production
-npm run build
+## Progress Since Latest Environment Update (May 2025)
+
+### AWS & CDN Environment Variables
+
+The following environment variables are required for media upload and delivery, and should be set in your `.env.local` file:
+
+```
+AWS_ACCESS_KEY_ID=A****B
+AWS_SECRET_ACCESS_KEY=G****Mg
+AWS_REGION=eu-north-1
+AWS_BUCKET_NAME=wave-cave-audio
+CDN_DOMAIN=d1r94114aksajj.cloudfront.net
 ```
 
-## Features
+These configure the app to use the production S3 bucket (`wave-cave-audio`) and the associated CloudFront CDN for fast, global media delivery.
 
-- Browse and search for audio tracks
-- Preview individual stem components
-- Purchase and download stems
-- User account management
-- Producer profiles
-
-## License
-
-This project is licensed under the MIT License. 
-
-A marketplace platform for musicians to buy and sell individual stems from audio tracks.
-
-## Cart System Update (April 20, 2025)
-
-The cart system has been completely redesigned to use React Context API:
-
-1. **New CartContext**:
-   - Added a centralized `CartContext` to manage cart state globally
-   - All cart operations now use the `useCart()` hook for consistency
-   - Implemented proper localStorage synchronization across tabs
-
-2. **Migration from Legacy Implementation**:
-   - Removed direct localStorage access in components
-   - Deprecated the old `/services/cart.ts` functions
-   - Added backward compatibility layer for existing code
-
-3. **Type Improvements**:
-   - Aligned CartItem interfaces across the codebase
-   - Added proper type checking for cart operations
-
-To use the cart system, import the `useCart()` hook:
-
-```tsx
-import { useCart } from '@/contexts/CartContext';
-
-function MyComponent() {
-  const { items, addItem, removeItem, getItemCount, getTotalPrice } = useCart();
-  
-  // Use these functions to interact with the cart
-}
-```
-
-## Performance Improvements (April 10, 2025)
-
-The codebase has undergone significant performance improvements with a focus on the audio playback system:
-
-1. **Modular Architecture**:
-   - Split monolithic `AudioPlayer.tsx` (83KB) into smaller functional components
-   - Created reusable hooks for audio playback logic
-   - Extracted utility functions into dedicated files
-
-2. **Audio Management**:
-   - Enhanced `audio-manager.ts` to support better event handling
-   - Added support for stem-specific playback control
-   - Implemented efficient time updates (250ms intervals) to reduce CPU usage
-
-3. **React Optimizations**:
-   - Implemented component memoization to prevent unnecessary re-renders
-   - Used `useCallback` for event handlers to maintain referential stability
-   - Created custom hooks that encapsulate complex logic
-
-4. **Resource Management**:
-   - Added proper cleanup for audio resources
-   - Implemented better error handling for audio loading failures
-   - Created robust lifecycle management for audio elements
-
-These changes have significantly improved the codebase maintainability and application performance.
+- **Environment variables**: Updated `.env.local` to set Strapi API and Media URLs, which are now used by the app and proxy for all media and API requests.
+- **AWS S3 Configuration**: Set up multiple S3 buckets for the project:
+  - `dargo-music-library`: Initial music library storage
+  - `dargo-strapi-media`: Strapi CMS media storage
+  - `wave-cave-audio`: Production audio files (selected as primary bucket)
+  - `wave-cave-audio-dev`: Development environment audio files
+- **Tag system refactor**: Migrated the tag system to use Tag objects throughout the codebase. The `TagSelector` component and all tag-related state now use `Tag` objects (`id`, `name`, `type`) instead of strings. This improves filtering, display, and backend integration for tags. The upload page and any future tag-related features now expect and handle Tag objects.
+- **Documentation**: Updated both `README.md` and `DOCUMENTATION.md` to reflect the tag system migration and environment changes.
+- **Migration plan**: Added a comprehensive website overview and executed a step-by-step migration plan for the tag system.
+- **Development servers**: Started the Next.js development server and Strapi backend. The app is running and proxying requests to Strapi. Proxy errors for missing media files were observed, but the main application and tag system refactor are functioning as intended.
 
 ## Getting Started
 

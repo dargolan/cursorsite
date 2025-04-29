@@ -1,4 +1,4 @@
-import { STRAPI_URL, findStemFile } from '../services/strapi';
+import { STRAPI_URL } from '../config/strapi';
 import { getStemUrlFromCache, saveStemUrlToCache, clearStemUrlCache } from './stem-cache';
 import { convertUrlToProxyUrl } from '../lib/audio';
 

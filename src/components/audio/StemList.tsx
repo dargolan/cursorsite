@@ -5,7 +5,7 @@ import { Track, Stem } from '../../types';
 import { unifiedAudioManager } from '../../lib/unified-audio-manager';
 import { useCart } from '../../contexts/CartContext';
 import StemPlayer from '../StemPlayer';
-import { STRAPI_URL } from '../../services/strapi';
+import { STRAPI_URL } from '../../config/strapi';
 
 interface StemListProps {
   track: Track;

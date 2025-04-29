@@ -6,7 +6,7 @@ import { Track, Tag, Stem } from '../../types';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { useCart } from '../../contexts/CartContext';
 import { findStemFileUrl } from '../../utils/stem-url-manager';
-import { STRAPI_URL } from '../../services/strapi';
+import { STRAPI_URL } from '../../config/strapi';
 import PlayButton from './PlayButton';
 import WaveformVisualizer from './WaveformVisualizer';
 import StemPlayer from './StemPlayer';

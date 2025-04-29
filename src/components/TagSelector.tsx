@@ -1,160 +1,128 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { XMarkIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { Tag } from '../types';
 
 // Tag data by category
-const PREDEFINED_TAGS = {
+const PREDEFINED_TAGS: Record<'genre' | 'mood' | 'instrument', Tag[]> = {
   genre: [
-    'Hip Hop', 'R&B', 'Pop', 'Electronic', 'Rock', 'Jazz', 'Lo-Fi', 
-    'Trap', 'House', 'Ambient', 'Funk', 'Soul', 'EDM', 'Classical'
+    { id: 'hiphop', name: 'Hip Hop', type: 'genre' },
+    { id: 'rnb', name: 'R&B', type: 'genre' },
+    { id: 'pop', name: 'Pop', type: 'genre' },
+    { id: 'electronic', name: 'Electronic', type: 'genre' },
+    { id: 'rock', name: 'Rock', type: 'genre' },
+    { id: 'jazz', name: 'Jazz', type: 'genre' },
+    { id: 'lofi', name: 'Lo-Fi', type: 'genre' },
+    { id: 'trap', name: 'Trap', type: 'genre' },
+    { id: 'house', name: 'House', type: 'genre' },
+    { id: 'ambient', name: 'Ambient', type: 'genre' },
+    { id: 'funk', name: 'Funk', type: 'genre' },
+    { id: 'soul', name: 'Soul', type: 'genre' },
+    { id: 'edm', name: 'EDM', type: 'genre' },
+    { id: 'classical', name: 'Classical', type: 'genre' },
   ],
   mood: [
-    'Chill', 'Energetic', 'Happy', 'Sad', 'Aggressive', 'Relaxed', 
-    'Dark', 'Uplifting', 'Dreamy', 'Inspirational', 'Playful', 'Serious'
+    { id: 'chill', name: 'Chill', type: 'mood' },
+    { id: 'energetic', name: 'Energetic', type: 'mood' },
+    { id: 'happy', name: 'Happy', type: 'mood' },
+    { id: 'sad', name: 'Sad', type: 'mood' },
+    { id: 'aggressive', name: 'Aggressive', type: 'mood' },
+    { id: 'relaxed', name: 'Relaxed', type: 'mood' },
+    { id: 'dark', name: 'Dark', type: 'mood' },
+    { id: 'uplifting', name: 'Uplifting', type: 'mood' },
+    { id: 'dreamy', name: 'Dreamy', type: 'mood' },
+    { id: 'inspirational', name: 'Inspirational', type: 'mood' },
+    { id: 'playful', name: 'Playful', type: 'mood' },
+    { id: 'serious', name: 'Serious', type: 'mood' },
   ],
   instrument: [
-    'Piano', 'Guitar', 'Drums', 'Bass', 'Synth', 'Vocals', 'Strings',
-    'Brass', 'Woodwinds', 'Percussion', 'Electric Guitar', 'Acoustic Guitar',
-    'Keyboard', 'Saxophone', 'Trumpet'
-  ]
+    { id: 'piano', name: 'Piano', type: 'instrument' },
+    { id: 'guitar', name: 'Guitar', type: 'instrument' },
+    { id: 'drums', name: 'Drums', type: 'instrument' },
+    { id: 'bass', name: 'Bass', type: 'instrument' },
+    { id: 'synth', name: 'Synth', type: 'instrument' },
+    { id: 'vocals', name: 'Vocals', type: 'instrument' },
+    { id: 'strings', name: 'Strings', type: 'instrument' },
+    { id: 'brass', name: 'Brass', type: 'instrument' },
+    { id: 'woodwinds', name: 'Woodwinds', type: 'instrument' },
+    { id: 'percussion', name: 'Percussion', type: 'instrument' },
+    { id: 'electricguitar', name: 'Electric Guitar', type: 'instrument' },
+    { id: 'acousticguitar', name: 'Acoustic Guitar', type: 'instrument' },
+    { id: 'keyboard', name: 'Keyboard', type: 'instrument' },
+    { id: 'saxophone', name: 'Saxophone', type: 'instrument' },
+    { id: 'trumpet', name: 'Trumpet', type: 'instrument' },
+  ],
 };
 
 interface TagSelectorProps {
-  category: 'genre' | 'mood' | 'instrument';
-  selectedTags: string[];
-  onChange: (tags: string[]) => void;
-  maxTags?: number;
-  allowCustomTags?: boolean;
+  category: string;
+  selectedTags: Tag[];
+  onChange: (tags: Tag[]) => void;
+  availableTags: Tag[];
 }
 
-export default function TagSelector({ 
-  category, 
-  selectedTags, 
-  onChange, 
-  maxTags = 5,
-  allowCustomTags = true 
-}: TagSelectorProps) {
-  const [inputValue, setInputValue] = useState('');
-  const [isAddingTag, setIsAddingTag] = useState(false);
-  const [filterText, setFilterText] = useState('');
-  
-  const availableTags = PREDEFINED_TAGS[category] || [];
-  
-  const filteredTags = filterText 
-    ? availableTags.filter(tag => 
-        tag.toLowerCase().includes(filterText.toLowerCase()) && 
-        !selectedTags.includes(tag)
-      )
-    : availableTags.filter(tag => !selectedTags.includes(tag));
+export default function TagSelector({ category, selectedTags, onChange, availableTags }: TagSelectorProps) {
+  const [filter, setFilter] = useState('');
 
-  const handleRemoveTag = (tagToRemove: string) => {
-    const newTags = selectedTags.filter(tag => tag !== tagToRemove);
-    onChange(newTags);
+  const filteredTags = availableTags.filter(tag => 
+    tag.name.toLowerCase().includes(filter.toLowerCase()) &&
+    !selectedTags.some(selected => selected.id === tag.id)
+  );
+
+  const handleAddTag = (tag: Tag) => {
+    onChange([...selectedTags, tag]);
   };
 
-  const handleAddTag = (tagToAdd: string) => {
-    if (selectedTags.length >= maxTags) {
-      return;
-    }
-    
-    if (selectedTags.includes(tagToAdd)) {
-      return;
-    }
-    
-    const newTags = [...selectedTags, tagToAdd];
-    onChange(newTags);
-    setFilterText('');
-    setInputValue('');
-    setIsAddingTag(false);
-  };
-
-  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && inputValue.trim()) {
-      e.preventDefault();
-      handleAddTag(inputValue.trim());
-    } else if (e.key === 'Escape') {
-      setIsAddingTag(false);
-      setInputValue('');
-      setFilterText('');
-    }
+  const handleRemoveTag = (tagToRemove: Tag) => {
+    onChange(selectedTags.filter(tag => tag.id !== tagToRemove.id));
   };
 
   return (
-    <div className="w-full">
-      <div className="flex flex-wrap gap-2 mb-2">
-        {selectedTags.map(tag => (
-          <div 
-            key={tag} 
-            className="bg-accent/10 text-gray-800 rounded-full px-3 py-1 text-sm flex items-center"
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        {selectedTags.map((tag) => (
+          <span
+            key={tag.id}
+            className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-accent text-white"
           >
-            <span>{tag}</span>
-            <button 
-              type="button"
-              onClick={() => handleRemoveTag(tag)}
-              className="ml-1 text-gray-500 hover:text-gray-700"
-            >
-              <XMarkIcon className="h-4 w-4" />
-            </button>
-          </div>
-        ))}
-        
-        {selectedTags.length < maxTags && (
-          isAddingTag ? (
-            <div className="relative">
-              <input
-                type="text"
-                value={filterText}
-                onChange={(e) => setFilterText(e.target.value)}
-                onKeyDown={handleInputKeyDown}
-                placeholder="Type to filter or add"
-                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                autoFocus
-              />
-              {filteredTags.length > 0 && (
-                <div className="absolute top-full left-0 mt-1 w-48 max-h-48 overflow-y-auto bg-white border border-gray-300 rounded-md shadow-md z-10">
-                  {filteredTags.map(tag => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => handleAddTag(tag)}
-                      className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100 text-gray-800"
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {allowCustomTags && filterText && !filteredTags.includes(filterText) && (
-                <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-300 rounded-md shadow-md z-10">
-                  <button
-                    type="button"
-                    onClick={() => handleAddTag(filterText)}
-                    className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100 text-green-700 font-medium"
-                  >
-                    + Add "{filterText}"
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
+            {tag.name}
             <button
               type="button"
-              onClick={() => setIsAddingTag(true)}
-              className="border border-gray-300 rounded-full px-3 py-1 text-sm text-gray-500 flex items-center hover:bg-gray-50"
+              onClick={() => handleRemoveTag(tag)}
+              className="ml-2 inline-flex items-center justify-center"
             >
-              <PlusIcon className="h-4 w-4 mr-1" />
-              Add {category}
+              <span className="sr-only">Remove {tag.name}</span>
+              ×
             </button>
-          )
+          </span>
+        ))}
+      </div>
+
+      <div className="relative">
+        <input
+          type="text"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder={`Search ${category} tags...`}
+          className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm"
+        />
+
+        {filter && filteredTags.length > 0 && (
+          <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base overflow-auto focus:outline-none sm:text-sm">
+            {filteredTags.map((tag) => (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={() => handleAddTag(tag)}
+                className="w-full text-left px-4 py-2 hover:bg-gray-100"
+              >
+                {tag.name}
+              </button>
+            ))}
+          </div>
         )}
       </div>
-      
-      {selectedTags.length >= maxTags && (
-        <p className="text-xs text-gray-500 italic">
-          Maximum of {maxTags} tags reached
-        </p>
-      )}
     </div>
   );
 } 

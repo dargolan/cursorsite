@@ -1,0 +1,42 @@
+{
+  "kind": "collectionType",
+  "collectionName": "tracks",
+  "info": {
+    "singularName": "track",
+    "pluralName": "tracks",
+    "displayName": "Track"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "Title": {
+      "type": "string",
+      "required": true
+    },
+    "BPM": {
+      "type": "integer"
+    },
+    "Duration": {
+      "type": "decimal"
+    },
+    "audioUrl": {
+      "type": "string"
+    },
+    "ImageUrl": {
+      "type": "string"
+    },
+    "Stems": {
+      "type": "json"
+    },
+    "trackId": {
+      "type": "uid"
+    },
+    "tags": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::tag.tag",
+      "mappedBy": "track"
+    }
+  }
+}
