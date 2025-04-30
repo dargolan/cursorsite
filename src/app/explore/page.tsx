@@ -9,15 +9,14 @@ import TagFilter from '../../components/TagFilter';
 import { Tag, Stem, Track, CartItem } from '../../types';
 import Header from '../../components/Header';
 import Image from 'next/image';
-import { getTracks, getTags, getTracksByTags, searchTracks } from '../../services/strapi';
+import { getTracks, getTags, getTracksByTags, searchTracks, getTracksWithMapping } from '../../services/strapi';
 import { STRAPI_URL } from '../../config/strapi';
 import { useCart } from '../../contexts/CartContext';
-import AudioPlayer from '../../components/AudioPlayer';
 import Footer from '../../components/Footer';
 import { useDebounce } from '../../hooks/useDebounce';
 
 // Lazy load the AudioPlayer component to improve performance
-const AudioPlayerComponent = dynamic(() => import('../../components/AudioPlayer'), {
+const AudioPlayerComponent = dynamic(() => import('../../components/AudioPlayer/index'), {
   loading: () => <div className="h-24 bg-[#1E1E1E] animate-pulse rounded"></div>,
   ssr: false, // This component uses browser APIs like wavesurfer
 });
@@ -92,10 +91,12 @@ export default function MusicLibrary() {
         console.error('Direct API test failed:', e);
       }
       
-      // Fetch tracks
-      const tracksData = await getTracks();
-      console.log('Tracks fetched:', tracksData.length);
-      console.log('Track data:', JSON.stringify(tracksData, null, 2));
+      // Fetch tracks using the new enhanced function that handles ID/UUID mapping properly
+      const tracksData = await getTracksWithMapping();
+      console.log('Tracks fetched with proper mapping:', tracksData.length);
+      
+      // The tracks from getTracksWithMapping already have proper IDs and URLs
+      // No need for additional validation or UUID extraction
       setTracks(tracksData);
       setFilteredTracks(tracksData);
       
@@ -358,20 +359,50 @@ export default function MusicLibrary() {
     return (
       <div className="flex flex-col w-full">
         {/* Track row */}
-        {filteredTracks.map(track => (
-          <div key={track.id} className="mb-0 max-w-[1464px] mx-auto w-full">
-            <AudioPlayerComponent 
-              track={track} 
-              isPlaying={playingTrackId === track.id}
-              onPlay={() => setPlayingTrackId(track.id)}
-              onStop={() => setPlayingTrackId(null)}
-              onTagClick={handleTagClick}
-              openStemsTrackId={openStemsTrackId}
-              setOpenStemsTrackId={setOpenStemsTrackId}
-            />
-          </div>
-                ))}
-              </div>
+        {filteredTracks.map((track, index) => {
+          // Debug log track ID to identify any issues
+          console.log(`[Track ${index}] ID: ${track.id}, title: ${track.title}, imageUrl: ${track.imageUrl}`);
+          
+          // Ensure track.id exists and is properly formatted
+          if (!track.id || track.id === index.toString() || track.id === `${index}`) {
+            console.error(`[Track ${index}] Invalid ID: "${track.id}" appears to be a sequential number`);
+            
+            // Try to extract UUID from imageUrl if available
+            let extractedId = null;
+            if (track.imageUrl && track.imageUrl.includes('/tracks/')) {
+              const matches = track.imageUrl.match(/\/tracks\/([^\/]+)\/cover/);
+              if (matches && matches[1]) {
+                extractedId = matches[1];
+                console.log(`[Track ${index}] Extracted ID from imageUrl: ${extractedId}`);
+              }
+            }
+            
+            // Create a new track with proper handling
+            track = {
+              ...track,
+              id: extractedId || `missing-id-${index}`, // Use a unique identifier based on index
+              imageUrl: extractedId 
+                ? `/api/direct-s3/tracks/${extractedId}/image` // Use dynamic /image endpoint
+                : `/api/placeholder-image` // Placeholder image path
+            };
+            console.log(`[Track ${index}] Fixed track with ID: ${track.id}`);
+          }
+          
+          return (
+            <div key={track.id} className="mb-0 max-w-[1464px] mx-auto w-full">
+              <AudioPlayerComponent 
+                track={track} 
+                isPlaying={playingTrackId === track.id}
+                onPlay={() => setPlayingTrackId(track.id)}
+                onStop={() => setPlayingTrackId(null)}
+                onTagClick={handleTagClick}
+                openStemsTrackId={openStemsTrackId}
+                setOpenStemsTrackId={setOpenStemsTrackId}
+              />
+            </div>
+          );
+        })}
+      </div>
     );
   };
 
