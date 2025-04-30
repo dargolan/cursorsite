@@ -502,7 +502,7 @@ wave-cave-audio/
 
 #### ⚠️ AVOID HARDCODING IDs
 
-The current implementation contains temporary hardcoded mappings between Strapi's numeric IDs and S3's UUIDs. This approach is **NOT SCALABLE** and is only intended as a temporary solution during development.
+The current implementation contains temporary hardcoded mappings between Strapi's numeric IDs and S3 UUIDs. This approach is **NOT SCALABLE** and is only intended as a temporary solution during development.
 
 For proper production deployment:
 
@@ -679,3 +679,86 @@ In addition to removing hardcoded ID-to-UUID mappings, we've also eliminated har
      ```
 
 This approach balances the need for consistent API access patterns with the flexibility required for real-world content management, where files might be named inconsistently or exist in different formats.
+
+## Audio Player Components
+
+### Main Track Player Design
+
+The platform's audio player has been designed for consistency, usability, and performance across the site:
+
+1. **Track Image with Play Button Overlay**:
+   - Clean, minimalist design with white filled play/pause icons
+   - Transparent background for maximum visibility
+   - Appears on hover or when track is playing
+   - Rounded corners on play/pause icon elements for a modern look
+   - Implementation using inline SVG for sharp rendering at all sizes
+   - Code example:
+     ```tsx
+     <button 
+       className={`absolute inset-0 flex items-center justify-center z-20 transition-opacity ${isHovering || isPlaying ? 'opacity-100' : 'opacity-0'}`}
+       onClick={handlePlayPause}
+       aria-label={isPlaying ? 'Pause' : 'Play'}
+     >
+       {isPlaying ? (
+         <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+           <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+           <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+         </svg>
+       ) : (
+         <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+           <polygon points="5 3 19 12 5 21 5 3"></polygon>
+         </svg>
+       )}
+     </button>
+     ```
+
+2. **Track Information Display**:
+   - Title with proper text truncation for long titles
+   - BPM indicator showing tempo information 
+   - Tag system with clickable genre and mood tags
+   - Clear visual hierarchy with title prominence
+
+3. **Playback Controls**:
+   - Interactive progress bar with draggable thumb
+   - Current time and duration display
+   - Stems dropdown toggle for accessing individual track components
+   - Download button for accessing the full track
+
+4. **Stems Panel**:
+   - Expandable interface for individual stem control
+   - Per-stem playback controls with consistent UI
+   - Progress indicator for each stem
+   - Add-to-cart functionality for purchasing stems
+   - "Buy All Stems" option with bundle discount
+
+5. **Responsive Behavior**:
+   - Adapts to different screen sizes
+   - Mobile-friendly touch targets
+   - Maintains usability on smaller devices
+   - Consistent appearance across browsers
+
+The audio player components use a consistent design language throughout the application, with white play/pause buttons on track images, teal accent colors for interactive elements, and a clean layout that emphasizes content discoverability and playback control.
+
+### Recent Audio Player Improvements (June 2025)
+
+The audio player has been enhanced with the following improvements:
+
+1. **Progress Bar and Duration Display**:
+   - Fixed issue where audio would play but progress bar wouldn't move
+   - Improved duration display to properly show total track duration
+   - Enhanced time update events to ensure proper synchronization
+   - Added fallback duration display when metadata is incomplete
+
+2. **Play/Pause Button Behavior**:
+   - Refined play/pause button to only appear on hover or when playing
+   - Improved play/pause state management with proper callback handling
+   - Enhanced transition effects for smoother appearance/disappearance
+   - Ensured proper icon switching between play and pause states
+
+3. **Error Handling**:
+   - Added comprehensive error tracking for audio loading issues
+   - Implemented graceful fallbacks for audio playback errors
+   - Added debug logging for troubleshooting timeupdate events
+   - Improved browser compatibility across different platforms
+
+These improvements create a more reliable and intuitive audio player experience throughout the application, addressing key usability concerns while maintaining the clean aesthetic of the platform.

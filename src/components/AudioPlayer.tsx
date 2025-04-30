@@ -8,6 +8,8 @@ import { findFileInStrapiByName } from '../utils/strapi-helpers';
 import { findStemFileUrl as helperFindStemFileUrl } from '../utils/audio-helpers';
 import { createAudio, convertUrlToProxyUrl } from '../lib/audio';
 import { useCart } from '../contexts/CartContext';
+import { getTrackCoverImageUrl } from '../utils/media-helpers';
+import PlayButton from './AudioPlayer/PlayButton';
 
 // Global audio manager to ensure only one audio source plays at a time
 const globalAudioManager = {
@@ -770,19 +772,34 @@ export default function AudioPlayer({
   const [progressIntervals, setProgressIntervals] = useState<Record<string, number>>({});
   const [showToast, setShowToast] = useState<{stemId: string, stemName: string, price: number, action: 'add' | 'remove'} | null>(null);
   
-  // Calculate if stems should be open for this track
+  // Check if stems are expanded
   const isStemsOpen = openStemsTrackId === track.id;
+  
+  // Toggle stems panel
+  const toggleStems = () => {
+    if (isStemsOpen) {
+      setOpenStemsTrackId(null);
+    } else {
+      setOpenStemsTrackId(track.id);
+    }
+  };
   
   // Group tags by type for display, filtering out Instrument tags
   const tagsByType = track.tags.reduce<Record<string, Tag[]>>((acc, tag) => {
     // Only include Genre and Mood tags (case insensitive comparison)
-    const tagTypeLower = tag.type.toLowerCase();
+    const tagTypeLower = (tag.type || '').toLowerCase();
     if (tagTypeLower === 'genre' || tagTypeLower === 'mood') {
+      // Use the original type from the tag for consistency
       const type = tag.type;
       if (!acc[type]) {
         acc[type] = [];
       }
       acc[type].push(tag);
+      
+      // Debug log to check tag types
+      console.log(`[AudioPlayer] Including tag "${tag.name}" with type "${tag.type}"`);
+    } else {
+      console.log(`[AudioPlayer] Excluding tag "${tag.name}" with type "${tag.type}"`);
     }
     return acc;
   }, {});
@@ -834,13 +851,32 @@ export default function AudioPlayer({
   
   // Initialize audio element
   useEffect(() => {
+    // Log track information for debugging
+    console.log(`[AudioPlayer] Initializing track:`, {
+      id: track.id,
+      title: track.title,
+      hasImageUrl: !!track.imageUrl,
+      hasAudioUrl: !!track.audioUrl,
+      imageUrl: track.imageUrl,
+      audioUrl: track.audioUrl,
+      hasStems: track.hasStems,
+      stemsCount: track.stems?.length || 0
+    });
+
     if (!audioRef.current) {
       // Create audio with cross-origin settings
       const audio = new Audio();
       audio.crossOrigin = "anonymous";
       
-      // Use the CloudFront URL directly
-      const audioUrl = track.audioUrl;
+      // Generate URL based on track title if needed
+      let audioUrl = track.audioUrl;
+      if (!audioUrl || audioUrl.trim() === '') {
+        // Create a sanitized track title for the URL
+        const sanitizedTitle = track.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        audioUrl = `/api/direct-s3/tracks/${sanitizedTitle}/main.mp3`;
+        console.log(`No audioUrl provided, using generated URL: ${audioUrl}`);
+      }
+      
       console.log(`Initializing audio with URL: ${audioUrl}`);
       audio.src = audioUrl;
       
@@ -849,8 +885,20 @@ export default function AudioPlayer({
       audio.dataset.trackId = track.id;
       audio.dataset.isMainTrack = 'true';
       
-      // Add event listeners
-      audio.addEventListener('timeupdate', handleTimeUpdate);
+      // Add event listeners with debug logging
+      audio.addEventListener('timeupdate', (e) => {
+        console.log('[AudioEvent] timeupdate fired');
+        handleTimeUpdate();
+      });
+      
+      audio.addEventListener('durationchange', (e) => {
+        console.log(`[AudioEvent] durationchange: ${audio.duration}s`);
+      });
+      
+      audio.addEventListener('playing', (e) => {
+        console.log('[AudioEvent] playing started');
+      });
+      
       audio.addEventListener('ended', handleAudioEnded);
       
       // Add error and canplaythrough handlers with detailed logging
@@ -872,17 +920,26 @@ export default function AudioPlayer({
       audioRef.current = audio;
     } else {
       // Update existing audio element
-      console.log(`Updating audio source to: ${track.audioUrl}`);
-      audioRef.current.src = track.audioUrl;
+      // Generate URL based on track title if needed
+      let audioUrl = track.audioUrl;
+      if (!audioUrl || audioUrl.trim() === '') {
+        // Create a sanitized track title for the URL
+        const sanitizedTitle = track.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        audioUrl = `/api/direct-s3/tracks/${sanitizedTitle}/main.mp3`;
+        console.log(`No audioUrl provided, using generated URL: ${audioUrl}`);
+      }
+      
+      console.log(`Updating audio source to: ${audioUrl}`);
+      audioRef.current.src = audioUrl;
       
       // Update data attributes
       audioRef.current.dataset.track = track.title;
       audioRef.current.dataset.trackId = track.id;
       audioRef.current.dataset.isMainTrack = 'true';
     }
-
+    
     // Cleanup function
-    return () => {
+      return () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
         audioRef.current.removeEventListener('ended', handleAudioEnded);
@@ -895,8 +952,11 @@ export default function AudioPlayer({
     if (audioRef.current) {
       const current = audioRef.current.currentTime;
       const duration = audioRef.current.duration || track.duration;
+      console.log(`[TimeUpdate] Current: ${current}, Duration: ${duration}, Progress: ${(current / duration) * 100}%`);
       setCurrentTime(current);
       setProgress((current / duration) * 100);
+    } else {
+      console.warn('[TimeUpdate] audioRef.current is null');
     }
   };
   
@@ -1025,20 +1085,18 @@ export default function AudioPlayer({
     } else {
       // Start playing this track, which will automatically stop any other audio
       if (audioRef.current) {
-        globalAudioManager.play(audioRef.current, { trackId: track.id });
-      }
-      
-      // Reset playing state for all stems in this track
-      if (track.stems) {
-        const newPlayingStems: Record<string, boolean> = {};
-        track.stems.forEach(stem => {
-          newPlayingStems[stem.id] = false;
+        console.log('[PlayPause] Playing audio:', {
+          currentTime: audioRef.current.currentTime,
+          duration: audioRef.current.duration,
+          hasEvents: audioRef.current.ontimeupdate !== null,
+          paused: audioRef.current.paused,
+          src: audioRef.current.src
         });
-        setPlayingStems(newPlayingStems);
+        globalAudioManager.play(audioRef.current, { trackId: track.id });
+        onPlay(); // Make sure onPlay is called to update the parent component's state
+      } else {
+        console.error('[PlayPause] No audio element found in ref');
       }
-      
-      onPlay();
-      setIsInteracting(true);
     }
   };
   
@@ -1578,6 +1636,55 @@ export default function AudioPlayer({
     }
   }, [isStemsOpen, openStemsTrackId]);
 
+  // Stem button rendering
+  const renderStemsButton = () => {
+    // Check for stems
+    const hasStems = track.hasStems || (track.stems && track.stems.length > 0);
+    
+    // Enhanced logging for debugging
+    console.log(`[AudioPlayer] Track ${track.title} (ID: ${track.id}):`);
+    console.log(`[AudioPlayer]   - hasStems property: ${track.hasStems}`);
+    console.log(`[AudioPlayer]   - stems array: ${track.stems ? `${track.stems.length} items` : 'undefined'}`);
+    console.log(`[AudioPlayer]   - Final hasStems value: ${hasStems}`);
+    
+    // Always show the button if we have a stems folder in S3, even if no stems are linked in the database
+    // This is because we might have stems in S3 that aren't linked in the database yet
+    return (
+      <div className="flex items-center mt-1">
+        <button
+          className={`flex items-center py-1 px-3 rounded-full text-sm
+            ${isStemsOpen ? 'bg-[#1DF7CE] text-black' : 'bg-[#232323] text-white hover:bg-[#2a2a2a]'}`}
+          onClick={toggleStems}
+        >
+          <svg 
+            className="w-3 h-3 mr-1" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path 
+              d="M2 5H12M2 12H12M2 19H22M12 5L22 5M12 12H22" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round"
+            />
+          </svg>
+          Stems
+          {hasStems && (
+            <span className="ml-1 text-xs">
+              ({track.stems?.length || '...'})
+            </span>
+          )}
+        </button>
+      </div>
+    );
+  };
+
+  // Get the most reliable image URL using our utility
+  const trackImageUrl = getTrackCoverImageUrl(track);
+  const fallbackImageUrl = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18V5l12-2v13'%3E%3C/path%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Ccircle cx='18' cy='16' r='3'%3E%3C/circle%3E%3C/svg%3E";
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
+  
   return (
     <div 
       className={`relative border-b border-[#1A1A1A] ${isHovering || isInteracting || isStemsOpen ? 'bg-[#232323]' : 'bg-[#121212]'}`}
@@ -1590,43 +1697,57 @@ export default function AudioPlayer({
         {/* Track image and info - left side - fixed width */}
         <div className="flex items-center w-[384px] flex-shrink-0">
           {/* Track image with fixed width */}
-          <div className="w-14 h-14 rounded overflow-hidden relative mr-4 flex-shrink-0">
+          <div className="w-14 h-14 rounded overflow-hidden relative mr-4 flex-shrink-0 bg-gray-800 flex items-center justify-center">
             <div 
               className={`absolute inset-0 bg-black ${isHovering || isPlaying ? 'opacity-50' : 'opacity-0'} transition-opacity z-10`}
             />
-            <Image 
-              src={track.imageUrl || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18V5l12-2v13'%3E%3C/path%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Ccircle cx='18' cy='16' r='3'%3E%3C/circle%3E%3C/svg%3E"} 
-              alt={track.title}
-              width={56}
-              height={56}
-              className="object-cover w-14 h-14"
-            />
+            {!imageLoadFailed ? (
+              <img 
+                src={trackImageUrl} 
+                alt={track.title}
+                className="object-cover w-14 h-14"
+                onError={(e) => {
+                  console.error(`[AudioPlayer] Failed to load image: ${trackImageUrl}`);
+                  setImageLoadFailed(true); // Mark image as failed to prevent further attempts
+                }}
+              />
+            ) : (
+              // Show fallback music icon SVG when image fails to load
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18V5l12-2v13"></path>
+                <circle cx="6" cy="18" r="3"></circle>
+                <circle cx="18" cy="16" r="3"></circle>
+              </svg>
+            )}
+            
+            {/* Play/Pause button overlay */}
             <button 
-              onClick={mainAudioError ? undefined : handlePlayPause}
-              disabled={mainAudioError}
-              className={`absolute inset-0 flex items-center justify-center z-20 ${
-                isHovering || isPlaying ? 'opacity-100' : 'opacity-0'
-              } transition-opacity ${mainAudioError ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-              title={mainAudioError ? "Audio file could not be loaded" : "Play/Pause"}
+              className={`absolute inset-0 flex items-center justify-center z-20 transition-opacity ${isHovering || isPlaying ? 'opacity-100' : 'opacity-0'}`}
+              onClick={handlePlayPause}
+              aria-label={isPlaying ? 'Pause' : 'Play'}
             >
-              {mainAudioError ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-500" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
-                  <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" strokeWidth="2" />
-                </svg>
-              ) : isPlaying ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24">
-                  <rect x="6" y="4" width="4" height="16" fill="currentColor"/>
-                  <rect x="14" y="4" width="4" height="16" fill="currentColor"/>
+              {isPlaying ? (
+                <svg 
+                  width="20" 
+                  height="20" 
+                  viewBox="0 0 24 24" 
+                  fill="white" 
+                >
+                  <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+                  <rect x="14" y="4" width="4" height="16" rx="1"></rect>
                 </svg>
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" fill="currentColor"/>
+                <svg 
+                  width="20" 
+                  height="20" 
+                  viewBox="0 0 24 24" 
+                  fill="white" 
+                >
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
                 </svg>
               )}
             </button>
-        </div>
+          </div>
           
           {/* Title and BPM area */}
           <div className="w-32 mr-6 flex-shrink-0">
@@ -1693,14 +1814,14 @@ export default function AudioPlayer({
           
           {/* Duration - fixed width with spacer */}
           <div className="w-20 text-[12.5px] font-normal text-[#999999] whitespace-nowrap ml-2 mr-24 flex-shrink-0 text-right">
-            {formatTime(currentTime)} / {formatTime(track.duration)}
+            {formatTime(currentTime)} / {formatTime(audioRef.current?.duration || track.duration || 0)}
           </div>
           
           {/* Action buttons area */}
           <div className="flex items-center space-x-3 flex-shrink-0 min-w-[110px]">
             {/* Consistent width container for Stems button or placeholder */}
             <div className="w-[68px] flex justify-end">
-              {track.hasStems && (
+              {(track.hasStems || (track.stems && track.stems.length > 0)) && (
         <button 
                   onClick={() => setOpenStemsTrackId(isStemsOpen ? null : track.id)}
                   className="text-white hover:text-[#1DF7CE] px-3 py-1 text-sm flex items-center transition-colors"
