@@ -423,4 +423,259 @@ AWS_BUCKET_NAME=wave-cave-audio
 CDN_DOMAIN=d1r94114aksajj.cloudfront.net
 ```
 
-These configure the app to use the production S3 bucket (`wave-cave-audio`) and the associated CloudFront CDN for fast, global media delivery. 
+These configure the app to use the production S3 bucket (`wave-cave-audio`) and the associated CloudFront CDN for fast, global media delivery.
+
+## Storage & Naming Conventions
+
+### S3 Bucket Structure
+The platform now uses track title-based paths instead of UUIDs for better organization and maintainability. Current structure in the S3 bucket:
+
+```
+wave-cave-audio/
+└── tracks/
+    ├── track-name-1/
+    │   ├── main.mp3         # Main track audio
+    │   ├── cover.jpg        # Track cover image
+    │   └── stems/           # Optional folder for individual stems
+    │       ├── drums.mp3
+    │       ├── bass.mp3
+    │       └── guitars.mp3
+    └── b3a7ae0b-4a9f-4b94-9a60-c168d97841da/  # Legacy UUID format still supported
+        ├── main.mp3
+        ├── cover.jpg
+        └── stems/
+```
+
+### Known Issues & Solutions (May 2025)
+
+1. **File Naming Consistency**:
+   - **Issue**: Main tracks are saved as "main.mp3" rather than using the track title
+   - **Solution**: This is by design for consistent file referencing. The track name is used for the folder, while standard filenames (main.mp3, cover.jpg) are used for the actual files to maintain consistency.
+
+2. **Duplicate Tracks**:
+   - **Issue**: Multiple instances of the same track appearing in the Music page
+   - **Solution**: This could be due to duplicate entries in the Strapi database. Check the Strapi admin panel and remove duplicate entries, or add a uniqueness constraint on track titles.
+
+3. **Missing Cover Images**:
+   - **Issue**: Cover images not displaying despite existing in the S3 bucket
+   - **Solution**: Ensure the cover image is named exactly "cover.jpg" (lowercase) within the track folder. The code expects this exact filename and path.
+
+4. **Missing Stems Button**:
+   - **Issue**: Stems button not appearing even when stems are available
+   - **Solution**: Verify that the track entry in Strapi has its stems properly linked in the relationship field. The hasStems property must be true and stems array should not be empty.
+
+5. **API Connection Issues & CORS Errors**:
+   - **Issue**: Frontend fails to connect to Strapi API with CORS errors or "Invalid key" validation errors
+   - **Solutions**:
+     - **CORS Configuration**: Update Strapi's CORS middleware with simplified settings:
+       ```js
+       // strapi-backend/config/middlewares.ts
+       {
+         name: 'strapi::cors',
+         config: {
+           origin: '*',  // For development; use specific origins in production
+           methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+           headers: ['Content-Type', 'Authorization', 'Origin', 'Accept']
+         }
+       }
+       ```
+     - **API URL Consistency**: Use `localhost` instead of `127.0.0.1` consistently throughout the application
+     - **Request Configuration**: Ensure fetch requests use correct options:
+       ```js
+       // Proper request options
+       {
+         headers: { ... },
+         mode: 'cors',
+         cache: 'no-store',
+         credentials: 'omit'  // Important when using token authentication
+       }
+       ```
+     - **Query Parameter Format**: Use `populate=*` for Strapi v4 to populate relations instead of complex nested parameters
+     - **Strapi Permissions**: Ensure both `find` and `findOne` permissions are enabled for public access to the Track and Tag content types
+     - **Server Configuration**: Set `url` property in `server.ts` to ensure Strapi knows its public URL:
+       ```js
+       // strapi-backend/config/server.ts
+       url: env('PUBLIC_URL', 'http://localhost:1337')
+       ```
+
+### Important Note on ID Mapping and Scalability
+
+#### ⚠️ AVOID HARDCODING IDs
+
+The current implementation contains temporary hardcoded mappings between Strapi's numeric IDs and S3's UUIDs. This approach is **NOT SCALABLE** and is only intended as a temporary solution during development.
+
+For proper production deployment:
+
+1. **Dynamic ID Resolution**: Implement a robust system that dynamically fetches track data from Strapi including all necessary metadata and file paths.
+
+2. **Metadata Storage**: Each track in S3 should include metadata that links back to its Strapi ID, allowing for reliable lookups without hardcoding.
+
+3. **Central Mapping Service**: Create a dedicated service that maintains the relationship between Strapi entities and their corresponding S3 resources. This service should:
+   - Cache frequently accessed mappings for performance
+   - Update when new content is added
+   - Provide fallback mechanisms when mappings aren't found
+   - Use a database table instead of in-memory or file-based caching for persistence
+
+4. **Webhook Integration**: Set up Strapi webhooks to automatically update the mapping service when content changes, ensuring S3 paths and Strapi IDs remain synchronized.
+
+Hardcoded mappings will be removed before production release, replaced with the dynamic fetching solution described above.
+
+### File Naming Requirements
+
+While the system now supports more flexible file naming through dynamic endpoint resolution, following these conventions is still recommended for consistency:
+
+1. **Track Folders**: Use the track title in kebab-case: `rock-intro/` instead of `Rock Intro/`
+2. **Main Audio Files**: Preferably use `main.mp3`, though the system will also recognize:
+   - `main.wav`
+   - `track.mp3`
+   - `audio.mp3`
+3. **Cover Images**: Preferably use `cover.jpg`, though the system will also recognize:
+   - `cover.png`
+   - `image.jpg`
+   - `cover.webp`
+   - `artwork.jpg`
+4. **Stems**: Can use descriptive names like `drums.mp3`, `bass.mp3`, etc.
+
+The new dynamic endpoint approach allows files to be found even if they don't follow these exact naming conventions, but following these guidelines helps maintain consistency across the platform.
+
+### API Endpoints for Media Access
+
+The platform provides several methods to access media files:
+
+1. **Dynamic Type-Based Endpoints** (Recommended):
+   - `/api/direct-s3/tracks/{id}/image` - Retrieves any cover image for the track, trying multiple formats
+   - `/api/direct-s3/tracks/{id}/audio` - Retrieves any audio file for the track, trying multiple formats
+   - Example: `/api/direct-s3/tracks/rock-intro/image`
+
+2. **Legacy Direct File Access** (Still supported):
+   - `/api/direct-s3/tracks/{track-name}/{specific-file}`
+   - Example: `/api/direct-s3/tracks/rock-intro/main.mp3`
+   - Automatically resolves track names to actual folder paths
+   - Will be deprecated in favor of the dynamic endpoints
+
+3. **S3 Track Listing**: `/api/s3-list-tracks`
+   - Returns all available tracks in the S3 bucket
+   - Useful for debugging and discovery
+
+4. **Legacy CloudFront Access**: 
+   - Automatically proxied through the direct-s3 API
+   - Example: `https://d1r94114aksajj.cloudfront.net/tracks/{uuid}/main.mp3`
+   - Will be deprecated in favor of the dynamic endpoints
+
+For new development, always use the dynamic type-based endpoints (`/image` and `/audio`) as they provide the most flexibility and will be maintained going forward.
+
+### Debugging Tools
+
+For troubleshooting file access issues, use the Track Finder debug tool at `/debug/track-finder.html`, which allows you to:
+1. Enter a track name and see if it can find matching files in S3
+2. List all available tracks in your bucket
+3. Test playback from the name-based URLs
+
+## ID to UUID Mapping System
+
+### Updates and Improvements
+
+#### Removal of Hardcoded ID-to-UUID Mappings
+
+The codebase previously contained hardcoded emergency mappings that directly linked numeric Strapi IDs to S3 UUIDs. These hardcoded mappings have been removed from the following locations:
+
+1. `src/app/api/direct-s3/[...path]/route.ts` - Emergency mappings in the API route
+2. `src/utils/client-mapping.ts` - Client-side emergency mappings
+3. `src/app/explore/page.tsx` - Fallback hardcoded UUID in the UI
+
+The system now relies entirely on dynamic resolution through:
+1. Direct Strapi API queries - Primary source of UUID information
+2. ID mapping cache - Secondary source, populated from Strapi
+3. UUID discovery from S3 - Used as a fallback when metadata files contain ID references
+
+This change makes the system more flexible and maintainable as all mappings are now stored in a centralized location (Strapi) rather than being hardcoded across multiple files.
+
+For tracks that don't have proper metadata or UUIDs in Strapi, a placeholder image is now displayed rather than falling back to a hardcoded track's assets.
+
+#### Eliminating Hardcoded File Names With Dynamic Endpoints
+
+In addition to removing hardcoded ID-to-UUID mappings, we've also eliminated hardcoded file name dependencies by implementing dynamic endpoint resolution. This further improves the system's flexibility and maintainability:
+
+1. **Previous Issue**: 
+   - The system previously relied on specific filenames (`cover.jpg`, `main.mp3`) throughout the codebase
+   - This created brittle dependencies, requiring exact filename matches in S3
+   - 404 errors would occur if files used different naming conventions or formats (e.g., PNG instead of JPG)
+
+2. **Solution - Dynamic Type-Based Endpoints**:
+   - Replaced hardcoded file path references with generic type-based endpoints:
+     - `/api/direct-s3/tracks/{id}/image` (replacing `/api/direct-s3/tracks/{id}/cover.jpg`)
+     - `/api/direct-s3/tracks/{id}/audio` (replacing `/api/direct-s3/tracks/{id}/main.mp3`)
+   - Updated the following files:
+     - `src/services/strapi.ts`: Changed normalizeTrack to use `/image` endpoint
+     - `src/app/api/direct-s3/[...path]/route.ts`: Enhanced to try multiple file formats when resolving paths
+     - `src/app/api/debug/route.ts`: Updated test URLs to use dynamic endpoints
+     - `src/app/debug/page.tsx`: Updated link generation to use dynamic endpoints
+
+3. **How It Works**:
+   - When a request comes in for `/api/direct-s3/tracks/{id}/image`, the API tries multiple file formats:
+     - Checks for `cover.jpg`, `cover.png`, `image.jpg`, `cover.webp`, `artwork.jpg`
+   - Similarly, `/api/direct-s3/tracks/{id}/audio` tries various audio formats:
+     - Checks for `main.mp3`, `main.wav`, `track.mp3`, `audio.mp3`
+   - Returns the first matching file, regardless of its exact name
+   - Creates a consistent API interface independent of the underlying file structure
+
+4. **Benefits**:
+   - More resilient to different file formats and naming conventions
+   - Enables future support for additional formats without code changes
+   - Provides a clean, consistent API for client components
+   - Simplifies onboarding by removing strict naming requirements
+   - Improves error handling with a dedicated placeholder image endpoint
+
+5. **Frontend Implementation**:
+   - **Enhanced Track Data Service**: The `getTracksWithMapping()` function in `src/services/strapi.ts` now:
+     - Normalizes any existing URLs to use dynamic endpoints
+     - Converts any references to `/main.mp3` to `/audio`
+     - Converts any references to `/cover.jpg` to `/image`
+     - Ensures all tracks returned by the API use these dynamic endpoints
+
+   - **Media Helper Utilities**: The `getTrackCoverImageUrl()` function in `src/utils/media-helpers.ts`:
+     - Takes a track object with ID and optional imageUrl properties
+     - Falls back to dynamic endpoints if no imageUrl is provided: `/api/direct-s3/tracks/${track.id}/image`
+     - Adds cache-busting query parameters to prevent stale images
+     - Returns placeholder SVG if no valid ID is available
+
+   - **TrackImage Component**: All components displaying track images consume these normalized URLs,
+     ensuring consistent handling across the application
+
+   - **Code Examples**:
+     ```tsx
+     // Example 1: Track service normalizing URLs
+     // From src/services/strapi.ts
+     const normalizedImageUrl = trackData.imageUrl?.includes('/cover.jpg') 
+       ? `/api/direct-s3/${s3Path}/image` 
+       : trackData.imageUrl || imageUrl;
+     
+     // Example 2: Media helper providing fallback dynamic URL
+     // From src/utils/media-helpers.ts
+     export function getTrackCoverImageUrl(track: { id?: string, imageUrl?: string }) {
+       // If track has an imageUrl, use it
+       if (track.imageUrl && track.imageUrl.trim() !== '') {
+         return track.imageUrl;
+       }
+       
+       // If track has an id, use the dynamic image endpoint
+       if (track.id) {
+         return `/api/direct-s3/tracks/${track.id}/image?t=${Date.now()}`;
+       }
+       
+       // Fallback to placeholder
+       return "/api/placeholder-image";
+     }
+     
+     // Example 3: Component using dynamic URL
+     // From a component like TrackImage.tsx
+     <Image 
+       src={getTrackCoverImageUrl(track)}
+       alt={track.title}
+       width={300}
+       height={300}
+       className="rounded-lg"
+     />
+     ```
+
+This approach balances the need for consistent API access patterns with the flexibility required for real-world content management, where files might be named inconsistently or exist in different formats.
