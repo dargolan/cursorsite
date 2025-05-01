@@ -15,21 +15,6 @@ interface UseStemPlayerOptions {
 function validateStemBelongsToTrack(url: string, trackTitle: string, stemName: string): boolean {
   const filename = url.split('/').pop()?.toLowerCase() || '';
   
-  // Special case matching patterns
-  const trackLower = trackTitle.toLowerCase();
-  
-  // Exact track-specific patterns
-  if ((trackLower.includes('lo-fi') && filename.includes('lo_fi_beat')) ||
-      (trackLower.includes('elevator') && filename.includes('elevator_music')) ||
-      (trackLower.includes('crazy meme') && filename.includes('crazy_meme_music')) ||
-      (trackLower.includes('dramatic') && filename.includes('dramatic_countdown')) ||
-      (trackLower.includes('long opener') && filename.includes('long_opener')) ||
-      (trackLower.includes('transition') && filename.includes('transition_music'))) {
-    
-    // Make sure the stem name is also valid
-    return filename.includes(stemName.toLowerCase());
-  }
-  
   // Normalize the track title for comparison (various formats)
   const normalizedTrackTitle = trackTitle.toLowerCase()
     .replace(/[\s-]+/g, '_')

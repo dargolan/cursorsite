@@ -44,16 +44,7 @@ function StemItem({
                             part.length > 3 && filename.includes(part.toLowerCase().replace(/[^a-z0-9]/g, '_'))
                           );
       
-      // Special case patterns
-      const specialMatch = 
-        (track.title.toLowerCase().includes('lo-fi') && filename.includes('lo_fi_beat')) ||
-        (track.title.toLowerCase().includes('elevator') && filename.includes('elevator_music')) ||
-        (track.title.toLowerCase().includes('crazy meme') && filename.includes('crazy_meme_music')) ||
-        (track.title.toLowerCase().includes('dramatic') && filename.includes('dramatic_countdown')) ||
-        (track.title.toLowerCase().includes('long opener') && filename.includes('long_opener')) ||
-        (track.title.toLowerCase().includes('transition') && filename.includes('transition_music'));
-      
-      if (!trackMatch && !specialMatch) {
+      if (!trackMatch) {
         console.error(`[STEM MISMATCH] ${stem.name} in ${track.title} is using URL for wrong track: ${url}`);
       }
     }
@@ -105,16 +96,6 @@ function StemItem({
   const isPotentiallyWrongTrack = url && !url.toLowerCase().includes(track.title.toLowerCase().replace(/\s+/g, '_')) && 
     !url.toLowerCase().includes(track.title.toLowerCase().replace(/\s+/g, '-'));
 
-  // Check for special track name patterns
-  const hasSpecialPattern = url && (
-    (track.title.toLowerCase().includes('lo-fi') && url.toLowerCase().includes('lo_fi_beat')) ||
-    (track.title.toLowerCase().includes('elevator') && url.toLowerCase().includes('elevator_music')) ||
-    (track.title.toLowerCase().includes('crazy meme') && url.toLowerCase().includes('crazy_meme_music')) ||
-    (track.title.toLowerCase().includes('dramatic') && url.toLowerCase().includes('dramatic_countdown')) ||
-    (track.title.toLowerCase().includes('long opener') && url.toLowerCase().includes('long_opener')) ||
-    (track.title.toLowerCase().includes('transition') && url.toLowerCase().includes('transition_music'))
-  );
-
   return (
     <div className="flex flex-col md:flex-row items-start md:items-center p-3 border-b border-gray-700">
       <div className="flex-grow flex items-center">
@@ -154,7 +135,7 @@ function StemItem({
             <h3 className="text-lg font-medium">{stem.name}</h3>
             {isLoading && <span className="ml-2 text-yellow-400 text-xs">(Loading...)</span>}
             {!isLoading && !isError && url && <span className="ml-2 text-green-400 text-xs">(Ready)</span>}
-            {isPotentiallyWrongTrack && !hasSpecialPattern && (
+            {isPotentiallyWrongTrack && (
               <span className="ml-2 text-orange-500 text-xs">(Possible track mismatch)</span>
             )}
           </div>
@@ -172,73 +153,6 @@ function StemItem({
                     Retry
                   </button>
                   <button 
-                    onClick={handleResetAllCaches}
-                    className="ml-2 px-2 py-0.5 bg-red-600 rounded text-white hover:bg-red-700"
-                    title="Reset all cached stem URLs"
-                  >
-                    Reset Cache
-                  </button>
-                </p>
-              )}
-              {!url && (
-                <button 
-                  onClick={handleRetry}
-                  className="mt-1 px-2 py-0.5 bg-blue-600 rounded text-white hover:bg-blue-700"
-                >
-                  Retry
-                </button>
-              )}
-            </div>
-          )}
-          
-          {/* Track display for verification */}
-          <p className="text-xs text-gray-400">Track: {track.title}</p>
-          {url && (
-            <p className="text-xs text-gray-500 truncate max-w-xs">
-              URL: {getFilenameFromUrl(url)}
-            </p>
-          )}
-        </div>
-      </div>
-      
-      {/* Progress Bar */}
-      <div className="w-full md:w-1/3 h-2 bg-gray-700 rounded-full mx-2 my-3 md:my-0 overflow-hidden">
-        <div 
-          className={`h-full rounded-full ${isPlaying ? 'bg-green-500' : 'bg-blue-500'}`} 
-          style={{ width: `${progress}%` }}
-        ></div>
-      </div>
-      
-      {/* Time Display */}
-      <div className="text-sm text-gray-400 whitespace-nowrap mx-2">
-        {currentTimeDisplay} / {durationDisplay}
-      </div>
-      
-      {/* Price and Cart Button */}
-      <div className="flex items-center mt-3 md:mt-0">
-        <span className="text-lg font-semibold mr-3">€{stem.price?.toFixed(2) || '0.00'}</span>
-        {isInCart ? (
-          <button
-            onClick={handleRemoveFromCart}
-            className="bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded"
-          >
-            Remove
-          </button>
-        ) : (
-          <button
-            onClick={handleAddToCart}
-            className="bg-green-600 hover:bg-green-700 text-white py-1 px-3 rounded"
-          >
-            Add to Cart
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Memoize the component to prevent unnecessary re-renders
-export default memo(StemItem); 
                     onClick={handleResetAllCaches}
                     className="ml-2 px-2 py-0.5 bg-red-600 rounded text-white hover:bg-red-700"
                     title="Reset all cached stem URLs"
