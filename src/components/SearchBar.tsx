@@ -4,9 +4,10 @@ import React, { useState, useRef } from 'react';
 
 interface SearchBarProps {
   onSearch?: (query: string) => void;
+  existingSearch?: string; // Add prop for existing search terms
 }
 
-export default function SearchBar({ onSearch }: SearchBarProps) {
+export default function SearchBar({ onSearch, existingSearch }: SearchBarProps) {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -31,6 +32,11 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
       inputRef.current.focus();
     }
   };
+
+  // Determine placeholder text based on whether we already have search terms
+  const placeholderText = existingSearch 
+    ? "Add another search term..."
+    : "Search Tracks...";
 
   return (
     <div className="mb-6">
@@ -57,7 +63,7 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
             type="search"
             id="search"
             className="block w-full py-2 pl-12 pr-4 text-base rounded-full bg-[#1E1E1E] border border-[#CDCDCD] text-white focus:outline-none focus:ring-1 focus:ring-[#1DF7CE]"
-            placeholder="Search Tracks..."
+            placeholder={placeholderText}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -85,6 +91,11 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
           )}
         </div>
       </form>
+      {existingSearch && (
+        <p className="text-[11px] text-gray-400 mt-1 pl-4">
+          Press Enter to add multiple search terms
+        </p>
+      )}
     </div>
   );
 } 

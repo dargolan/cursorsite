@@ -20,6 +20,7 @@ interface FilterSidebarProps {
   onBpmChange: (range: [number, number]) => void;
   onDurationChange: (range: [number, number]) => void;
   onSearch?: (query: string) => void;
+  existingSearch?: string;
 }
 
 export default function FilterSidebar({
@@ -32,7 +33,8 @@ export default function FilterSidebar({
   onTagToggle,
   onBpmChange,
   onDurationChange,
-  onSearch
+  onSearch,
+  existingSearch
 }: FilterSidebarProps): React.ReactElement {
   const [genreExpanded, setGenreExpanded] = useState(true);
   const [moodExpanded, setMoodExpanded] = useState(true);
@@ -247,7 +249,7 @@ export default function FilterSidebar({
           </Link>
 
           <div className="px-6 pb-6">
-            <SearchBar onSearch={onSearch} />
+            <SearchBar onSearch={onSearch} existingSearch={existingSearch} />
             
             <div className="mb-6">
               <h3 className="text-[#1DF7CE] font-normal text-sm mb-4">Filters</h3>

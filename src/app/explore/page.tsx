@@ -16,7 +16,7 @@ import Footer from '../../components/Footer';
 import { useDebounce } from '../../hooks/useDebounce';
 
 // Lazy load the AudioPlayer component to improve performance
-const AudioPlayerComponent = dynamic(() => import('../../components/AudioPlayer/index'), {
+const AudioPlayerComponent = dynamic(() => import('../../components/AudioPlayer'), {
   loading: () => <div className="h-24 bg-[#1E1E1E] animate-pulse rounded"></div>,
   ssr: false, // This component uses browser APIs like wavesurfer
 });
@@ -184,7 +184,9 @@ export default function MusicLibrary() {
     // Get search query from URL
     const searchParam = searchParams.get('search');
     if (searchParam) {
-      setSearchQuery(searchParam);
+      // URL encoding may have replaced commas, ensure they're restored properly
+      const decodedSearch = decodeURIComponent(searchParam).replace(/\+/g, ' ');
+      setSearchQuery(decodedSearch);
     }
   }, [searchParams, setBpmRange, setDurationRange, setSelectedTags, setSearchQuery]);
 
@@ -216,10 +218,14 @@ export default function MusicLibrary() {
     
     // Filter by search query
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+      const searchTerms = searchQuery.toLowerCase().split(',').map(term => term.trim());
+      
       filtered = filtered.filter(track => 
-        track.title.toLowerCase().includes(query) ||
-        track.tags.some(tag => tag.name.toLowerCase().includes(query))
+        // Check if any of the search terms match the track title or tags
+        searchTerms.some(term => 
+          track.title.toLowerCase().includes(term) ||
+          track.tags.some(tag => tag.name.toLowerCase().includes(term))
+        )
       );
     }
     
@@ -255,8 +261,15 @@ export default function MusicLibrary() {
 
   // Handler for search input
   const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query);
-  }, []);
+    // Check if we already have a search query
+    if (searchQuery) {
+      // Add the new term to the existing search query with comma separation
+      setSearchQuery(prev => `${prev}, ${query}`);
+    } else {
+      // First search term
+      setSearchQuery(query);
+    }
+  }, [searchQuery]);
 
   // Handler for BPM range change
   const handleBpmChange = useCallback((range: [number, number]) => {
@@ -422,6 +435,7 @@ export default function MusicLibrary() {
           onBpmChange={handleBpmChange}
           onDurationChange={handleDurationChange}
           onSearch={handleSearch}
+          existingSearch={searchQuery}
         />
         
         <ContentWrapper>
@@ -441,20 +455,34 @@ export default function MusicLibrary() {
                     />
                   ))}
                   
-                  {/* Display search query as a tag-like filter */}
-                  {searchQuery && (
-                    <div className="flex items-center space-x-1 text-xs font-normal px-3 py-1 rounded-full bg-[#303030] text-[#1DF7CE] border border-[#1DF7CE]">
-                      <span>Search: {searchQuery}</span>
-                      <button 
-                        onClick={() => setSearchQuery('')}
-                        className="ml-1 text-[#1DF7CE] hover:text-white"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                  </div>
-                  )}
+                  {/* Display search queries as tag-like filters */}
+                  {searchQuery && searchQuery.split(',').map((term, index) => {
+                    const trimmedTerm = term.trim();
+                    if (!trimmedTerm) return null;
+                    
+                    return (
+                      <div key={`search-${index}`} className="flex items-center space-x-1 text-xs font-normal px-3 py-1 rounded-full bg-[#303030] text-[#1DF7CE] border border-[#1DF7CE]">
+                        <span>Search: {trimmedTerm}</span>
+                        <button 
+                          onClick={() => {
+                            // Remove this specific search term
+                            const searchTerms = searchQuery
+                              .split(',')
+                              .map(t => t.trim())
+                              .filter((_, i) => i !== index)
+                              .join(', ');
+                            
+                            setSearchQuery(searchTerms);
+                          }}
+                          className="ml-1 text-[#1DF7CE] hover:text-white"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    );
+                  })}
                   
                   <button 
                     onClick={() => {
