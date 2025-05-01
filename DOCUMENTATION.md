@@ -490,7 +490,7 @@ wave-cave-audio/
          credentials: 'omit'  // Important when using token authentication
        }
        ```
-     - **Query Parameter Format**: Use `populate=*` for Strapi v4 to populate relations instead of complex nested parameters
+     - **Query Parameter Format**: Use `populate=*` for Strapi v4 to populate relations instead of complex nested parameters. **IMPORTANT**: Using `populate=deep` will cause a validation error (`"Invalid key deep"`) with this version of Strapi. Always use `populate=*` instead.
      - **Strapi Permissions**: Ensure both `find` and `findOne` permissions are enabled for public access to the Track and Tag content types
      - **Server Configuration**: Set `url` property in `server.ts` to ensure Strapi knows its public URL:
        ```js
@@ -680,6 +680,31 @@ In addition to removing hardcoded ID-to-UUID mappings, we've also eliminated har
 
 This approach balances the need for consistent API access patterns with the flexibility required for real-world content management, where files might be named inconsistently or exist in different formats.
 
+## Recent Audio Player Improvements
+
+The audio player component has been enhanced with several important improvements:
+
+1. **Fixed Progress Bar and Duration Display**:
+   - The progress bar now correctly moves as the audio plays
+   - Current duration is displayed properly
+   - Total duration is fetched from the audio element with fallback to track data
+
+2. **Play/Pause Button Behavior**:
+   - The play button now only appears on hover or when the track is playing
+   - Fixed both the UI state and playback control functionality 
+
+3. **Tag System Integration**:
+   - Tags are now fetched directly from Strapi API
+   - The platform no longer uses hardcoded predefined tags
+   - Tags are properly displayed in the AudioPlayer component
+   - Empty tag lists show a "No tags available" message
+   - Tags are correctly organized by type (genre, mood)
+   - The system automatically attempts to fetch tags if none are provided with a track
+
+4. **Query Parameter Formats**:
+   - Strapi API requests use `populate=*` not `populate=deep` (which is unsupported)
+   - API queries include proper pagination parameters (`pagination[pageSize]=100`)
+
 ## Audio Player Components
 
 ### Main Track Player Design
@@ -762,3 +787,197 @@ The audio player has been enhanced with the following improvements:
    - Improved browser compatibility across different platforms
 
 These improvements create a more reliable and intuitive audio player experience throughout the application, addressing key usability concerns while maintaining the clean aesthetic of the platform.
+
+## Recent Bug Fixes & Updates (June 2025)
+
+### Tag Clickability Improvement
+
+An issue with tag clickability in the audio player was identified and fixed in June 2025:
+
+1. **Problem Identified**:
+   - The rightmost tags (particularly "Internet" in some tracks) were not fully clickable
+   - Only the leftmost part of these tags would respond to clicks
+   - The issue occurred when tags reached the container boundaries
+
+2. **Solution Implemented**:
+   - Made the tag container relative to create a proper stacking context
+   - Added z-index to tag buttons to ensure they always receive clicks
+   - Changed from inline to inline-flex for better sizing behavior
+   - Preserved the original width and line-clamp behavior to maintain the layout
+
+3. **Code Changes**:
+   ```tsx
+   // Tag container improvements
+   <div className="w-52 mr-8 flex-shrink-0">
+     <div className="text-[12.5px] font-normal text-[#999999] line-clamp-2 relative">
+       {/* Tag rendering */}
+     </div>
+   </div>
+   
+   // Better tag button styling for clickability
+   <button 
+     onClick={() => onTagClick(tag)}
+     className="hover:text-[#1DF7CE] transition-colors inline-flex items-center relative z-10"
+   >
+     {tag.name}
+   </button>
+   ```
+
+This fix ensures all tags in the audio player are fully clickable while maintaining the original layout with proper line wrapping for multiple tags.
+
+### Tag Display Filtering Fix
+
+An issue with tag display in audio players was identified and fixed in June 2025:
+
+1. **Problem Identified**:
+   - Instrument tags were incorrectly showing up in the audio player alongside genre and mood tags
+   - By design, only genre and mood tags should appear in the audio players, while instrument tags should only appear in the sidebar
+
+2. **Solution Implemented**:
+   - Modified the AudioPlayer component to filter out tags with type "instrument"
+   - Updated the tag grouping logic to skip instrument tags when creating `tagsByType`
+   - Added a fallback filter for the untyped tags display method
+   - Ensured that empty lists aren't rendered when all tags are filtered out
+
+3. **Code Changes**:
+   ```typescript
+   // Filter out instrument tags in the AudioPlayer component
+   const tagsByType = (trackTags || []).reduce<Record<string, Tag[]>>((acc, tag) => {
+     const effectiveType = tag.type || 'genre';
+     
+     // Skip instrument tags
+     if (effectiveType === 'instrument') {
+       return acc;
+     }
+     
+     // Only include genre and mood tags
+     if (!acc[effectiveType]) {
+       acc[effectiveType] = [];
+     }
+     acc[effectiveType].push(tag);
+     
+     return acc;
+   }, {});
+   
+   // Also filter for fallback display
+   const filteredTrackTags = trackTags.filter(tag => (tag.type || 'genre') !== 'instrument');
+   ```
+
+This fix ensures consistent tag display throughout the application with genre and mood tags appearing in audio players, while all three tag types (genre, mood, and instrument) are available in the sidebar filters.
+
+### Tag System Data Structure Fix
+
+A critical issue with tag display in the sidebar was identified and fixed in June 2025:
+
+1. **Problem Identified**:
+   - Tags existed in Strapi and were correctly displayed in the audio player tracks
+   - However, tags were not appearing in the sidebar filters
+   - Debug tools showed tags were being fetched from the API but displaying as "Unknown Tag"
+
+2. **Root Cause**:
+   - The Strapi API was returning tag data in a different format than expected
+   - Tags were returned with direct `name` and `type` properties at the root level
+   - Our code was incorrectly looking for these properties inside an `attributes` object
+
+3. **Solution Implemented**:
+   - Modified tag parsing in two key places:
+     1. `getTags()` function in `src/services/strapi.ts`: Updated to read tag properties directly from the root object
+     2. `normalizeTrack()` function in `src/services/strapi.ts`: Enhanced to support multiple tag data formats
+
+4. **Code Changes**:
+   ```typescript
+   // Fixed tag parsing in getTags()
+   const tags = data.data.map((tag: any) => ({
+     id: tag.id.toString(),
+     name: tag.name || 'Unknown Tag',  // Direct access instead of tag.attributes?.name
+     type: tag.type || 'genre',        // Direct access instead of tag.attributes?.type
+     count: 0
+   }));
+
+   // Fixed tag parsing in normalizeTrack()
+   trackTags = data.tags.data.map((tag: any) => ({
+     id: tag.id.toString(),
+     name: tag.attributes?.name || tag.name || 'Unknown Tag',  // Try both formats
+     type: tag.attributes?.type || tag.type || 'genre'         // Try both formats
+   }));
+   ```
+
+5. **Related Improvements**:
+   - Removed "No tags available" message when no tags are present
+   - Added better debug logging for tag data structures
+   - Created diagnostic tools to visualize the actual API response formats
+   - Added fallback mechanisms to handle different tag data structures
+
+6. **Testing & Verification**:
+   - Created a diagnostic endpoint to directly test tag data retrieval
+   - Added a debug page to visualize the tag data coming from Strapi
+   - Confirmed that all tag types (genre, mood, instrument) display correctly
+   - Validated that tag filtering works properly in the explore page
+
+This fix improves the user experience by properly displaying all available tags in the sidebar, making the filtering system fully functional. The flexible parsing approach now accommodates variations in API response formats, making the system more robust.
+
+### Tag Relationship Fix
+
+A critical issue with tag relationships was identified and fixed in June 2025:
+
+1. **Problem Identified**:
+   - Tags could only be associated with one track at a time
+   - When adding an existing tag (e.g., "Drums") to a new track, it would disappear from any previous tracks that used it
+   - This severely limited the usefulness of tags for categorization and filtering
+
+2. **Root Cause**:
+   - Strapi schema defined the relationship incorrectly as one-to-many/many-to-one instead of many-to-many
+   - In the track schema, tags were defined as:
+     ```json
+     "tags": {
+       "type": "relation",
+       "relation": "oneToMany",
+       "target": "api::tag.tag",
+       "mappedBy": "track"
+     }
+     ```
+   - In the tag schema, track was defined as:
+     ```json
+     "track": {
+       "type": "relation",
+       "relation": "manyToOne",
+       "target": "api::track.track",
+       "inversedBy": "tags"
+     }
+     ```
+
+3. **Solution Implemented**:
+   - Modified both schemas to create a proper many-to-many relationship
+   - Updated track schema to use "manyToMany" relation and reference "tracks" (plural)
+   - Updated tag schema to rename "track" field to "tracks" and use "manyToMany" relation
+   - Changes to track schema:
+     ```json
+     "tags": {
+       "type": "relation",
+       "relation": "manyToMany",
+       "target": "api::tag.tag",
+       "mappedBy": "tracks"
+     }
+     ```
+   - Changes to tag schema:
+     ```json
+     "tracks": {
+       "type": "relation",
+       "relation": "manyToMany",
+       "target": "api::track.track",
+       "inversedBy": "tags"
+     }
+     ```
+
+4. **Impact**:
+   - Tags can now be properly reused across multiple tracks
+   - The filtering system works more intuitively, with proper grouping by tag
+   - Improved overall data model integrity
+   - Better user experience when adding tags to tracks
+
+5. **Implementation Notes**:
+   - This change requires running Strapi migrations to update the database schema
+   - Existing tag-track relationships need to be recreated after the schema change
+   - The frontend code doesn't require changes as it already expects tags to be reusable across tracks
+
+This fix ensures that tags behave as expected in a categorization system, allowing proper filtering, searching, and organization of tracks by common attributes.

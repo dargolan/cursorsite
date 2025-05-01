@@ -10,6 +10,7 @@ import { createAudio, convertUrlToProxyUrl } from '../lib/audio';
 import { useCart } from '../contexts/CartContext';
 import { getTrackCoverImageUrl } from '../utils/media-helpers';
 import PlayButton from './AudioPlayer/PlayButton';
+import { getTags } from '../services/strapi';
 
 // Global audio manager to ensure only one audio source plays at a time
 const globalAudioManager = {
@@ -772,6 +773,9 @@ export default function AudioPlayer({
   const [progressIntervals, setProgressIntervals] = useState<Record<string, number>>({});
   const [showToast, setShowToast] = useState<{stemId: string, stemName: string, price: number, action: 'add' | 'remove'} | null>(null);
   
+  // Track tags state
+  const [trackTags, setTrackTags] = useState<Tag[]>(track.tags || []);
+  
   // Check if stems are expanded
   const isStemsOpen = openStemsTrackId === track.id;
   
@@ -784,25 +788,59 @@ export default function AudioPlayer({
     }
   };
   
-  // Group tags by type for display, filtering out Instrument tags
-  const tagsByType = track.tags.reduce<Record<string, Tag[]>>((acc, tag) => {
-    // Only include Genre and Mood tags (case insensitive comparison)
-    const tagTypeLower = (tag.type || '').toLowerCase();
-    if (tagTypeLower === 'genre' || tagTypeLower === 'mood') {
-      // Use the original type from the tag for consistency
-      const type = tag.type;
-      if (!acc[type]) {
-        acc[type] = [];
-      }
-      acc[type].push(tag);
-      
-      // Debug log to check tag types
-      console.log(`[AudioPlayer] Including tag "${tag.name}" with type "${tag.type}"`);
-    } else {
-      console.log(`[AudioPlayer] Excluding tag "${tag.name}" with type "${tag.type}"`);
+  // Fetch tags if none are provided
+  useEffect(() => {
+    if (track.tags && track.tags.length > 0) {
+      console.log(`[AudioPlayer] Track ${track.id} has ${track.tags.length} tags from Strapi:`, 
+        track.tags.map(tag => `${tag.name} (${tag.type})`));
+      setTrackTags(track.tags);
+      return;
     }
+    
+    // No fallback tags - if there are no tags, we just show a message that there are no tags
+    console.log(`[AudioPlayer] Track ${track.id} has no tags and we won't create fallbacks`);
+  }, [track.id, track.tags, track.title]);
+  
+  // Group tags by type for display
+  console.log('[AudioPlayer] Processing tags for track:', {
+    trackId: track.id,
+    trackTitle: track.title,
+    tagsCount: trackTags.length || 0,
+    tags: trackTags
+  });
+  
+  const tagsByType = (trackTags || []).reduce<Record<string, Tag[]>>((acc, tag) => {
+    // Only include genre and mood tags, not instrument tags
+    const effectiveType = tag.type || 'genre';
+    
+    // Skip instrument tags
+    if (effectiveType === 'instrument') {
+      console.log(`[AudioPlayer] Filtering out instrument tag "${tag.name}"`);
+      return acc;
+    }
+    
+    // Initialize array if needed
+    if (!acc[effectiveType]) {
+      acc[effectiveType] = [];
+    }
+    
+    // Add tag to appropriate category
+    acc[effectiveType].push(tag);
+    
+    // Debug log to check tag types
+    console.log(`[AudioPlayer] Including tag "${tag.name}" with effective type "${effectiveType}"`);
+    
     return acc;
   }, {});
+  
+  // Also filter trackTags for the fallback display in case tagsByType is empty
+  const filteredTrackTags = trackTags.filter(tag => (tag.type || 'genre') !== 'instrument');
+  
+  // Log the final tag structure
+  console.log('[AudioPlayer] Tag structure for display:', {
+    trackId: track.id,
+    tagsByType: Object.keys(tagsByType).map(key => `${key}: ${tagsByType[key].length} tags`)
+  });
   
   // Add an effect to listen for stem-stopped events from other components
   useEffect(() => {
@@ -1757,29 +1795,49 @@ export default function AudioPlayer({
           
           {/* Tags area */}
           <div className="w-52 mr-8 flex-shrink-0">
-            <div className="text-[12.5px] font-normal text-[#999999] overflow-hidden line-clamp-2">
-              {Object.entries(tagsByType).flatMap(([type, tags], typeIndex, array) => (
-                tags.map((tag, tagIndex, tagArray) => (
-                  <React.Fragment key={tag.id}>
-                    <button 
-                      onClick={() => {
-                        console.log('[AudioPlayer] Tag clicked:', tag);
-                        console.log('[AudioPlayer] Tag object structure:', JSON.stringify(tag));
-                        onTagClick(tag);
-                      }}
-                      className="hover:text-[#1DF7CE] transition-colors inline"
-                    >
-                      {tag.name}
-                    </button>
-                    {tagIndex < tagArray.length - 1 && <span>, </span>}
-                    {typeIndex < array.length - 1 && tagIndex === tagArray.length - 1 && <span>, </span>}
-                  </React.Fragment>
-                ))
-              ))}
+            <div className="text-[12.5px] font-normal text-[#999999] line-clamp-2 relative">
+              {trackTags && trackTags.length > 0 && filteredTrackTags.length > 0 ? (
+                // Check if tagsByType has any entries
+                Object.entries(tagsByType).length > 0 ? (
+                  Object.entries(tagsByType).flatMap(([type, tags], typeIndex, array) => (
+                    tags.map((tag, tagIndex, tagArray) => (
+                      <React.Fragment key={tag.id}>
+                        <button 
+                          onClick={() => {
+                            console.log('[AudioPlayer] Tag clicked:', tag);
+                            console.log('[AudioPlayer] Tag object structure:', JSON.stringify(tag));
+                            onTagClick(tag);
+                          }}
+                          className="hover:text-[#1DF7CE] transition-colors inline-flex items-center relative z-10"
+                        >
+                          {tag.name}
+                        </button>
+                        {tagIndex < tagArray.length - 1 && <span>, </span>}
+                        {typeIndex < array.length - 1 && tagIndex === tagArray.length - 1 && <span>, </span>}
+                      </React.Fragment>
+                    ))
+                  ))
+                ) : (
+                  // If we have tags but no types, just display them all
+                  filteredTrackTags.map((tag, tagIndex) => (
+                    <React.Fragment key={tag.id || `tag-${tagIndex}`}>
+                      <button 
+                        onClick={() => onTagClick(tag)}
+                        className="hover:text-[#1DF7CE] transition-colors inline-flex items-center relative z-10"
+                      >
+                        {tag.name}
+                      </button>
+                      {tagIndex < filteredTrackTags.length - 1 && <span>, </span>}
+                    </React.Fragment>
+                  ))
+                )
+              ) : (
+                <></>
+              )}
             </div>
+          </div>
         </div>
-      </div>
-      
+        
         {/* Progress bar, duration, and buttons - fixed layout with reliable spacing */}
         <div className="flex items-center justify-between flex-grow pl-24">
           {/* Progress bar - fixed width */}
