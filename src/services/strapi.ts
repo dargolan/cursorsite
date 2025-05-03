@@ -1,7 +1,6 @@
 import { Track, Tag, Stem } from '../types';
 import { STRAPI_URL, API_URL, API_TOKEN } from '../config/strapi';
 import { getProxiedMediaUrl } from '../utils/media-helpers';
-import idMappingCache from '../utils/client-mapping';
 
 // Debug info for environment setup (only log once)
 if (typeof window !== 'undefined') {
@@ -68,82 +67,59 @@ export function normalizeTrack(strapiTrack: any): Track {
     }
     
     // Get track title for path generation
-    const trackTitle = data.title || 'Unknown Track';
+    const trackTitle = data.title || data.Title || 'Unknown Track';
     
-    // Determine UUID for S3 access
-    // 1. Check if it's directly in the data
-    let s3TrackId = data.uuid || data.s3_uuid || '';
-    
-    // 2. If not found in data, note that we'll rely on API mapping
-    if (!s3TrackId && trackId) {
-      console.log(`[normalizeTrack] No direct UUID for track ID ${trackId}, will rely on API mapping`);
-    }
-    
-    // Extract raw URLs or generate paths based on track ID
-    // audioUrl and imageUrl will be populated by the frontend using ID
+    // Get the actual URLs directly from Strapi
     let audioUrl = data.audioUrl || '';
-    let imageUrl = data.imageUrl || '';
-    
-    // Use UUID from metadata if available, else generate a path to use
-    const s3Path = s3TrackId 
-      ? `tracks/${s3TrackId}` 
-      : `tracks/${trackId}`;  // Use numeric ID - API will handle mapping
-
-    // If no URL was provided, build the audio and image URLs based on the path
-    if (!audioUrl) {
-      audioUrl = `/api/direct-s3/${s3Path}/main.mp3`;
-      console.log(`[normalizeTrack] Generated audio URL: ${audioUrl}`);
-    }
-    
-    if (!imageUrl) {
-      imageUrl = `/api/direct-s3/${s3Path}/image`;
-      console.log(`[normalizeTrack] Generated image URL: ${imageUrl}`);
-    }
-
-    // Always proxy CloudFront URLs to avoid CORS issues
-    const proxiedAudioUrl = getProxiedMediaUrl(audioUrl);
-    const proxiedImageUrl = getProxiedMediaUrl(imageUrl);
-    
-    console.log(`[normalizeTrack] Track ${trackTitle} (ID: ${trackId}, S3 Path: ${s3Path})`);
+    let imageUrl = data.imageUrl || data.ImageUrl || '';
     
     // Process tags from Strapi response
     let tags: Tag[] = [];
     if (data.tags?.data && Array.isArray(data.tags.data)) {
-      tags = data.tags.data.map((tag: any) => ({
-        id: tag.id.toString(),
-        name: tag.attributes?.name || 'Unknown Tag',
-        type: tag.attributes?.type || 'genre'
-      }));
+      tags = data.tags.data.map((tag: any) => {
+        // Handle both formats (attributes or direct properties)
+        const tagData = tag.attributes || tag;
+        return {
+          id: tag.id.toString(),
+          name: tagData?.name || 'Unknown Tag',
+          type: tagData?.type || 'genre'
+        };
+      });
       
       console.log(`[normalizeTrack] Track ${trackTitle} has ${tags.length} tags: ${tags.map(t => t.name).join(', ')}`);
     } else {
       console.warn(`[normalizeTrack] Track ${trackTitle} has no tags or invalid tag structure`);
     }
     
+    // Process stems directly from Strapi data
+    const stems = data.stems?.data?.map((stem: any) => {
+      const stemData = stem.attributes || stem;
+      return {
+        id: stem.id.toString(),
+        name: stemData?.name || 'Unknown Stem',
+        url: getProxiedMediaUrl(stemData?.url || ''),
+        price: Number(stemData?.price) || 0,
+        duration: Number(stemData?.duration) || 0
+      };
+    }) || [];
+    
     return {
       id: trackId,
       title: trackTitle,
-      bpm: Number(data.bpm) || 0,
-      duration: Number(data.duration) || 0,
+      bpm: Number(data.bpm || data.BPM) || 0,
+      duration: Number(data.duration || data.Duration) || 0,
       tags: tags,
-      stems: data.stems?.data?.map((stem: any) => ({
-        id: stem.id.toString(),
-        name: stem.attributes?.name || 'Unknown Stem',
-        url: getProxiedMediaUrl(stem.attributes?.url || ''),
-        price: Number(stem.attributes?.price) || 0,
-        duration: Number(stem.attributes?.duration) || 0
-      })) || [],
-      hasStems: data.stems?.data?.length > 0 || false,
-      audioUrl: proxiedAudioUrl,
-      imageUrl: proxiedImageUrl,
-      waveform: data.waveform || [],
-      s3Path
+      stems: stems,
+      hasStems: stems.length > 0,
+      audioUrl: getProxiedMediaUrl(audioUrl),
+      imageUrl: getProxiedMediaUrl(imageUrl),
+      waveform: data.waveform || []
     };
   } catch (error) {
     console.error('Error normalizing track:', error);
     return {
       id: strapiTrack?.id?.toString() || 'error',
-      title: 'Error Track',
+      title: 'Error Loading Track',
       bpm: 0,
       duration: 0,
       tags: [],
@@ -151,8 +127,7 @@ export function normalizeTrack(strapiTrack: any): Track {
       audioUrl: '',
       imageUrl: '',
       hasStems: false,
-      waveform: [],
-      s3Path: ''
+      waveform: []
     };
   }
 }
@@ -499,129 +474,15 @@ export async function findStemFile(stemName: string, trackTitle: string): Promis
 }
 
 /**
- * Enhanced function to fetch complete track data from Strapi with direct UUID mapping
- * This removes dependency on hardcoded mappings by fetching and mapping IDs correctly
+ * Enhanced function to fetch complete track data from Strapi
+ * Simplified to rely solely on Strapi for all data
  */
 export async function getTracksWithMapping(): Promise<Track[]> {
   try {
-    console.log('[getTracksWithMapping] Fetching complete track data from Strapi');
+    console.log('[getTracksWithMapping] Fetching track data from Strapi');
     
-    // Make sure to get tags, stems, and all related data
-    const response = await fetch(`${API_URL}/tracks?populate=deep&pagination[pageSize]=100`, getRequestOptions());
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[getTracksWithMapping] Error fetching tracks: ${response.status}`, errorText);
-      throw new Error(`Error fetching tracks: ${response.status}`);
-    }
-
-    const data = await response.json();
-    if (!data?.data || !Array.isArray(data.data)) {
-      console.error('[getTracksWithMapping] Invalid or empty data returned from Strapi');
-      return [];
-    }
-
-    console.log(`[getTracksWithMapping] Retrieved ${data.data.length} tracks from Strapi`);
-    
-    // Process each track and extract proper info for the frontend
-    const processedTracks: Track[] = [];
-    
-    // 2. Extract essential metadata including UUIDs from Strapi
-    const tracks = await Promise.all(data.data.map(async (strapiTrack: any) => {
-      try {
-        // Get the track ID and data
-        const trackId = strapiTrack.id?.toString();
-        const trackData = strapiTrack.attributes || strapiTrack;
-        
-        if (!trackId) {
-          console.error('[getTracksWithMapping] Track missing ID:', strapiTrack);
-          return null;
-        }
-        
-        // Extract S3 UUID from Strapi metadata fields
-        // Check all possible locations where the UUID might be stored
-        let s3Uuid = trackData.uuid || 
-                    trackData.s3_uuid || 
-                    trackData.s3Id || 
-                    trackData.s3_id ||
-                    trackData.s3TrackId || 
-                    trackData.s3_track_id;
-                    
-        // If there's no direct UUID in the Strapi data, try to get it from the media URLs
-        if (!s3Uuid && (trackData.audioUrl || trackData.imageUrl)) {
-          const mediaUrl = trackData.audioUrl || trackData.imageUrl;
-          const uuidMatch = mediaUrl.match(/tracks\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
-          if (uuidMatch && uuidMatch[1]) {
-            s3Uuid = uuidMatch[1];
-            console.log(`[getTracksWithMapping] Extracted UUID ${s3Uuid} from media URL`);
-          }
-        }
-        
-        // As a last resort, dynamically fetch UUID mapping if we have a service for it
-        if (!s3Uuid) {
-          try {
-            // Try to fetch from mapping service
-            const mappingResponse = await fetch(`/api/debug/uuid-mapping?action=lookup&strapiId=${trackId}`);
-            if (mappingResponse.ok) {
-              const mappingData = await mappingResponse.json();
-              if (mappingData.uuid) {
-                s3Uuid = mappingData.uuid;
-                console.log(`[getTracksWithMapping] Found UUID ${s3Uuid} for ID ${trackId} via mapping service`);
-              }
-            }
-          } catch (mappingError) {
-            console.error(`[getTracksWithMapping] Error fetching mapping for ID ${trackId}:`, mappingError);
-          }
-        }
-        
-        // Generate S3 path based on UUID or track ID
-        const s3Path = s3Uuid ? `tracks/${s3Uuid}` : `tracks/${trackId}`;
-        
-        // Generate URLs for audio and image using dynamic paths
-        const audioUrl = `/api/direct-s3/${s3Path}/audio`;
-        const imageUrl = `/api/direct-s3/${s3Path}/image`;
-        
-        // Ensure that any existing URLs are converted to the dynamic endpoints
-        const normalizedAudioUrl = trackData.audioUrl?.includes('/main.mp3') 
-          ? `/api/direct-s3/${s3Path}/audio` 
-          : trackData.audioUrl || audioUrl;
-        
-        const normalizedImageUrl = trackData.imageUrl?.includes('/cover.jpg') 
-          ? `/api/direct-s3/${s3Path}/image` 
-          : trackData.imageUrl || imageUrl;
-        
-        return {
-          id: trackId,
-          title: trackData.title || 'Unknown Track',
-          bpm: Number(trackData.bpm) || 0,
-          duration: Number(trackData.duration) || 0,
-          tags: trackData.tags?.data?.map((tag: any) => ({
-            id: tag.id.toString(),
-            name: tag.attributes?.name || 'Unknown Tag',
-            type: tag.attributes?.type || 'genre'
-          })) || [],
-          stems: trackData.stems?.data?.map((stem: any) => ({
-            id: stem.id.toString(),
-            name: stem.attributes?.name || 'Unknown Stem',
-            url: getProxiedMediaUrl(stem.attributes?.url || ''),
-            price: Number(stem.attributes?.price) || 0,
-            duration: Number(stem.attributes?.duration) || 0
-          })) || [],
-          hasStems: trackData.stems?.data?.length > 0 || false,
-          audioUrl: getProxiedMediaUrl(normalizedAudioUrl),
-          imageUrl: getProxiedMediaUrl(normalizedImageUrl),
-          waveform: trackData.waveform || [],
-          s3Path,
-          s3Uuid // Include the UUID in the track data
-        };
-      } catch (trackError) {
-        console.error('[getTracksWithMapping] Error processing track:', trackError);
-        return null;
-      }
-    }));
-    
-    // Filter out null tracks and return
-    return tracks.filter(Boolean) as Track[];
+    // Use the same implementation as getTracks - no special handling needed
+    return getTracks();
   } catch (error) {
     console.error('[getTracksWithMapping] Error:', error);
     return [];
