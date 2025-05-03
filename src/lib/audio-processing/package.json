@@ -1,0 +1,16 @@
+{
+  "name": "@music-website/audio-processing",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "dependencies": {
+    "audio-decode": "^2.2.2",
+    "audiobuffer-to-wav": "^1.0.0",
+    "peaks.js": "^3.4.2",
+    "wavefile": "^11.0.0",
+    "waveform-data": "^4.5.1",
+    "wavesurfer.js": "^7.9.4",
+    "web-audio-api": "^0.2.2",
+    "web-audio-engine": "^0.13.4"
+  }
+} 

@@ -71,7 +71,7 @@ export default function NavBar({ cartItems, removeFromCart }: NavBarProps) {
                     {cartItems.map(item => (
                       <div key={item.id} className="flex justify-between items-center mb-2 p-2 hover:bg-[#232323] rounded">
                         <div>
-                          <p className="text-white font-normal text-xs">{item.type === 'track' ? 'Track' : 'Stem'}</p>
+                          <p className="text-white font-normal text-xs">Track</p>
                           <p className="text-[#CDCDCD] font-normal text-xs">${item.price.toFixed(2)}</p>
                         </div>
                         <button 

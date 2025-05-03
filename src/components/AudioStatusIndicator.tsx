@@ -13,7 +13,6 @@ export default function AudioStatusIndicator({
 }: AudioStatusIndicatorProps): React.ReactElement | null {
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
-  const [activeStemId, setActiveStemId] = useState<string | null>(null);
   const [trackInfo, setTrackInfo] = useState<{title?: string, artist?: string}>({});
   const [showTips, setShowTips] = useState(false);
   
@@ -37,7 +36,6 @@ export default function AudioStatusIndicator({
     const handleAudioEvents = (event: AudioEvent) => {
       if (event.type === 'play') {
         setActiveTrackId(event.trackId);
-        setActiveStemId(event.stemId);
         
         // Fetch track info (this would normally come from your store/state management)
         if (event.trackId) {
@@ -56,7 +54,7 @@ export default function AudioStatusIndicator({
               // Fallback if API fails - just use IDs
               setTrackInfo({
                 title: `Track ${event.trackId}`,
-                artist: event.stemId ? `Stem: ${event.stemId}` : 'Main'
+                artist: 'Unknown Artist'
               });
             });
         }

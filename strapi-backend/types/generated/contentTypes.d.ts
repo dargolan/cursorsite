@@ -420,7 +420,6 @@ export interface ApiTrackTrack extends Struct.CollectionTypeSchema {
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::track.track'> &
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
-    Stems: Schema.Attribute.JSON;
     tags: Schema.Attribute.Relation<'oneToMany', 'api::tag.tag'>;
     Title: Schema.Attribute.String & Schema.Attribute.Required;
     trackId: Schema.Attribute.UID;

@@ -1,4 +1,4 @@
-import { Track, Tag, Stem } from '../types';
+import { Track, Tag } from '../types';
 import { mockTracks } from "./mockData";
 
 // Define the base URL for your Strapi API
@@ -54,11 +54,6 @@ export async function getTracks(): Promise<Track[]> {
         // Extract attributes, handling both new and old Strapi formats
         const data = item.attributes || item;
         
-        // Debug stems
-        if (data.stems && Array.isArray(data.stems.data)) {
-          console.log(`Track ${data.title} has ${data.stems.data.length} stems`);
-        }
-        
         // Process tags - handle both formats
         let tags: Tag[] = [];
         if (data.tags) {
@@ -79,35 +74,6 @@ export async function getTracks(): Promise<Track[]> {
           }
         }
         
-        // Process stems - handle both formats
-        let stems: Stem[] = [];
-        let hasStems = false;
-        if (data.stems) {
-          if (data.stems.data && Array.isArray(data.stems.data)) {
-            // New Strapi format
-            stems = data.stems.data.map((stem: any) => {
-              const stemAttrs = stem.attributes || stem;
-              return {
-                id: stem.id.toString(),
-                name: stemAttrs.name || 'Unknown Stem',
-                url: stemAttrs.url || stemAttrs.audio?.data?.attributes?.url || '',
-                price: Number(stemAttrs.price || 0),
-                duration: Number(stemAttrs.duration || 0)
-              };
-            });
-          } else if (Array.isArray(data.stems)) {
-            // Old format
-            stems = data.stems.map((stem: any) => ({
-              id: stem.id.toString(),
-              name: stem.name || 'Unknown Stem',
-              url: stem.url || stem.audio?.url || '',
-              price: Number(stem.price || 0),
-              duration: Number(stem.duration || 0)
-            }));
-          }
-          hasStems = stems.length > 0;
-        }
-        
         // Create waveform array from URL if needed
         const waveform = data.waveform?.data ? [1, 0.8, 0.6, 0.4, 0.6, 0.8, 1] : undefined; // Placeholder waveform
         
@@ -117,8 +83,6 @@ export async function getTracks(): Promise<Track[]> {
           bpm: data.bpm ? parseFloat(data.bpm) : 120,
           duration: data.duration ? parseFloat(data.duration) : 180,
           tags: tags,
-          stems: stems,
-          hasStems: hasStems,
           audioUrl: data.audio?.data?.attributes?.url || data.audio?.url || '',
           waveform: waveform,
           imageUrl: data.image?.data?.attributes?.url || data.image?.url || '',
@@ -210,7 +174,9 @@ function ensureValidType(category: string | undefined): 'genre' | 'mood' | 'inst
  */
 export async function getTrack(id: string): Promise<Track | null> {
   try {
-    // Find the track in mock data first
+    console.log(`Fetching track with ID: ${id}`);
+    
+    // Check mock data first (for working offline)
     const mockTracks = getMockTracks();
     const mockTrack = mockTracks.find(track => track.id === id);
     if (mockTrack) {
@@ -245,18 +211,10 @@ export async function getTrack(id: string): Promise<Track | null> {
       duration: item.Duration || 0, // Changed from track.duration
       imageUrl: item.Cover?.url || '', // Changed structure
       audioUrl: item.Audio?.url || '', // Changed structure
-      hasStems: Boolean(item.stems?.length), // Changed structure
       tags: (item.tags || []).map((tag: any) => ({
         id: tag.id?.toString() || '',
         name: tag.Name || 'Unknown Tag', // Changed from name
         type: ensureValidType(tag.Category), // Changed from category
-      })),
-      stems: (item.stems || []).map((stem: any) => ({
-        id: stem.id?.toString() || '',
-        name: stem.Title || 'Untitled Stem', // Changed from title
-        url: stem.Audio?.url || '', // Changed structure
-        price: Number(stem.Price) || 0, // Changed from price
-        duration: Number(stem.Duration) || 0, // Changed from duration
       })),
     };
   } catch (error) {
@@ -276,15 +234,10 @@ function getMockTracks(): Track[] {
       duration: 180,
       imageUrl: '',
       audioUrl: '',
-      hasStems: true,
       tags: [
         { id: 'tag-1', name: 'Electronic', type: 'genre' },
         { id: 'tag-2', name: 'Energetic', type: 'mood' },
         { id: 'tag-9', name: 'Drums', type: 'instrument' }
-      ],
-      stems: [
-        { id: 'stem-1', name: 'Drums', url: '', price: 9.99, duration: 180 },
-        { id: 'stem-2', name: 'Bass', url: '', price: 8.99, duration: 180 }
       ]
     },
     {
@@ -294,15 +247,10 @@ function getMockTracks(): Track[] {
       duration: 210,
       imageUrl: '',
       audioUrl: '',
-      hasStems: true,
       tags: [
         { id: 'tag-3', name: 'Hip Hop', type: 'genre' },
         { id: 'tag-4', name: 'Chill', type: 'mood' },
         { id: 'tag-8', name: 'Guitar', type: 'instrument' }
-      ],
-      stems: [
-        { id: 'stem-3', name: 'Vocals', url: '', price: 12.99, duration: 210 },
-        { id: 'stem-4', name: 'Beat', url: '', price: 10.99, duration: 210 }
       ]
     },
     {
@@ -312,16 +260,11 @@ function getMockTracks(): Track[] {
       duration: 195,
       imageUrl: '',
       audioUrl: '',
-      hasStems: true,
       tags: [
         { id: 'tag-5', name: 'Jazz', type: 'genre' },
         { id: 'tag-6', name: 'Relaxed', type: 'mood' },
         { id: 'tag-7', name: 'Piano', type: 'instrument' },
         { id: 'tag-10', name: 'Saxophone', type: 'instrument' }
-      ],
-      stems: [
-        { id: 'stem-5', name: 'Piano', url: '', price: 7.99, duration: 195 },
-        { id: 'stem-6', name: 'Saxophone', url: '', price: 8.99, duration: 195 }
       ]
     }
   ];

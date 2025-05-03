@@ -1,57 +1,133 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { audioManager } from '../lib/audio-manager';
-import { globalAudioController } from '../lib/global-audio-controller';
 
 interface UseAudioPlayerProps {
   src?: string;
+  trackId?: string;
   autoPlay?: boolean;
   loop?: boolean;
+  volume?: number;
+  onTimeUpdate?: (time: number, duration: number) => void;
   onEnded?: () => void;
-  onTimeUpdate?: (currentTime: number, duration: number) => void;
-  stemId?: string;
-  trackId?: string;
 }
 
 export function useAudioPlayer({
   src,
+  trackId,
   autoPlay = false,
   loop = false,
-  onEnded,
+  volume = 1,
   onTimeUpdate,
-  stemId,
-  trackId,
-}: UseAudioPlayerProps = {}) {
+  onEnded
+}: UseAudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
-  // Play/pause functions
+  // Make an audio element on mount
+  useEffect(() => {
+    if (!audioRef.current) {
+      const audio = new Audio();
+      audioRef.current = audio;
+      
+      // Default attributes
+      audio.crossOrigin = 'anonymous';
+      audio.preload = 'auto';
+      
+      // Set up event listeners
+      audio.addEventListener('loadstart', () => setIsLoading(true));
+      audio.addEventListener('loadeddata', () => {
+        setIsLoading(false);
+        setIsLoaded(true);
+        setDuration(audio.duration);
+      });
+      audio.addEventListener('ended', () => {
+        setIsPlaying(false);
+        if (onEnded) onEnded();
+        
+        // Reset to start
+        audioRef.current!.currentTime = 0;
+        setCurrentTime(0);
+      });
+      audio.addEventListener('timeupdate', () => {
+        setCurrentTime(audio.currentTime);
+        if (onTimeUpdate) onTimeUpdate(audio.currentTime, audio.duration);
+      });
+      audio.addEventListener('error', (e) => {
+        setIsLoading(false);
+        setError(new Error(`Failed to load audio file: ${e}`));
+      });
+    }
+    
+    // Cleanup function
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+        
+        // Clean up any global references
+        if (audioManager.activeAudio === audioRef.current) {
+          audioManager.stop();
+        }
+      }
+    };
+  }, [onEnded, onTimeUpdate]);
+  
+  // Set or update audio source
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !src) return;
+    
+    // Set new src only if it changed
+    if (audio.src !== src) {
+      setIsLoaded(false);
+      setIsLoading(true);
+      audio.src = src;
+      audio.load();
+    }
+    
+    // Apply props
+    audio.loop = loop;
+    audio.volume = Math.min(1, Math.max(0, volume));
+    
+    // Auto play if requested
+    if (autoPlay && src) {
+      audioManager.play(audio, { trackId });
+      setIsPlaying(true);
+    }
+  }, [src, autoPlay, loop, volume, trackId]);
+  
+  // Global audio manager active changes
+  useEffect(() => {
+    const unsubscribe = audioManager.subscribe((activeId) => {
+      // If the active ID changed and it's not this track
+      if (audioManager.activeAudio !== audioRef.current && isPlaying) {
+        setIsPlaying(false);
+      }
+    });
+    
+    return () => {
+      unsubscribe();
+    };
+  }, [isPlaying, trackId]);
+  
+  // Play/pause controls
   const play = useCallback(() => {
     if (!audioRef.current) return;
     
-    // Use our new global audio controller instead of audioManager
-    globalAudioController.play(audioRef.current)
-      .then(() => setIsPlaying(true))
-      .catch(err => {
-        setError(err);
-        setIsPlaying(false);
-      });
-      
-    // Still use audioManager for event dispatching if needed  
-    audioManager.activeAudio = audioRef.current;
-    audioManager.activeStemId = stemId || null;
-    audioManager.activeTrackId = trackId || null;
-  }, [stemId, trackId]);
+    audioManager.play(audioRef.current, { trackId });
+    setIsPlaying(true);
+  }, [trackId]);
   
   const pause = useCallback(() => {
     if (!audioRef.current) return;
     
-    // Use our global controller for pausing
-    globalAudioController.pause();
+    audioRef.current.pause();
     setIsPlaying(false);
   }, []);
   
@@ -66,107 +142,22 @@ export function useAudioPlayer({
   const seek = useCallback((time: number) => {
     if (!audioRef.current) return;
     
-    audioRef.current.currentTime = Math.min(Math.max(0, time), duration);
-    setCurrentTime(audioRef.current.currentTime);
+    const constrainedTime = Math.max(0, Math.min(time, duration));
+    audioRef.current.currentTime = constrainedTime;
+    setCurrentTime(constrainedTime);
   }, [duration]);
-  
-  // Initialize audio element
-  useEffect(() => {
-    if (!src) return;
-    
-    // Create audio element if it doesn't exist
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-    }
-    
-    const audio = audioRef.current;
-    
-    // Set properties
-    audio.src = src;
-    audio.loop = loop;
-    
-    // Set up listeners
-    const handleLoadStart = () => setIsLoading(true);
-    const handleLoadedData = () => {
-      setIsLoading(false);
-      setDuration(audio.duration);
-      if (autoPlay) {
-        play();
-      }
-    };
-    const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-      onTimeUpdate?.(audio.currentTime, audio.duration);
-    };
-    const handleEnded = () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-      onEnded?.();
-    };
-    const handleError = (e: ErrorEvent) => {
-      setIsLoading(false);
-      setError(e.error || new Error('Failed to load audio'));
-    };
-    
-    // Add event listeners
-    audio.addEventListener('loadstart', handleLoadStart);
-    audio.addEventListener('loadeddata', handleLoadedData);
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('error', handleError as EventListener);
-    
-    // Subscribe to global audio controller
-    const unsubscribe = globalAudioController.subscribe((playingState) => {
-      // If global state says not playing but we think we are, update our state
-      if (!playingState && isPlaying && audio === globalAudioController['currentAudio']) {
-        setIsPlaying(false);
-      }
-    });
-    
-    // Clean up on unmount
-    return () => {
-      audio.removeEventListener('loadstart', handleLoadStart);
-      audio.removeEventListener('loadeddata', handleLoadedData);
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('error', handleError as EventListener);
-      
-      // Unsubscribe from global controller
-      unsubscribe();
-      
-      // Stop and unload
-      audio.pause();
-      audio.src = '';
-    };
-  }, [src, autoPlay, loop, onTimeUpdate, onEnded, play, isPlaying]);
-
-  // Listen for global stop events for this stem
-  useEffect(() => {
-    if (!stemId) return;
-    
-    const handleStemStopped = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      if (customEvent.detail?.stemId === stemId) {
-        setIsPlaying(false);
-      }
-    };
-    
-    document.addEventListener('stem-stopped', handleStemStopped);
-    return () => {
-      document.removeEventListener('stem-stopped', handleStemStopped);
-    };
-  }, [stemId]);
   
   return {
     isPlaying,
-    duration,
     currentTime,
+    duration,
+    isLoaded,
     isLoading,
     error,
     play,
     pause,
     toggle,
     seek,
-    audioRef,
+    audioRef
   };
 } 

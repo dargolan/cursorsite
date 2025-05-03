@@ -3,10 +3,13 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { CartItem as GlobalCartItem } from '../types';
 
-// Extending the CartItem from types.ts but making the type field optional with a default
-interface CartItem extends Omit<GlobalCartItem, 'type' | 'trackTitle'> {
-  type?: 'track' | 'stem';
-  trackName: string;
+// Replace the CartItem interface with this simplified version
+export interface CartItem {
+  id: string;
+  type: 'track';
+  price: number;
+  name: string;
+  imageUrl: string;
 }
 
 interface CartContextType {
@@ -41,10 +44,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         const convertedCart = parsedCart.map((item: any) => ({
           id: item.id,
           name: item.name,
-          trackName: item.trackName || item.trackTitle || '', // Support both properties
           price: item.price,
           imageUrl: item.imageUrl,
-          type: item.type || 'stem' // Default to stem if not specified
+          type: 'track' // All items are tracks now
         }));
         setItems(convertedCart);
       }
@@ -72,13 +74,10 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     
-    // Add the item to the cart with default type if not specified
+    // Add the item to the cart
     setItems(prevItems => [
       ...prevItems, 
-      {
-        ...item,
-        type: item.type || 'stem'
-      }
+      item
     ]);
   };
   

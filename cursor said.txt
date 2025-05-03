@@ -1,0 +1,6 @@
+The correct approach, which you're implementing through your cleanup, is to:
+Remove all hardcoded track references from the code
+Use a single, consistent method to access stem files for any track
+Handle all tracks generically through the stem-audio endpoint
+Keep track and stem data in your database (or JSON files) completely separate from application logic
+This way, when you add track #1,000, nothing in your code needs to change - your application will handle it exactly the same way as track #1, using the consistent URL patterns and API endpoints you've established.

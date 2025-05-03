@@ -11,7 +11,7 @@ import { getTracks, getTags, getTracksByTags, searchTracks } from '../services/s
 import { getCart, addToCart, removeFromCart, getCartTotal } from '../services/cart';
 
 // Lazy load the AudioPlayer component to improve performance
-const AudioPlayer = dynamic(() => import('../components/AudioPlayer'), {
+const AudioPlayer = dynamic(() => import('../components/SimplifiedAudioPlayer'), {
   loading: () => <div className="h-24 bg-[#1E1E1E] animate-pulse rounded"></div>,
   ssr: false, // This component uses browser APIs like wavesurfer
 });

@@ -7,27 +7,23 @@
 
 interface AudioPlayOptions {
   trackId?: string;
-  stemId?: string;
   seekTime?: number;
 }
 
 export interface AudioEvent {
   type: 'play' | 'pause' | 'stop' | 'ended' | 'timeupdate';
   trackId: string | null;
-  stemId: string | null;
   time?: number;
 }
 
 type AudioEventListener = (event: AudioEvent) => void;
 
 type PlayInfo = {
-  stemId?: string;
   trackId?: string;
 };
 
 class AudioManager {
   activeAudio: HTMLAudioElement | null = null;
-  activeStemId: string | null = null;
   activeTrackId: string | null = null;
   private stateListeners: Set<(trackId: string | null) => void> = new Set();
   private eventListeners: Set<AudioEventListener> = new Set();
@@ -50,7 +46,6 @@ class AudioManager {
         this.dispatchEvent({
           type: 'timeupdate',
           trackId: this.activeTrackId,
-          stemId: this.activeStemId,
           time: this.activeAudio.currentTime
         });
       }
@@ -68,16 +63,10 @@ class AudioManager {
       
       // Reset currentTime
       this.activeAudio.currentTime = 0;
-      
-      // Dispatch custom event for stem stopped
-      if (this.activeStemId) {
-        this.dispatchStemStoppedEvent(this.activeStemId, this.activeTrackId);
-      }
     }
     
     // Set new active audio
     this.activeAudio = audio;
-    this.activeStemId = info?.stemId || null;
     this.activeTrackId = info?.trackId || null;
     
     // Play the new audio
@@ -92,15 +81,9 @@ class AudioManager {
   stop(): void {
     if (this.activeAudio && !this.activeAudio.paused) {
       this.activeAudio.pause();
-      
-      // Dispatch custom event if it's a stem
-      if (this.activeStemId) {
-        this.dispatchStemStoppedEvent(this.activeStemId, this.activeTrackId);
-      }
     }
     
     this.activeAudio = null;
-    this.activeStemId = null;
     this.activeTrackId = null;
   }
 
@@ -132,19 +115,6 @@ class AudioManager {
     if (this.activeAudio) {
       this.activeAudio.currentTime = time;
     }
-  }
-
-  /**
-   * Helper to dispatch stem stopped event
-   */
-  private dispatchStemStoppedEvent(stemId: string | null, trackId: string | null): void {
-    const event = new CustomEvent('stem-stopped', {
-      detail: {
-        stemId,
-        trackId
-      }
-    });
-    document.dispatchEvent(event);
   }
 
   // Legacy subscribe method for backward compatibility

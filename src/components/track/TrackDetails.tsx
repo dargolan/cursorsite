@@ -4,11 +4,9 @@ import { Track, Tag } from '../../types';
 interface TrackDetailsProps {
   track: Track;
   onTagClick: (tag: Tag) => void;
-  openStemsHandler: () => void;
-  isOpen: boolean;
 }
 
-export const TrackDetails = ({ track, onTagClick, openStemsHandler, isOpen }: TrackDetailsProps) => {
+export const TrackDetails = ({ track, onTagClick }: TrackDetailsProps) => {
   return (
     <div className="flex flex-col">
       {/* Track Title */}
@@ -32,18 +30,6 @@ export const TrackDetails = ({ track, onTagClick, openStemsHandler, isOpen }: Tr
           </button>
         ))}
       </div>
-      
-      {/* Stems Button (if track has stems) */}
-      {track.stems && track.stems.length > 0 && (
-        <button
-          onClick={openStemsHandler}
-          className={`px-4 py-2 rounded-md text-white font-medium ${
-            isOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-transparent hover:bg-gray-700 border border-gray-600'
-          }`}
-        >
-          {isOpen ? 'Hide Stems' : 'Show Stems'}
-        </button>
-      )}
     </div>
   );
 }; 

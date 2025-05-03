@@ -1,76 +1,73 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState } from 'react';
+import { loadStripe } from '@stripe/stripe-js';
 
 interface StripeCheckoutProps {
-  stemId: string;
-  stemName: string;
   trackId: string;
   trackName: string;
   price: number;
+  className?: string;
   buttonText?: string;
-  userId?: string;
 }
 
-export default function StripeCheckout({
-  stemId,
-  stemName,
+// Initialize Stripe with your public key
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_KEY || '');
+
+export function StripeCheckout({
   trackId,
   trackName,
   price,
-  buttonText = 'Purchase',
-  userId
+  className = '',
+  buttonText = 'Buy Now'
 }: StripeCheckoutProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   const handleCheckout = async () => {
-    setIsLoading(true);
-    setError(null);
-
     try {
-      // Call our API to create a checkout session
-      const response = await fetch('/api/checkout', {
+      setIsLoading(true);
+      setError(null);
+
+      // Create Stripe checkout session
+      const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          stemId,
-          trackId,
-          userId,
-          stemName,
-          trackName,
-          price: price * 100, // Convert to cents for Stripe
+          items: [
+            {
+              id: trackId,
+              name: trackName,
+              price,
+              type: 'track'
+            }
+          ]
         }),
       });
 
-      const data = await response.json();
+      const { sessionId } = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create checkout session');
-      }
+      // Redirect to Stripe checkout
+      const stripe = await stripePromise;
+      const { error } = await stripe!.redirectToCheckout({ sessionId });
 
-      // Redirect to Stripe Checkout
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error('No checkout URL returned');
+      if (error) {
+        setError(error.message || 'Failed to redirect to checkout');
       }
     } catch (err: any) {
       console.error('Checkout error:', err);
-      setError(err.message || 'Failed to initiate checkout');
+      setError(err.message || 'Failed to start checkout process');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="stripe-checkout">
+    <div>
       {error && (
-        <div className="text-red-500 mb-3 text-sm">
+        <div className="text-red-500 mb-2 text-sm">
           {error}
         </div>
       )}
@@ -78,95 +75,9 @@ export default function StripeCheckout({
       <button
         onClick={handleCheckout}
         disabled={isLoading}
-        className={`bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md 
-                    transition-colors ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
-      >
-        {isLoading ? 'Processing...' : buttonText}
-      </button>
-    </div>
-  );
-} 
-
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-
-interface StripeCheckoutProps {
-  stemId: string;
-  stemName: string;
-  trackId: string;
-  trackName: string;
-  price: number;
-  buttonText?: string;
-  userId?: string;
-}
-
-export default function StripeCheckout({
-  stemId,
-  stemName,
-  trackId,
-  trackName,
-  price,
-  buttonText = 'Purchase',
-  userId
-}: StripeCheckoutProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
-
-  const handleCheckout = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Call our API to create a checkout session
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          stemId,
-          trackId,
-          userId,
-          stemName,
-          trackName,
-          price: price * 100, // Convert to cents for Stripe
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create checkout session');
-      }
-
-      // Redirect to Stripe Checkout
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error('No checkout URL returned');
-      }
-    } catch (err: any) {
-      console.error('Checkout error:', err);
-      setError(err.message || 'Failed to initiate checkout');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="stripe-checkout">
-      {error && (
-        <div className="text-red-500 mb-3 text-sm">
-          {error}
-        </div>
-      )}
-      
-      <button
-        onClick={handleCheckout}
-        disabled={isLoading}
-        className={`bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md 
-                    transition-colors ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+        className={`flex items-center justify-center rounded-md px-4 py-2 
+          bg-[#6772E5] text-white hover:bg-[#5469D4] transition-colors
+          ${isLoading ? 'opacity-70 cursor-not-allowed' : ''} ${className}`}
       >
         {isLoading ? 'Processing...' : buttonText}
       </button>

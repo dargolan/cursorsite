@@ -10,14 +10,12 @@
 
 export interface AudioPlayOptions {
   trackId?: string;
-  stemId?: string;
   seekTime?: number;
 }
 
 export interface AudioEvent {
   type: 'play' | 'pause' | 'stop' | 'ended' | 'timeupdate';
   trackId: string | null;
-  stemId: string | null;
   time?: number;
 }
 
@@ -28,7 +26,6 @@ class UnifiedAudioManager {
   
   // Current audio state
   private currentAudio: HTMLAudioElement | null = null;
-  private activeStemId: string | null = null;
   private activeTrackId: string | null = null;
   
   // Subscribers
@@ -68,7 +65,6 @@ class UnifiedAudioManager {
         this.dispatchEvent({
           type: 'timeupdate',
           trackId: this.activeTrackId,
-          stemId: this.activeStemId,
           time: this.currentAudio.currentTime
         });
       }
@@ -86,16 +82,10 @@ class UnifiedAudioManager {
       
       // Reset currentTime
       this.currentAudio.currentTime = 0;
-      
-      // Dispatch custom event for stem stopped
-      if (this.activeStemId) {
-        this.dispatchStemStoppedEvent(this.activeStemId, this.activeTrackId);
-      }
     }
     
     // Set new active audio
     this.currentAudio = audio;
-    this.activeStemId = options?.stemId || null;
     this.activeTrackId = options?.trackId || null;
     
     // Set seek time if provided
@@ -110,7 +100,6 @@ class UnifiedAudioManager {
     this.dispatchEvent({
       type: 'play',
       trackId: this.activeTrackId,
-      stemId: this.activeStemId,
       time: audio.currentTime
     });
     
@@ -136,7 +125,6 @@ class UnifiedAudioManager {
       this.dispatchEvent({
         type: 'pause',
         trackId: this.activeTrackId,
-        stemId: this.activeStemId,
         time: this.currentAudio.currentTime
       });
     }
@@ -150,16 +138,10 @@ class UnifiedAudioManager {
       this.currentAudio.pause();
       this.currentAudio.currentTime = 0;
       
-      // Dispatch custom event if it's a stem
-      if (this.activeStemId) {
-        this.dispatchStemStoppedEvent(this.activeStemId, this.activeTrackId);
-      }
-      
       // Dispatch stop event
       this.dispatchEvent({
         type: 'stop',
-        trackId: this.activeTrackId,
-        stemId: this.activeStemId
+        trackId: this.activeTrackId
       });
       
       // Notify subscribers
@@ -167,7 +149,6 @@ class UnifiedAudioManager {
     }
     
     this.currentAudio = null;
-    this.activeStemId = null;
     this.activeTrackId = null;
   }
 
@@ -185,7 +166,6 @@ class UnifiedAudioManager {
       this.dispatchEvent({
         type: 'play',
         trackId: this.activeTrackId,
-        stemId: this.activeStemId,
         time: this.currentAudio.currentTime
       });
     } else {
@@ -196,7 +176,6 @@ class UnifiedAudioManager {
       this.dispatchEvent({
         type: 'pause',
         trackId: this.activeTrackId,
-        stemId: this.activeStemId,
         time: this.currentAudio.currentTime
       });
     }
@@ -210,18 +189,14 @@ class UnifiedAudioManager {
   }
   
   /**
-   * Check if a specific stem or track is currently playing
+   * Check if a specific track is currently playing
    */
-  public isPlayingItem(info: { stemId?: string, trackId?: string }): boolean {
+  public isPlayingItem(info: { trackId?: string }): boolean {
     if (!this.isPlaying()) {
       return false;
     }
     
-    if (info.stemId && this.activeStemId === info.stemId) {
-      return true;
-    }
-    
-    if (info.trackId && this.activeTrackId === info.trackId && !this.activeStemId) {
+    if (info.trackId && this.activeTrackId === info.trackId) {
       return true;
     }
     
@@ -252,64 +227,56 @@ class UnifiedAudioManager {
   }
   
   /**
-   * Create a new audio element with proper settings
+   * Create a new audio element with the given URL
    */
   public createAudio(url: string, options?: { 
-    stemName?: string, 
     trackTitle?: string,
-    stemId?: string,
     trackId?: string
   }): HTMLAudioElement {
     const audio = new Audio(url);
     
-    // Set cross-origin attribute to avoid CORS issues
-    audio.crossOrigin = 'anonymous';
+    // Set cross-origin attribute for CORS requests
+    audio.crossOrigin = "anonymous";
     
-    // Add data attributes for identification
-    if (options?.stemName) {
-      audio.dataset.stem = options.stemName;
-    }
-    
+    // Add metadata attributes
     if (options?.trackTitle) {
-      audio.dataset.track = options.trackTitle;
-    }
-    
-    if (options?.stemId) {
-      audio.dataset.stemId = options.stemId;
+      audio.dataset.trackTitle = options.trackTitle;
     }
     
     if (options?.trackId) {
       audio.dataset.trackId = options.trackId;
     }
     
+    // Add ended event listener
+    audio.addEventListener('ended', () => {
+      // Dispatch ended event
+      this.dispatchEvent({
+        type: 'ended',
+        trackId: options?.trackId || null
+      });
+      
+      // Notify subscribers that playback has stopped
+      this.notifyPlaybackSubscribers(false);
+    });
+    
     return audio;
   }
-
+  
   /**
-   * Handle keypress events (space bar for play/pause)
+   * Handle space key press to toggle play/pause
    */
   private handleKeyPress = (event: KeyboardEvent): void => {
     // Only handle space key when not in an input field
-    if (event.code === 'Space' && 
-        !['INPUT', 'TEXTAREA', 'SELECT'].includes((event.target as HTMLElement)?.tagName)) {
+    if (
+      event.code === 'Space' && 
+      document.activeElement?.tagName !== 'INPUT' && 
+      document.activeElement?.tagName !== 'TEXTAREA'
+    ) {
       event.preventDefault();
       this.toggle();
     }
   };
   
-  /**
-   * Helper to dispatch stem stopped event
-   */
-  private dispatchStemStoppedEvent(stemId: string | null, trackId: string | null): void {
-    const event = new CustomEvent('stem-stopped', {
-      detail: {
-        stemId,
-        trackId
-      }
-    });
-    document.dispatchEvent(event);
-  }
-
   /**
    * Subscribe to playback state changes
    */
@@ -333,27 +300,27 @@ class UnifiedAudioManager {
       this.eventSubscribers.delete(listener);
     };
   }
-
+  
   /**
-   * Notify all playback subscribers of state changes
+   * Notify all playback subscribers of state change
    */
   private notifyPlaybackSubscribers(isPlaying: boolean): void {
     this.playbackSubscribers.forEach(callback => {
       callback(isPlaying);
     });
   }
-
+  
   /**
-   * Dispatch an event to all subscribers
+   * Dispatch event to all event subscribers
    */
   private dispatchEvent(event: AudioEvent): void {
     this.eventSubscribers.forEach(listener => {
       listener(event);
     });
   }
-
+  
   /**
-   * Clean up resources when no longer needed
+   * Clean up resources
    */
   public dispose(): void {
     if (typeof window !== 'undefined') {

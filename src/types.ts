@@ -6,16 +6,6 @@ export interface Tag {
   count?: number;
 }
 
-export interface Stem {
-  id: string;
-  name: string;
-  url: string;
-  alternativeUrl?: string;
-  price: number;
-  duration: number;
-  waveform?: number[];
-}
-
 export interface Track {
   id: string;
   title: string;
@@ -25,13 +15,11 @@ export interface Track {
   imageUrl: string;
   audioUrl: string;
   waveform?: number[];
-  hasStems: boolean;
-  stems?: Stem[];
 }
 
 export interface CartItem {
   id: string;
-  type: 'track' | 'stem';
+  type: 'track';
   price: number;
   name: string;
   trackTitle: string;

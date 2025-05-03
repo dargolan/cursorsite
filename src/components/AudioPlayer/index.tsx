@@ -2,14 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Track, Tag, Stem } from '../../types';
+import { Track, Tag } from '../../types';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { useCart } from '../../contexts/CartContext';
-import { findStemFileUrl } from '../../utils/stem-url-manager';
-import { STRAPI_URL } from '../../config/strapi';
 import PlayButton from './PlayButton';
 import WaveformVisualizer from './WaveformVisualizer';
-import StemPlayer from './StemPlayer';
 
 interface AudioPlayerProps {
   track: Track;
@@ -17,8 +14,6 @@ interface AudioPlayerProps {
   onPlay: () => void;
   onStop: () => void;
   onTagClick: (tag: Tag) => void;
-  openStemsTrackId: string | null;
-  setOpenStemsTrackId: (id: string | null) => void;
 }
 
 export default function AudioPlayer({
@@ -26,18 +21,12 @@ export default function AudioPlayer({
   isPlaying,
   onPlay,
   onStop,
-  onTagClick,
-  openStemsTrackId,
-  setOpenStemsTrackId
+  onTagClick
 }: AudioPlayerProps): React.ReactElement {
   const [trackUrl, setTrackUrl] = useState<string | null>(null);
   const [isUrlLoading, setIsUrlLoading] = useState(false);
-  const [showAllStems, setShowAllStems] = useState(false);
   
   const { items: cartItems, addItem, removeItem } = useCart();
-  
-  // Check if stems are expanded
-  const stemsExpanded = openStemsTrackId === track.id;
   
   // Load track audio URL
   useEffect(() => {
@@ -50,9 +39,8 @@ export default function AudioPlayer({
           return;
         }
         
-        // Otherwise try to find the main stem URL
-        const url = await findStemFileUrl('Main', track.title);
-        setTrackUrl(url);
+        // Set a fallback URL using the track ID
+        setTrackUrl(`/api/track-audio/${track.id}`);
       } catch (error) {
         console.error(`Error loading URL for track ${track.title}:`, error);
       } finally {
@@ -91,54 +79,19 @@ export default function AudioPlayer({
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
   
-  // Handle adding stem to cart
-  const handleStemAddToCart = (stem: Stem) => {
-    const stemItem = {
-      id: `${track.id}-${stem.id}`,
-      name: stem.name,
-      trackName: track.title,
-      price: stem.price,
-      imageUrl: track.imageUrl || '',
-      type: 'stem' as const,
-      stemId: stem.id,
-      trackId: track.id
-    };
-    
-    addItem(stemItem);
+  // Handle adding track to cart
+  const handleAddToCart = () => {
+    addItem({
+      id: track.id,
+      type: 'track',
+      price: 9.99, // Fixed price or use track.price if available
+      name: track.title,
+      imageUrl: track.imageUrl || ''
+    } as any); // Use type assertion to avoid the TypeScript error
   };
   
-  // Handle removing stem from cart
-  const handleStemRemoveFromCart = (stem: Stem) => {
-    removeItem(`${track.id}-${stem.id}`);
-  };
-  
-  // Check if a stem is in the cart
-  const isStemInCart = (stem: Stem): boolean => {
-    return cartItems.some(item => item.id === `${track.id}-${stem.id}`);
-  };
-  
-  // Toggle stems panel
-  const handleToggleStems = () => {
-    if (stemsExpanded) {
-      setOpenStemsTrackId(null);
-    } else {
-      setOpenStemsTrackId(track.id);
-    }
-  };
-  
-  // Download all stems
-  const handleDownloadAllStems = () => {
-    const stems = track.stems || [];
-    stems.forEach(stem => {
-      // Only download stems that are in the cart
-      if (isStemInCart(stem)) {
-        window.open(`${STRAPI_URL}/api/download/stem/${stem.id}`, '_blank');
-      }
-    });
-  };
-  
-  // Extract stems with null check
-  const stems = track.stems || [];
+  // Check if track is already in cart
+  const isInCart = cartItems.some(item => item.id === track.id && item.type === 'track');
   
   return (
     <div className="bg-[#1E1E1E] rounded-lg overflow-hidden flex flex-col mb-6">
@@ -188,19 +141,27 @@ export default function AudioPlayer({
             className="mr-4"
           />
           
-          <button 
-            className={`flex items-center text-sm px-3 py-1.5 rounded ${
-              stemsExpanded 
-                ? 'bg-[#1DF7CE] text-black hover:bg-[#1DF7CE]/90' 
-                : 'bg-[#282828] text-white hover:bg-[#333]'
-            } transition-colors`}
-            onClick={handleToggleStems}
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-            </svg>
-            Stems {stems.length > 0 && `(${stems.length})`}
-          </button>
+          {isInCart ? (
+            <button 
+              className="flex items-center text-sm px-3 py-1.5 rounded bg-[#282828] text-white hover:bg-[#333] transition-colors"
+              onClick={() => removeItem(track.id)}
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Remove
+            </button>
+          ) : (
+            <button 
+              className="flex items-center text-sm px-3 py-1.5 rounded bg-[#1DF7CE] text-black hover:bg-[#1DF7CE]/90 transition-colors"
+              onClick={handleAddToCart}
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              Add to Cart
+            </button>
+          )}
         </div>
       </div>
       
@@ -225,59 +186,25 @@ export default function AudioPlayer({
         </div>
       </div>
       
-      {/* Stems panel */}
-      {stemsExpanded && (
-        <div className="px-4 pb-4 border-t border-[#282828] pt-4">
-          <div className="flex justify-between items-center mb-4">
-            <h4 className="text-white font-medium">Stems</h4>
-            
-            {/* Only show download all button if there are stems in cart */}
-            {stems.some(stem => isStemInCart(stem)) && (
-              <button
-                onClick={handleDownloadAllStems}
-                className="text-[#1DF7CE] text-sm flex items-center hover:text-[#1DF7CE]/80 transition-colors"
-              >
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Download All
-              </button>
-            )}
+      {/* Track details */}
+      <div className="px-4 pb-4 border-t border-[#282828] pt-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-gray-400 text-sm mr-2">BPM:</span>
+            <span className="text-white text-sm">{track.bpm}</span>
           </div>
           
-          {/* Stem list */}
-          <div className="space-y-3">
-            {stems.length === 0 ? (
-              <p className="text-gray-400 text-sm">No stems available for this track.</p>
-            ) : (
-              <>
-                {/* Show the first few stems or all stems if showAllStems is true */}
-                {(showAllStems ? stems : stems.slice(0, 3)).map(stem => (
-                  <StemPlayer
-                    key={stem.id}
-                    stem={stem}
-                    trackTitle={track.title}
-                    trackId={track.id}
-                    isInCart={isStemInCart(stem)}
-                    onAddToCart={handleStemAddToCart}
-                    onRemoveFromCart={handleStemRemoveFromCart}
-                  />
-                ))}
-                
-                {/* "Show more" button if there are more than 3 stems */}
-                {stems.length > 3 && !showAllStems && (
-                  <button
-                    className="w-full py-2 text-sm text-[#1DF7CE] hover:text-[#1DF7CE]/80 transition-colors"
-                    onClick={() => setShowAllStems(true)}
-                  >
-                    Show {stems.length - 3} more stem{stems.length - 3 > 1 ? 's' : ''}
-                  </button>
-                )}
-              </>
-            )}
+          <div>
+            <span className="text-gray-400 text-sm mr-2">Duration:</span>
+            <span className="text-white text-sm">{formatTime(track.duration || duration)}</span>
+          </div>
+          
+          <div>
+            <span className="text-gray-400 text-sm mr-2">Price:</span>
+            <span className="text-white text-sm">$9.99</span>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 } 

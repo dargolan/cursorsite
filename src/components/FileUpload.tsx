@@ -12,7 +12,7 @@ interface FileUploadProps {
   label?: string;
   analyzeBpm?: boolean;
   onBpmDetected?: (bpm: number) => void;
-  fileType?: 'main' | 'stem';
+  fileType?: 'main' | 'image';
   multiple?: boolean;
 }
 

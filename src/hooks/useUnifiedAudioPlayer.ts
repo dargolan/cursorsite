@@ -7,7 +7,6 @@ interface UseAudioPlayerProps {
   loop?: boolean;
   onEnded?: () => void;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
-  stemId?: string;
   trackId?: string;
 }
 
@@ -17,7 +16,6 @@ export function useUnifiedAudioPlayer({
   loop = false,
   onEnded,
   onTimeUpdate,
-  stemId,
   trackId,
 }: UseAudioPlayerProps = {}) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -32,13 +30,13 @@ export function useUnifiedAudioPlayer({
   const play = useCallback(() => {
     if (!audioRef.current) return;
     
-    unifiedAudioManager.play(audioRef.current, { stemId, trackId })
+    unifiedAudioManager.play(audioRef.current, { trackId })
       .then(() => setIsPlaying(true))
       .catch(err => {
         setError(err);
         setIsPlaying(false);
       });
-  }, [stemId, trackId]);
+  }, [trackId]);
   
   const pause = useCallback(() => {
     if (!audioRef.current) return;
@@ -69,7 +67,6 @@ export function useUnifiedAudioPlayer({
     // Create audio element if it doesn't exist
     if (!audioRef.current) {
       audioRef.current = unifiedAudioManager.createAudio(src, {
-        stemId,
         trackId,
       });
     }
@@ -132,37 +129,7 @@ export function useUnifiedAudioPlayer({
       audio.pause();
       audio.src = '';
     };
-  }, [src, autoPlay, loop, onTimeUpdate, onEnded, play, isPlaying, stemId, trackId]);
-
-  // Listen for stem-specific events
-  useEffect(() => {
-    if (!stemId) return;
-    
-    // Handle audio events from unified manager
-    const handleAudioEvent = (event: AudioEvent) => {
-      if (event.stemId === stemId && event.type === 'stop') {
-        setIsPlaying(false);
-      }
-    };
-    
-    // Subscribe to audio events
-    const unsubscribe = unifiedAudioManager.addEventListener(handleAudioEvent);
-    
-    // Also listen for custom stem stopped events (legacy support)
-    const handleStemStopped = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      if (customEvent.detail?.stemId === stemId) {
-        setIsPlaying(false);
-      }
-    };
-    
-    document.addEventListener('stem-stopped', handleStemStopped);
-    
-    return () => {
-      unsubscribe();
-      document.removeEventListener('stem-stopped', handleStemStopped);
-    };
-  }, [stemId]);
+  }, [src, autoPlay, loop, onTimeUpdate, onEnded, play, isPlaying, trackId]);
   
   return {
     isPlaying,

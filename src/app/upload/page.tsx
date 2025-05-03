@@ -15,14 +15,12 @@ interface UploadedFile {
   originalName: string;
   size: number;
   url: string;
-  fileType: 'main' | 'stem' | 'image';
+  fileType: 'main' | 'image';
 }
 
 export default function UploadPage() {
   const [mainTrack, setMainTrack] = useState<UploadedFile | null>(null);
   const [trackImage, setTrackImage] = useState<UploadedFile | null>(null);
-  const [stems, setStems] = useState<UploadedFile[]>([]);
-  const [stemPrices, setStemPrices] = useState<{[key: string]: string}>({});
   const [trackTitle, setTrackTitle] = useState('');
   const [genreTags, setGenreTags] = useState<Tag[]>([]);
   const [moodTags, setMoodTags] = useState<Tag[]>([]);
@@ -31,14 +29,11 @@ export default function UploadPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [showStemUpload, setShowStemUpload] = useState(false);
   const [trackId, setTrackId] = useState<string>(uuidv4());
   const [selectedMainFile, setSelectedMainFile] = useState<File | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
-  const [selectedStemFiles, setSelectedStemFiles] = useState<File[]>([]);
   const [isUploadingMain, setIsUploadingMain] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [isUploadingStems, setIsUploadingStems] = useState(false);
   const [allTags, setAllTags] = useState<Tag[]>([]);
 
   useEffect(() => {
@@ -60,7 +55,7 @@ export default function UploadPage() {
   }, []);
 
   // Helper to upload a file to /api/upload
-  const uploadFile = async (file: File, fileType: 'main' | 'stem' | 'image') => {
+  const uploadFile = async (file: File, fileType: 'main' | 'image') => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('fileType', fileType);
@@ -76,7 +71,6 @@ export default function UploadPage() {
   // New handlers for file selection
   const handleMainFileSelected = (file: File) => setSelectedMainFile(file);
   const handleImageFileSelected = (file: File) => setSelectedImageFile(file);
-  const handleStemFilesSelected = (files: File[]) => setSelectedStemFiles(files);
 
   // Upload handlers
   const handleUploadMainTrack = async () => {
@@ -85,7 +79,6 @@ export default function UploadPage() {
     try {
       const fileData = await uploadFile(selectedMainFile, 'main');
       setMainTrack(fileData);
-      setShowStemUpload(true);
       setSelectedMainFile(null);
     } catch (err) {
       setSubmitError('Failed to upload main track');
@@ -106,57 +99,18 @@ export default function UploadPage() {
       setIsUploadingImage(false);
     }
   };
-  const handleUploadStems = async () => {
-    if (!selectedStemFiles.length) return;
-    setIsUploadingStems(true);
-    const uploadedStems: UploadedFile[] = [];
-    const newPrices = { ...stemPrices };
-    for (const file of selectedStemFiles) {
-      try {
-        const fileData = await uploadFile(file, 'stem');
-        uploadedStems.push(fileData);
-        newPrices[fileData.filename] = '1.99';
-      } catch (err) {
-        setSubmitError('Failed to upload one or more stems');
-      }
-    }
-    setStemPrices(newPrices);
-    setStems(prev => [...prev, ...uploadedStems]);
-    setSelectedStemFiles([]);
-    setIsUploadingStems(false);
-  };
 
   const handleBpmDetected = (detectedBpm: number) => {
     setBpm(detectedBpm.toString());
   };
 
-  const removeStem = (index: number) => {
-    const stem = stems[index];
-    setStems(prev => prev.filter((_, i) => i !== index));
-    
-    // Remove price for this stem
-    setStemPrices(prev => {
-      const newPrices = {...prev};
-      delete newPrices[stem.filename];
-      return newPrices;
-    });
-  };
-
   const removeMainTrack = () => {
     setMainTrack(null);
-    setShowStemUpload(false);
     setBpm('');
   };
 
   const removeTrackImage = () => {
     setTrackImage(null);
-  };
-
-  const handleStemPriceChange = (stemFilename: string, price: string) => {
-    setStemPrices(prev => ({
-      ...prev,
-      [stemFilename]: price
-    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -176,13 +130,6 @@ export default function UploadPage() {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      // Prepare stems data for backend
-      const stemsData = stems.map(stem => ({
-        name: stem.originalName,
-        url: stem.url,
-        price: parseFloat(stemPrices[stem.filename] || '0'),
-        duration: 0 // You can add duration extraction if available
-      }));
       // POST metadata to /api/tracks/create
       const res = await fetch('/api/tracks/create', {
         method: 'POST',
@@ -194,7 +141,6 @@ export default function UploadPage() {
           tags: [...genreTags, ...moodTags, ...instrumentTags].map(tag => tag.id),
           audioUrl: mainTrack.url,
           imageUrl: trackImage.url,
-          stems: stemsData,
           trackId,
         })
       });
@@ -203,14 +149,11 @@ export default function UploadPage() {
       setTimeout(() => {
         setMainTrack(null);
         setTrackImage(null);
-        setStems([]);
-        setStemPrices({});
         setTrackTitle('');
         setGenreTags([]);
         setMoodTags([]);
         setInstrumentTags([]);
         setBpm('');
-        setShowStemUpload(false);
         setSubmitSuccess(false);
         setTrackId(uuidv4());
       }, 3000);
@@ -352,73 +295,6 @@ export default function UploadPage() {
                     </div>
                   </div>
                 </div>
-                
-                {showStemUpload && (
-                  <div className="bg-white shadow rounded-lg p-6">
-                    <h2 className="text-lg font-medium text-gray-900 mb-4">Stems (For Sale)</h2>
-                    <p className="text-sm text-gray-500 mb-4">
-                      Upload individual stems for the track (drums, bass, etc.). You can select multiple files at once.
-                    </p>
-                    
-                    <div className="space-y-4">
-                      <FileUpload 
-                        onMultipleFilesSelected={handleStemFilesSelected}
-                        label="Upload stems"
-                        fileType="stem"
-                        multiple={true}
-                      />
-                      {selectedStemFiles.length > 0 && (
-                        <button onClick={handleUploadStems} disabled={isUploadingStems} className="mt-2 bg-accent text-white rounded px-4 py-2">
-                          {isUploadingStems ? 'Uploading...' : `Upload ${selectedStemFiles.length} Stems`}
-                        </button>
-                      )}
-                      
-                      {stems.length > 0 && (
-                        <div className="mt-4">
-                          <h3 className="text-sm font-medium text-gray-700 mb-2">Uploaded Stems:</h3>
-                          <ul className="divide-y divide-gray-200 border border-gray-200 rounded-md overflow-hidden">
-                            {stems.map((stem, index) => (
-                              <li key={index} className="px-4 py-3 flex items-center justify-between bg-white">
-                                <div className="flex items-center min-w-0 flex-1">
-                                  <span className="text-sm font-medium text-gray-900 truncate">
-                                    {stem.originalName}
-                                  </span>
-                                  <span className="ml-2 text-xs text-gray-500">
-                                    ({(stem.size / (1024 * 1024)).toFixed(2)} MB)
-                                  </span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <div className="w-24">
-                                    <div className="relative rounded-md shadow-sm">
-                                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2">
-                                        <span className="text-gray-500 sm:text-sm">€</span>
-                                      </div>
-                                      <input
-                                        type="number"
-                                        value={stemPrices[stem.filename] || '1.99'}
-                                        onChange={(e) => handleStemPriceChange(stem.filename, e.target.value)}
-                                        min="0"
-                                        step="0.01"
-                                        className="block w-full rounded-md border-0 py-1.5 pl-7 pr-2 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-accent sm:text-sm sm:leading-6"
-                                      />
-                                    </div>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => removeStem(index)}
-                                    className="ml-2 p-1 text-gray-500 hover:text-red-500"
-                                  >
-                                    <TrashIcon className="h-5 w-5" />
-                                  </button>
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
                 
                 {submitError && (
                   <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded">

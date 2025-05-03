@@ -4,6 +4,7 @@ interface PlayButtonProps {
   isPlaying: boolean;
   onClick: () => void;
   isLoading?: boolean;
+  hasError?: boolean;
   size?: 'sm' | 'md' | 'lg';
   accentColor?: string;
   className?: string;
@@ -13,6 +14,7 @@ export default function PlayButton({
   isPlaying,
   onClick,
   isLoading = false,
+  hasError = false,
   size = 'md',
   accentColor = '#1DF7CE',
   className = '',
@@ -39,13 +41,29 @@ export default function PlayButton({
   return (
     <button
       type="button"
-      className={`rounded-full flex items-center justify-center bg-[#282828] hover:bg-[#333] transition-colors focus:outline-none focus:ring-2 focus:ring-${accentColor.replace('#', '')} ${buttonClasses} ${className}`}
+      className={`rounded-full flex items-center justify-center ${hasError ? 'bg-red-900 hover:bg-red-800' : 'bg-[#282828] hover:bg-[#333]'} transition-colors focus:outline-none focus:ring-2 focus:ring-${accentColor.replace('#', '')} ${buttonClasses} ${className}`}
       onClick={onClick}
       disabled={isLoading}
       aria-label={isPlaying ? 'Pause' : 'Play'}
     >
       {isLoading ? (
         <div className={`border-2 border-gray-600 border-t-${accentColor.replace('#', '')} rounded-full animate-spin ${iconClasses}`}></div>
+      ) : hasError ? (
+        // Error icon
+        <svg 
+          className={iconClasses} 
+          fill="none" 
+          stroke="red" 
+          viewBox="0 0 24 24" 
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            strokeWidth={2} 
+            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
+          />
+        </svg>
       ) : isPlaying ? (
         // Pause icon
         <svg 

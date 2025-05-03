@@ -1,14 +1,13 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { globalAudioManager } from '../lib/audio-manager';
+import { audioManager } from '../lib/audio-manager';
 
 interface UseAudioPlaybackProps {
   trackId: string;
-  stemId?: string;
   onPlay?: () => void;
   onStop?: () => void;
 }
 
-export function useAudioPlayback({ trackId, stemId, onPlay, onStop }: UseAudioPlaybackProps) {
+export function useAudioPlayback({ trackId, onPlay, onStop }: UseAudioPlaybackProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -19,15 +18,15 @@ export function useAudioPlayback({ trackId, stemId, onPlay, onStop }: UseAudioPl
     if (!audioRef.current) return;
 
     if (isPlaying) {
-      globalAudioManager.stop();
+      audioManager.stop();
       setIsPlaying(false);
       onStop?.();
     } else {
-      globalAudioManager.play(audioRef.current, { stemId, trackId });
+      audioManager.play(audioRef.current, { trackId });
       setIsPlaying(true);
       onPlay?.();
     }
-  }, [isPlaying, stemId, trackId, onPlay, onStop]);
+  }, [isPlaying, trackId, onPlay, onStop]);
 
   // Handle time updates
   const handleTimeUpdate = useCallback(() => {
@@ -43,23 +42,6 @@ export function useAudioPlayback({ trackId, stemId, onPlay, onStop }: UseAudioPl
     setCurrentTime(0);
     onStop?.();
   }, [onStop]);
-
-  // Handle stem stopped event
-  useEffect(() => {
-    const handleStemStopped = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      if (customEvent.detail.stemId === stemId && customEvent.detail.trackId === trackId) {
-        setIsPlaying(false);
-        setCurrentTime(0);
-        onStop?.();
-      }
-    };
-
-    document.addEventListener('stem-stopped', handleStemStopped);
-    return () => {
-      document.removeEventListener('stem-stopped', handleStemStopped);
-    };
-  }, [stemId, trackId, onStop]);
 
   // Set up audio element
   useEffect(() => {

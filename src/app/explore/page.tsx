@@ -409,8 +409,6 @@ export default function MusicLibrary() {
                 onPlay={() => setPlayingTrackId(track.id)}
                 onStop={() => setPlayingTrackId(null)}
                 onTagClick={handleTagClick}
-                openStemsTrackId={openStemsTrackId}
-                setOpenStemsTrackId={setOpenStemsTrackId}
               />
             </div>
           );

@@ -6,7 +6,7 @@ export function clearAudioCache(): void {
   // Find all localStorage keys related to audio caching
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && (key.startsWith('audio_url_') || key.startsWith('stem_url_'))) {
+    if (key && key.startsWith('audio_url_')) {
       keys.push(key);
     }
   }

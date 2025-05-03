@@ -2,7 +2,7 @@
 // This file uses the CartContext internally and will be deprecated
 // New code should use the CartContext directly via useCart() hook
 
-import { CartItem, Stem, Track } from '../types';
+import { CartItem, Track } from '../types';
 
 /**
  * @deprecated Use CartContext instead via useCart() hook
@@ -39,10 +39,10 @@ export function getCart(): CartItem[] {
 }
 
 /**
- * Add a stem to the cart
+ * Add a track to the cart
  * @deprecated Use useCart() hook instead
  */
-export function addToCart(stem: Stem, track: Track): void {
+export function addToCart(track: Track): void {
   const localStorage = accessLocalStorage();
   if (!localStorage) {
     return;
@@ -51,15 +51,15 @@ export function addToCart(stem: Stem, track: Track): void {
   const cart = getCart();
   
   // Check if item is already in cart
-  const existingItemIndex = cart.findIndex(item => item.id === stem.id && item.type === 'stem');
+  const existingItemIndex = cart.findIndex(item => item.id === track.id && item.type === 'track');
   
   if (existingItemIndex === -1) {
     // Add new item
     cart.push({
-      id: stem.id,
-      type: 'stem',
-      price: stem.price,
-      name: stem.name,
+      id: track.id,
+      type: 'track',
+      price: 9.99,
+      name: track.title,
       trackTitle: track.title,
       imageUrl: track.imageUrl
     });
@@ -72,7 +72,7 @@ export function addToCart(stem: Stem, track: Track): void {
 }
 
 /**
- * Remove a stem from the cart
+ * Remove an item from the cart
  * @deprecated Use useCart() hook instead
  */
 export function removeFromCart(itemId: string): void {
@@ -82,46 +82,6 @@ export function removeFromCart(itemId: string): void {
   }
   
   const cart = getCart();
-  const updatedCart = cart.filter(item => item.id !== itemId);
-  
-  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updatedCart));
-  
-  // Trigger a storage event for other components using CartContext
-  window.dispatchEvent(new Event('storage'));
-}
-
-/**
- * Clear the entire cart
- * @deprecated Use useCart() hook instead
- */
-export function clearCart(): void {
-  const localStorage = accessLocalStorage();
-  if (!localStorage) {
-    return;
-  }
-  
-  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify([]));
-  
-  // Trigger a storage event for other components using CartContext
-  window.dispatchEvent(new Event('storage'));
-}
-
-/**
- * Calculate the total price of items in the cart
- * @deprecated Use useCart() hook instead
- */
-export function getCartTotal(): number {
-  const cart = getCart();
-  return cart.reduce((total, item) => total + item.price, 0);
-}
-
-/**
- * Get the number of items in the cart
- * @deprecated Use useCart() hook instead
- */
-export function getCartCount(): number {
-  return getCart().length;
-} 
   const updatedCart = cart.filter(item => item.id !== itemId);
   
   localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updatedCart));

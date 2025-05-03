@@ -1,4 +1,4 @@
-import { Track, Tag, Stem } from '../types';
+import { Track, Tag } from '../types';
 import { STRAPI_URL, API_URL, API_TOKEN } from '../config/strapi';
 import { getProxiedMediaUrl } from '../utils/media-helpers';
 import idMappingCache from '../utils/client-mapping';
@@ -126,14 +126,6 @@ export function normalizeTrack(strapiTrack: any): Track {
       bpm: Number(data.bpm) || 0,
       duration: Number(data.duration) || 0,
       tags: tags,
-      stems: data.stems?.data?.map((stem: any) => ({
-        id: stem.id.toString(),
-        name: stem.attributes?.name || 'Unknown Stem',
-        url: getProxiedMediaUrl(stem.attributes?.url || ''),
-        price: Number(stem.attributes?.price) || 0,
-        duration: Number(stem.attributes?.duration) || 0
-      })) || [],
-      hasStems: data.stems?.data?.length > 0 || false,
       audioUrl: proxiedAudioUrl,
       imageUrl: proxiedImageUrl,
       waveform: data.waveform || [],
@@ -147,10 +139,8 @@ export function normalizeTrack(strapiTrack: any): Track {
       bpm: 0,
       duration: 0,
       tags: [],
-      stems: [],
       audioUrl: '',
       imageUrl: '',
-      hasStems: false,
       waveform: [],
       s3Path: ''
     };
@@ -454,50 +444,6 @@ async function createDummyAudioFiles(): Promise<void> {
   }
 }
 
-// Export a utility function to help find stem files
-export async function findStemFile(stemName: string, trackTitle: string): Promise<string | null> {
-  try {
-    // Try to find the parent track by title
-    const encodedTitle = encodeURIComponent(trackTitle);
-    const trackResponse = await fetch(
-      `${API_URL}/tracks?filters[title][$containsi]=${encodedTitle}&populate=*`,
-      { headers: getHeaders() }
-    );
-    
-    if (!trackResponse.ok) return null;
-    
-      const trackData = await trackResponse.json();
-    if (!trackData?.data?.length) return null;
-      
-    // Find best matching track
-        const matchingTrack = trackData.data.find((t: any) => 
-          t.attributes.title.toLowerCase() === trackTitle.toLowerCase()
-    ) || trackData.data[0];
-        
-    // Get stems from track
-        const stems = matchingTrack.attributes.stems || [];
-    if (!stems.length) return null;
-        
-    // Find matching stem
-          const matchingStem = stems.find((s: any) => 
-            (s.name && s.name.toLowerCase() === stemName.toLowerCase()) || 
-            (s.Name && s.Name.toLowerCase() === stemName.toLowerCase())
-          );
-          
-          if (matchingStem) {
-            const audioFile = matchingStem.audio || matchingStem.file;
-      if (audioFile?.data?.attributes?.url) {
-        return `${API_URL}${audioFile.data.attributes.url}`;
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error finding stem file:', error);
-    return null;
-  }
-}
-
 /**
  * Enhanced function to fetch complete track data from Strapi with direct UUID mapping
  * This removes dependency on hardcoded mappings by fetching and mapping IDs correctly
@@ -507,7 +453,7 @@ export async function getTracksWithMapping(): Promise<Track[]> {
     console.log('[getTracksWithMapping] Fetching complete track data from Strapi');
     
     // Make sure to get tags, stems, and all related data
-    const response = await fetch(`${API_URL}/tracks?populate=deep&pagination[pageSize]=100`, getRequestOptions());
+    const response = await fetch(`${API_URL}/tracks?populate=*&pagination[pageSize]=100`, getRequestOptions());
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -600,14 +546,6 @@ export async function getTracksWithMapping(): Promise<Track[]> {
             name: tag.attributes?.name || 'Unknown Tag',
             type: tag.attributes?.type || 'genre'
           })) || [],
-          stems: trackData.stems?.data?.map((stem: any) => ({
-            id: stem.id.toString(),
-            name: stem.attributes?.name || 'Unknown Stem',
-            url: getProxiedMediaUrl(stem.attributes?.url || ''),
-            price: Number(stem.attributes?.price) || 0,
-            duration: Number(stem.attributes?.duration) || 0
-          })) || [],
-          hasStems: trackData.stems?.data?.length > 0 || false,
           audioUrl: getProxiedMediaUrl(normalizedAudioUrl),
           imageUrl: getProxiedMediaUrl(normalizedImageUrl),
           waveform: trackData.waveform || [],
@@ -626,4 +564,75 @@ export async function getTracksWithMapping(): Promise<Track[]> {
     console.error('[getTracksWithMapping] Error:', error);
     return [];
   }
+}
+
+// Transform track data from Strapi to our internal format
+export const transformTrackData = (data: any): Track => {
+  try {
+    return {
+      id: data.id.toString(),
+      documentId: data.attributes?.documentId || '',
+      title: data.attributes?.Title || 'Unknown Track',
+      description: data.attributes?.Description || '',
+      bpm: Number(data.attributes?.BPM) || 0,
+      key: data.attributes?.Key || '',
+      duration: Number(data.attributes?.Duration) || 0,
+      s3Path: data.attributes?.s3Path || '',
+      imageUrl: getStrapiMedia(data.attributes?.Image?.data?.attributes?.url),
+      imageBlur: data.attributes?.imageBlur || null,
+      audioUrl: getProxiedMediaUrl(data.attributes?.Audio?.data?.attributes?.url),
+      tags: data.attributes?.tags?.data?.map((tag: any) => ({
+        id: tag.id.toString(),
+        name: tag.attributes?.Name || 'Unknown Tag',
+        type: tag.attributes?.Type || 'genre'
+      })) || [],
+      waveform: data.attributes?.Waveform || null,
+      price: Number(data.attributes?.Price) || 9.99,
+      createdAt: data.attributes?.createdAt || '',
+      updatedAt: data.attributes?.updatedAt || '',
+      licenseUrl: data.attributes?.License?.data?.attributes?.url || null
+    };
+  } catch (error) {
+    console.error('Error transforming track data:', error);
+    return {
+      id: data.id?.toString() || '0',
+      title: 'Error Track',
+      bpm: 0,
+      tags: [],
+      duration: 0,
+      imageUrl: '',
+      audioUrl: ''
+    };
+  }
+};
+
+// Update the fetchTrackBySlug function to remove stem references
+export async function fetchTrackBySlug(slug: string): Promise<Track | null> {
+  // ... existing code ...
+  if (trackData) {
+    return {
+      id: trackData.id.toString(),
+      documentId: trackData.attributes?.documentId || '',
+      title: trackData.attributes?.Title || 'Unknown Track',
+      description: trackData.attributes?.Description || '',
+      bpm: Number(trackData.attributes?.BPM) || 0,
+      key: trackData.attributes?.Key || '',
+      duration: Number(trackData.attributes?.Duration) || 0, 
+      s3Path: trackData.attributes?.s3Path || '',
+      imageUrl: getStrapiMedia(trackData.attributes?.Image?.data?.attributes?.url),
+      imageBlur: trackData.attributes?.imageBlur || null,
+      audioUrl: getProxiedMediaUrl(trackData.attributes?.Audio?.data?.attributes?.url),
+      tags: trackData.attributes?.tags?.data?.map((tag: any) => ({
+        id: tag.id.toString(),
+        name: tag.attributes?.Name || 'Unknown Tag',
+        type: tag.attributes?.Type || 'genre'
+      })) || [],
+      waveform: trackData.attributes?.Waveform || null,
+      price: Number(trackData.attributes?.Price) || 9.99,
+      createdAt: trackData.attributes?.createdAt || '',
+      updatedAt: trackData.attributes?.updatedAt || '',
+      licenseUrl: trackData.attributes?.License?.data?.attributes?.url || null
+    };
+  }
+  // ... existing code ...
 } 

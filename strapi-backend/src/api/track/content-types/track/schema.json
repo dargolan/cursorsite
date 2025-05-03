@@ -26,9 +26,6 @@
     "ImageUrl": {
       "type": "string"
     },
-    "Stems": {
-      "type": "json"
-    },
     "trackId": {
       "type": "uid"
     },
