@@ -389,7 +389,7 @@ export interface ApiTagTag extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     Name: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
-    track: Schema.Attribute.Relation<'manyToOne', 'api::track.track'>;
+    tracks: Schema.Attribute.Relation<'manyToMany', 'api::track.track'>;
     type: Schema.Attribute.Enumeration<['genre', 'mood', 'instrument']> &
       Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
@@ -421,7 +421,7 @@ export interface ApiTrackTrack extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
     Stems: Schema.Attribute.JSON;
-    tags: Schema.Attribute.Relation<'oneToMany', 'api::tag.tag'>;
+    tags: Schema.Attribute.Relation<'manyToMany', 'api::tag.tag'>;
     Title: Schema.Attribute.String & Schema.Attribute.Required;
     trackId: Schema.Attribute.UID;
     updatedAt: Schema.Attribute.DateTime;

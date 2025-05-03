@@ -75,20 +75,29 @@ export function normalizeTrack(strapiTrack: any): Track {
     
     // Process tags from Strapi response
     let tags: Tag[] = [];
-    if (data.tags?.data && Array.isArray(data.tags.data)) {
-      tags = data.tags.data.map((tag: any) => {
-        // Handle both formats (attributes or direct properties)
-        const tagData = tag.attributes || tag;
-        return {
-          id: tag.id.toString(),
-          name: tagData?.name || 'Unknown Tag',
-          type: tagData?.type || 'genre'
-        };
-      });
+    
+    // Add debug logging to see the exact structure of the tags
+    console.log(`[normalizeTrack] Raw tag data for track "${trackTitle}":`, {
+      hasTagsProperty: !!data.tags,
+      tagsType: data.tags ? typeof data.tags : 'undefined',
+      isTagsArray: data.tags && Array.isArray(data.tags),
+      tagsLength: data.tags && Array.isArray(data.tags) ? data.tags.length : 0,
+      firstTag: data.tags && Array.isArray(data.tags) && data.tags.length > 0 ? 
+        JSON.stringify(data.tags[0]) : 'No tags'
+    });
+    
+    if (data.tags && Array.isArray(data.tags)) {
+      // Direct array of tags with capitalized property names (Name, Type)
+      tags = data.tags.map((tag: any) => ({
+        id: tag.id.toString(),
+        name: tag.Name || tag.name || 'Unknown Tag', // Note: API returns "Name" not "name"
+        type: tag.type || 'genre' // The "type" property is lowercase
+      }));
       
-      console.log(`[normalizeTrack] Track ${trackTitle} has ${tags.length} tags: ${tags.map(t => t.name).join(', ')}`);
+      console.log(`[normalizeTrack] Processed ${tags.length} tags for "${trackTitle}":`, 
+        tags.map(t => `${t.name} (${t.type})`));
     } else {
-      console.warn(`[normalizeTrack] Track ${trackTitle} has no tags or invalid tag structure`);
+      console.warn(`[normalizeTrack] No tags found for "${trackTitle}"`);
     }
     
     // Process stems directly from Strapi data
@@ -155,8 +164,8 @@ export async function getTags(): Promise<Tag[]> {
     
     const tags = data.data.map((item: any) => ({
       id: item.id.toString(),
-      name: item.attributes?.name || 'Unknown Tag',
-      type: item.attributes?.type || 'unknown',
+      name: item.attributes?.name || item.attributes?.Name || item.name || item.Name || 'Unknown Tag',
+      type: item.attributes?.type || item.attributes?.Type || item.type || item.Type || 'genre',
       count: 0
     }));
     
@@ -187,6 +196,11 @@ export async function getTracks(): Promise<Track[]> {
     }
 
     const data = await response.json();
+    
+    // Add debugging for the API response
+    console.log('[getTracks] API Response structure:', JSON.stringify(data, null, 2).substring(0, 1000) + '...');
+    console.log('[getTracks] First track tags data:', data.data && data.data[0] ? 
+      JSON.stringify(data.data[0].attributes?.tags || 'No tags found in first track') : 'No tracks found');
 
     if (!data?.data || !Array.isArray(data.data)) {
       console.error('[getTracks] Invalid or empty data returned from Strapi:', data);

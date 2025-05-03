@@ -14,9 +14,9 @@
     "Name": {
       "type": "string"
     },
-    "track": {
+    "tracks": {
       "type": "relation",
-      "relation": "manyToOne",
+      "relation": "manyToMany",
       "target": "api::track.track",
       "inversedBy": "tags"
     },
