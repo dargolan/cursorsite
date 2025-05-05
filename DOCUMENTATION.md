@@ -404,6 +404,32 @@ Stem files with individual pricing
 
 Premium track versions with pricing
 
+## Automatic Audio Analysis
+
+The platform implements automatic analysis of audio files during upload to extract important metadata:
+
+### Duration Detection
+- Automatically extracts precise track duration using the Web Audio API
+- Process:
+  1. Audio file is read as ArrayBuffer when selected
+  2. Web Audio API's `AudioContext.decodeAudioData()` processes the file
+  3. Duration is extracted directly from the decoded AudioBuffer
+  4. Value is stored in seconds and formatted as MM:SS for display
+  5. Saved to Strapi as track metadata for filtering
+
+### BPM Detection
+- Automatically analyzes beats per minute using peak detection algorithm
+- Results are immediately displayed to user during upload
+- User can override BPM if needed
+
+### Implementation Details
+- Audio analysis happens client-side using browser APIs
+- No server processing required, improving upload speed
+- Both duration and BPM detection are performed in a single file read
+- Results are displayed to users in real-time before final upload
+- Values are included in the track metadata sent to Strapi
+- Used by the filtering system to enable duration-based track discovery
+
 Technical Implementation
 Storage Architecture:
 

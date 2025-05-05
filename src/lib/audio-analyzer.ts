@@ -42,6 +42,44 @@ export async function analyzeBPM(file: File): Promise<number> {
 }
 
 /**
+ * Get audio file duration in seconds
+ * Returns the precise duration of an audio file using the Web Audio API
+ */
+export async function getAudioDuration(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = async (event) => {
+      try {
+        const arrayBuffer = event.target?.result as ArrayBuffer;
+        if (!arrayBuffer) {
+          reject(new Error('Failed to read file'));
+          return;
+        }
+
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        
+        // Decode the audio file
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        // The duration is available directly on the audioBuffer
+        resolve(audioBuffer.duration);
+      } catch (error) {
+        console.error('Audio duration analysis error:', error);
+        reject(error);
+      }
+    };
+    
+    reader.onerror = (error) => {
+      reject(error);
+    };
+    
+    // Read the file as an array buffer
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+/**
  * Simple BPM detection using peak detection
  * This is a basic implementation and could be improved with more sophisticated algorithms
  */

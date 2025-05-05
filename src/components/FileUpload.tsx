@@ -2,10 +2,13 @@
 
 import React, { useState, useRef, ChangeEvent, DragEvent, useEffect } from 'react';
 import { CloudArrowUpIcon, DocumentIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { analyzeBPM, getAudioDuration } from '@/lib/audio-analyzer';
 
 interface FileUploadProps {
   onFileSelected?: (file: File) => void;
   onMultipleFilesSelected?: (files: File[]) => void;
+  onBpmDetected?: (bpm: number) => void;
+  onDurationDetected?: (duration: number) => void;
   acceptedTypes?: string;
   maxSizeMB?: number;
   label?: string;
@@ -13,18 +16,24 @@ interface FileUploadProps {
   multiple?: boolean;
   onProgress?: (progress: number, speed: number, timeRemaining: number) => void;
   retryCount?: number;
+  analyzeBpm?: boolean;
+  analyzeDuration?: boolean;
 }
 
 export default function FileUpload({
   onFileSelected,
   onMultipleFilesSelected,
+  onBpmDetected,
+  onDurationDetected,
   acceptedTypes = "audio/mpeg,audio/wav,audio/mp3",
   maxSizeMB = 50,
   label = "Upload audio file",
   fileType = 'main',
   multiple = false,
   onProgress,
-  retryCount = 3
+  retryCount = 3,
+  analyzeBpm = false,
+  analyzeDuration = true
 }: FileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -130,6 +139,38 @@ export default function FileUpload({
         }
       };
       img.src = URL.createObjectURL(selectedFile);
+    }
+    
+    // Analyze audio properties if needed and if it's an audio file
+    if ((analyzeBpm || analyzeDuration) && 
+        (selectedFile.type === 'audio/mpeg' || 
+         selectedFile.type === 'audio/wav' || 
+         selectedFile.type === 'audio/mp3' ||
+         selectedFile.type === 'audio/flac')) {
+      
+      // Analyze BPM if requested
+      if (analyzeBpm && onBpmDetected) {
+        analyzeBPM(selectedFile)
+          .then(bpm => {
+            console.log(`Detected BPM: ${bpm}`);
+            onBpmDetected(bpm);
+          })
+          .catch(err => {
+            console.error('Error analyzing BPM:', err);
+          });
+      }
+      
+      // Analyze duration if requested
+      if (analyzeDuration && onDurationDetected) {
+        getAudioDuration(selectedFile)
+          .then(duration => {
+            console.log(`Detected duration: ${duration} seconds`);
+            onDurationDetected(duration);
+          })
+          .catch(err => {
+            console.error('Error analyzing duration:', err);
+          });
+      }
     }
     
     setFile(selectedFile);
