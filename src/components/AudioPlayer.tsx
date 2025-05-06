@@ -11,6 +11,8 @@ import { useCart } from '../contexts/CartContext';
 import { getTrackCoverImageUrl } from '../utils/media-helpers';
 import PlayButton from './AudioPlayer/PlayButton';
 import { getTags } from '../services/strapi';
+import { toCdnUrl } from '../utils/cdn-url';
+import WaveformProgressBar from './WaveformProgressBar';
 
 // Global audio manager to ensure only one audio source plays at a time
 const globalAudioManager = {
@@ -917,23 +919,16 @@ export default function AudioPlayer({
     });
 
     if (!audioRef.current) {
-      // Create audio with cross-origin settings
       const audio = new Audio();
       audio.crossOrigin = "anonymous";
-      
-      // Generate URL based on track title if needed
-      let audioUrl = track.audioUrl;
-      if (!audioUrl || audioUrl.trim() === '') {
-        // Create a sanitized track title for the URL
-        const sanitizedTitle = track.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-        audioUrl = `/api/direct-s3/tracks/${sanitizedTitle}/main.mp3`;
-        console.log(`No audioUrl provided, using generated URL: ${audioUrl}`);
+      // Use only the Strapi-provided audioUrl
+      let audioUrl = track.audioUrl || '';
+      if (!audioUrl) {
+        console.error(`[AudioPlayer] No audioUrl provided for track:`, track);
+        setMainAudioError(true);
+        return;
       }
-      
-      console.log(`Initializing audio with URL: ${audioUrl}`);
-      audio.src = audioUrl;
-      
-      // Add data attributes for identification
+      audio.src = toCdnUrl(audioUrl);
       audio.dataset.track = track.title;
       audio.dataset.trackId = track.id;
       audio.dataset.isMainTrack = 'true';
@@ -972,18 +967,16 @@ export default function AudioPlayer({
 
       audioRef.current = audio;
     } else {
-      // Update existing audio element
-      // Generate URL based on track title if needed
-      let audioUrl = track.audioUrl;
-      if (!audioUrl || audioUrl.trim() === '') {
-        // Create a sanitized track title for the URL
-        const sanitizedTitle = track.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-        audioUrl = `/api/direct-s3/tracks/${sanitizedTitle}/main.mp3`;
-        console.log(`No audioUrl provided, using generated URL: ${audioUrl}`);
+      let audioUrl = track.audioUrl || '';
+      if (!audioUrl) {
+        console.error(`[AudioPlayer] No audioUrl provided for track:`, track);
+        setMainAudioError(true);
+        return;
       }
-      
-      console.log(`Updating audio source to: ${audioUrl}`);
-      audioRef.current.src = audioUrl;
+      audioRef.current.src = toCdnUrl(audioUrl);
+      audioRef.current.dataset.track = track.title;
+      audioRef.current.dataset.trackId = track.id;
+      audioRef.current.dataset.isMainTrack = 'true';
       
       // Update data attributes
       audioRef.current.dataset.track = track.title;
@@ -1429,7 +1422,7 @@ export default function AudioPlayer({
             setStemLoading(prev => ({...prev, [stem.id]: true}));
             
             // Always use the convertUrlToProxyUrl function from our library
-            const initialProxyUrl = convertUrlToProxyUrl(getStemUrl(stem.name, track.title));
+            const initialProxyUrl = toCdnUrl(getStemUrl(stem.name, track.title));
             console.log(`Initial proxy URL for stem ${stem.name}: ${initialProxyUrl}`);
             
             // Create audio element with cross-origin attribute
@@ -1734,14 +1727,14 @@ export default function AudioPlayer({
   };
 
   // Get the most reliable image URL using our utility
-  const trackImageUrl = getTrackCoverImageUrl(track);
+  const trackImageUrl = track.imageUrl ? toCdnUrl(track.imageUrl) : '';
   const fallbackImageUrl = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18V5l12-2v13'%3E%3C/path%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Ccircle cx='18' cy='16' r='3'%3E%3C/circle%3E%3C/svg%3E";
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   
   return (
     <div 
       className={`relative border-b border-[#1A1A1A] ${isHovering || isInteracting || isStemsOpen ? 'bg-[#232323]' : 'bg-[#121212]'}`}
-      style={{ marginBottom: "0" }} /* Change from -1px to 0 to remove gap */
+      style={{ marginBottom: "0" }}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
@@ -1759,13 +1752,13 @@ export default function AudioPlayer({
                 src={trackImageUrl} 
                 alt={track.title}
                 className="object-cover w-14 h-14"
+                crossOrigin="anonymous"
                 onError={(e) => {
                   console.error(`[AudioPlayer] Failed to load image: ${trackImageUrl}`);
-                  setImageLoadFailed(true); // Mark image as failed to prevent further attempts
+                  setImageLoadFailed(true);
                 }}
               />
             ) : (
-              // Show fallback music icon SVG when image fails to load
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 18V5l12-2v13"></path>
                 <circle cx="6" cy="18" r="3"></circle>
@@ -1812,20 +1805,22 @@ export default function AudioPlayer({
           <div className="w-52 mr-8 flex-shrink-0">
             <div className="text-[12.5px] font-normal text-[#999999] line-clamp-2 relative">
               {Array.isArray(trackTags) && trackTags.length > 0 ? (
-                trackTags.map((tag, index) => (
-                  <React.Fragment key={tag.id}>
-                    <button 
-                      onClick={() => {
-                        console.log('[AudioPlayer] Tag clicked:', tag);
-                        onTagClick(tag);
-                      }}
-                      className="hover:text-[#1DF7CE] transition-colors cursor-pointer"
-                    >
-                      {tag.name}
-                    </button>
-                    {index < trackTags.length - 1 && <span>, </span>}
-                  </React.Fragment>
-                ))
+                trackTags
+                  .filter(tag => tag.type === 'genre' || tag.type === 'mood')
+                  .map((tag, index, arr) => (
+                    <React.Fragment key={tag.id}>
+                      <button 
+                        onClick={() => {
+                          console.log('[AudioPlayer] Tag clicked:', tag);
+                          onTagClick(tag);
+                        }}
+                        className="hover:text-[#1DF7CE] transition-colors cursor-pointer"
+                      >
+                        {tag.name}
+                      </button>
+                      {index < arr.length - 1 && <span>, </span>}
+                    </React.Fragment>
+                  ))
               ) : null}
             </div>
           </div>
@@ -1833,31 +1828,22 @@ export default function AudioPlayer({
         
         {/* Progress bar, duration, and buttons - fixed layout with reliable spacing */}
         <div className="flex items-center justify-between flex-grow pl-24">
-          {/* Progress bar - fixed width */}
+          {/* Waveform progress bar - fixed width */}
           <div className="w-[calc(100%-240px)] min-w-[200px]">
-            <div 
-              className="relative w-full"
-              ref={progressBarRef}
-              onClick={handleProgressBarClick}
-            >
-              {/* Gray track background */}
-              <div className="w-full h-[8px] bg-[#3A3A3A] rounded-full cursor-pointer" />
-              
-              {/* Teal progress fill */}
-              <div 
-                className="absolute top-0 left-0 h-[8px] bg-[#1DF7CE] rounded-full"
-                style={{ width: `${progress}%`, zIndex: 2 }}
-              />
-              
-              {/* Teal dot at the edge of progress */}
-              <div 
-                ref={thumbRef}
-                onMouseDown={handleThumbMouseDown}
-                className="absolute top-1/2 w-3.5 h-3.5 rounded-full bg-[#1DF7CE] cursor-pointer"
-                style={{ 
-                  left: `calc(${progress}% - 2px)`, 
-                  zIndex: 3,
-                  transform: 'translateY(-50%)'
+            <div className="relative w-full" style={{ cursor: 'pointer' }}>
+              <WaveformProgressBar
+                audioUrl={track.audioUrl}
+                currentTime={currentTime}
+                duration={audioRef.current?.duration || track.duration || 0}
+                height={44}
+                onSeek={(time) => {
+                  if (audioRef.current) {
+                    audioRef.current.currentTime = time;
+                    setCurrentTime(time);
+                    if (!isPlaying) {
+                      onPlay();
+                    }
+                  }
                 }}
               />
             </div>
@@ -1873,7 +1859,7 @@ export default function AudioPlayer({
             {/* Consistent width container for Stems button or placeholder */}
             <div className="w-[68px] flex justify-end">
               {(track.hasStems || (track.stems && track.stems.length > 0)) && (
-        <button 
+                <button 
                   onClick={() => setOpenStemsTrackId(isStemsOpen ? null : track.id)}
                   className="text-white hover:text-[#1DF7CE] px-3 py-1 text-sm flex items-center transition-colors"
                 >
@@ -1884,13 +1870,54 @@ export default function AudioPlayer({
                 </button>
               )}
             </div>
-            
+            {/* Hide the Generate Waveform Button as it should only be in the upload page */}
+            {/* 
+            <button
+              className="w-auto h-10 flex items-center justify-center px-4 text-[#1E1E1E] hover:text-[#1DF7CE] transition-colors border-2 border-[#1DF7CE] rounded-full bg-[#1DF7CE] hover:bg-transparent focus:outline-none font-bold z-10"
+              style={{ minWidth: 180, marginLeft: 8, display: 'flex' }}
+              onClick={async () => {
+                console.log('Generate Waveform button clicked for track:', track.title, track.audioUrl);
+                try {
+                  // Extract S3 key from audioUrl (remove protocol and domain)
+                  const audioUrl = track.audioUrl || '';
+                  const s3Key = audioUrl.replace(/^https?:\/\/[^/]+\//, '');
+                  const res = await fetch('/api/generate-waveform', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ s3Key }),
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    alert('Waveform generated!');
+                  } else {
+                    alert('Error: ' + data.error);
+                    console.error('Waveform generation error:', data.error);
+                  }
+                } catch (error) {
+                  alert('Error: ' + (error instanceof Error ? error.message : String(error)));
+                  console.error('Waveform generation error:', error);
+                }
+              }}
+              title="Generate waveform JSON for this track"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14m7-7H5" />
+              </svg>
+              Generate Waveform
+            </button>
+            */}
             <button 
               className="w-10 h-10 flex items-center justify-center text-[#1E1E1E] hover:text-[#1DF7CE] transition-colors border-2 border-[#1DF7CE] rounded-full bg-[#1DF7CE] hover:bg-transparent focus:outline-none"
               onClick={async () => {
                 try {
                   // Fetch the file as a blob
-                  const response = await fetch(track.audioUrl);
+                  const audioUrl = track.audioUrl ? toCdnUrl(track.audioUrl) : '';
+                  if (!audioUrl) {
+                    console.error('[AudioPlayer] No audio URL available for download');
+                    return;
+                  }
+                  
+                  const response = await fetch(audioUrl);
                   const blob = await response.blob();
                   
                   // Create a temporary anchor element

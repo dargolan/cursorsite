@@ -9,7 +9,6 @@ import ContentWrapper from '@/components/ContentWrapper';
 import { PlusCircleIcon, TrashIcon, ArrowDownTrayIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import { v4 as uuidv4 } from 'uuid';
 import { Tag } from '../../types';
-import StrapiDebug from '@/components/StrapiDebug';
 
 interface UploadedFile {
   filename: string;
@@ -562,13 +561,13 @@ export default function UploadPage() {
       
       // Prepare track payload
       const trackData = {
-        title: trackTitle,
-        bpm: parseInt(bpm),
-        duration: trackDuration,
+        Title: trackTitle,
+        BPM: parseInt(bpm),
+        Duration: trackDuration,
         tags: [...genreTags, ...moodTags, ...instrumentTags].map(tag => tag.id),
         audioUrl: mainTrack.url,
-        imageUrl: trackImage.url,
-        stems: stemsData,
+        ImageUrl: trackImage.url,
+        Stems: stemsData,
         trackId,
       };
       
@@ -583,6 +582,16 @@ export default function UploadPage() {
       if (!res.ok) {
         console.log('Original endpoint failed, trying no-auth endpoint...');
         res = await fetch('/api/tracks/create-noauth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(trackData)
+        });
+      }
+      
+      // If that also fails, try the temp-track fallback
+      if (!res.ok) {
+        console.log('No-auth endpoint failed, trying temp-track fallback...');
+        res = await fetch('/api/temp-track', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(trackData)
@@ -646,6 +655,63 @@ export default function UploadPage() {
   const formatTime = (seconds: number) => {
     if (seconds < 60) return `${seconds.toFixed(0)}s`;
     return `${Math.floor(seconds / 60)}m ${(seconds % 60).toFixed(0)}s`;
+  };
+
+  // Add a new handler for generating waveform
+  const handleGenerateWaveform = async () => {
+    if (!mainTrack) return;
+    
+    try {
+      // Extract S3 key from audioUrl (remove protocol and domain)
+      const audioUrl = mainTrack.url || '';
+      const s3Key = audioUrl.replace(/^https?:\/\/[^/]+\//, '');
+      
+      // Show loading in success message
+      const successMessage = document.getElementById('upload-success-message');
+      if (successMessage) {
+        successMessage.textContent = 'Generating waveform...';
+        successMessage.classList.remove('hidden');
+      }
+      
+      const res = await fetch('/api/generate-waveform', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ s3Key }),
+      });
+      
+      const data = await res.json();
+      
+      // Show success or error message
+      if (successMessage) {
+        if (data.success) {
+          successMessage.textContent = 'Waveform generated successfully!';
+        } else {
+          successMessage.textContent = 'Error: ' + (data.error || 'Failed to generate waveform');
+          successMessage.className = 'fixed top-4 right-4 bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded z-50 shadow-lg';
+        }
+        
+        setTimeout(() => {
+          successMessage.classList.add('hidden');
+          // Reset class if it was changed to error
+          successMessage.className = 'fixed top-4 right-4 bg-green-50 border border-green-400 text-green-700 px-4 py-3 rounded hidden z-50 shadow-lg';
+        }, 3000);
+      }
+    } catch (error) {
+      console.error('Waveform generation error:', error);
+      
+      // Show error message
+      const successMessage = document.getElementById('upload-success-message');
+      if (successMessage) {
+        successMessage.textContent = 'Error: ' + (error instanceof Error ? error.message : String(error));
+        successMessage.className = 'fixed top-4 right-4 bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded z-50 shadow-lg';
+        
+        setTimeout(() => {
+          successMessage.classList.add('hidden');
+          // Reset class back to success style
+          successMessage.className = 'fixed top-4 right-4 bg-green-50 border border-green-400 text-green-700 px-4 py-3 rounded hidden z-50 shadow-lg';
+        }, 3000);
+      }
+    }
   };
 
   return (
@@ -767,11 +833,26 @@ export default function UploadPage() {
                         maxSizeMB={50}
                         onProgress={handleMainProgress}
                       />
-                      {selectedMainFile && (
-                        <button onClick={handleUploadMainTrack} disabled={isUploadingMain} className="mt-2 bg-accent text-white rounded px-4 py-2">
-                          {isUploadingMain ? 'Uploading...' : 'Upload Main Track'}
-                        </button>
-                      )}
+                      <div className="flex flex-wrap gap-2">
+                        {selectedMainFile && (
+                          <button onClick={handleUploadMainTrack} disabled={isUploadingMain} className="mt-2 bg-accent text-white rounded px-4 py-2">
+                            {isUploadingMain ? 'Uploading...' : 'Upload Main Track'}
+                          </button>
+                        )}
+                        
+                        {/* Add Generate Waveform button after main track is uploaded */}
+                        {mainTrack && (
+                          <button 
+                            onClick={handleGenerateWaveform} 
+                            className="mt-2 bg-accent text-white rounded px-4 py-2 flex items-center"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 5v14m7-7H5" />
+                            </svg>
+                            Generate Waveform
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                   
@@ -785,10 +866,8 @@ export default function UploadPage() {
                       <ImageUpload
                         label="Upload cover image"
                         onImageSelected={handleImageFileSelected}
-                        acceptedTypes="image/jpeg,image/png,image/webp"
+                        acceptedTypes="image/jpeg,image/png,image/webp,image/gif"
                         maxSizeMB={5}
-                        fileType="image"
-                        onProgress={handleImageProgress}
                       />
                       {selectedImageFile && (
                         <button onClick={handleUploadImage} disabled={isUploadingImage} className="mt-2 bg-accent text-white rounded px-4 py-2">
@@ -892,7 +971,6 @@ export default function UploadPage() {
       <div id="upload-success-message" className="fixed top-4 right-4 bg-green-50 border border-green-400 text-green-700 px-4 py-3 rounded hidden z-50 shadow-lg">
         Success message here
       </div>
-      <StrapiDebug />
     </PageContainer>
   );
 } 
