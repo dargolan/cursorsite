@@ -28,15 +28,22 @@ function getWaveformPath(peaks: number[], height: number, width: number, progres
   let lastYTop = 0;
   let lastYBottom = 0;
   let cutoffIndex = n;
+  
+  // Add minimum height factor (3% of total height)
+  const minHeightFactor = 0.03;
+  
   if (progress !== undefined) {
     cutoffIndex = Math.floor(progress * n);
     if (cutoffIndex < 1) cutoffIndex = 1;
     if (cutoffIndex > n) cutoffIndex = n;
   }
+  
   // Top edge (left to right)
   for (let i = 0; i < cutoffIndex; i++) {
     const x = i * step;
-    const y = (height - peaks[i] * height) / 2;
+    // Apply minimum height to the peak value
+    const peakValue = Math.max(peaks[i], minHeightFactor);
+    const y = (height - peakValue * height) / 2;
     if (i === 0) {
       path += `M${x},${y}`;
     } else {
@@ -45,20 +52,25 @@ function getWaveformPath(peaks: number[], height: number, width: number, progres
     lastX = x;
     lastYTop = y;
   }
+  
   // Vertical line at the cutoff (top to bottom)
   if (progress !== undefined && cutoffIndex <= n) {
-    const x = lastX + step; // The next x after the last drawn
-    const yTop = (height - peaks[Math.min(cutoffIndex, n - 1)] * height) / 2;
-    const yBottom = (height + peaks[Math.min(cutoffIndex, n - 1)] * height) / 2;
+    const x = lastX + step;
+    const peakValue = Math.max(peaks[Math.min(cutoffIndex, n - 1)], minHeightFactor);
+    const yTop = (height - peakValue * height) / 2;
+    const yBottom = (height + peakValue * height) / 2;
     path += `L${x},${yTop}`;
     path += `L${x},${yBottom}`;
     lastX = x;
     lastYBottom = yBottom;
   }
+  
   // Bottom edge (right to left)
   for (let i = cutoffIndex - 1; i >= 0; i--) {
     const x = i * step;
-    const y = (height + peaks[i] * height) / 2;
+    // Apply minimum height to the peak value
+    const peakValue = Math.max(peaks[i], minHeightFactor);
+    const y = (height + peakValue * height) / 2;
     path += `L${x},${y}`;
     if (i === cutoffIndex - 1) lastYBottom = y;
   }
@@ -187,7 +199,9 @@ export default function WaveformProgressBar({
       {/* Full waveform background */}
       <path d={fullPath} fill="#444" opacity={0.5} />
       {/* Progress overlay */}
-      <path d={progressPath} fill={color} opacity={1} />
+      {progress > 0 && (
+        <path d={progressPath} fill={color} opacity={1} />
+      )}
     </svg>
   );
 } 
