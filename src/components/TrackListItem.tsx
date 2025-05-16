@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Track, Tag } from '../types';
 import { useUnifiedAudioPlayer } from '../hooks/useUnifiedAudioPlayer';
+import { toCdnUrl } from '../utils/cdn-url';
 
 interface TrackListItemProps {
   track: Track;
@@ -27,13 +28,14 @@ export default function TrackListItem({
       setIsUrlLoading(true);
       try {
         // If track has an audioUrl, use it directly
-        if (track.audioUrl) {
-          setTrackUrl(track.audioUrl);
+        const audioUrl = track.audioUrl || (track.audio && track.audio.url) || '';
+        if (audioUrl) {
+          setTrackUrl(audioUrl);
           return;
         }
-        
-        // Set a fallback URL using the track ID
-        setTrackUrl(`/api/direct-s3/tracks/${track.id}/main.mp3`);
+        // No fallback to /api/direct-s3 or manual construction
+        setTrackUrl(null);
+        console.error(`[TrackListItem] No audioUrl provided for track:`, track);
       } catch (error) {
         console.error(`Error loading URL for track ${track.title}:`, error);
       } finally {
@@ -91,7 +93,7 @@ export default function TrackListItem({
       {/* Track image */}
       <div className="flex-shrink-0 w-12 h-12 mr-4">
         <Image
-          src={track.imageUrl || 'https://placehold.co/200x200/1e1e1e/1df7ce?text=Track'}
+          src={track.imageUrl ? toCdnUrl(track.imageUrl) : 'https://placehold.co/200x200/1e1e1e/1df7ce?text=Track'}
           alt={track.title}
           width={48}
           height={48}

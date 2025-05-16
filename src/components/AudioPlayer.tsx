@@ -15,7 +15,7 @@ import { toCdnUrl } from '../utils/cdn-url';
 import WaveformProgressBar from './WaveformProgressBar';
 
 // Global audio manager to ensure only one audio source plays at a time
-const globalAudioManager = {
+export const globalAudioManager = {
   activeAudio: null as HTMLAudioElement | null,
   activeStemId: null as string | null,
   activeTrackId: null as string | null,
@@ -1731,6 +1731,26 @@ export default function AudioPlayer({
   const fallbackImageUrl = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18V5l12-2v13'%3E%3C/path%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Ccircle cx='18' cy='16' r='3'%3E%3C/circle%3E%3C/svg%3E";
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   
+  // Add this after the other useEffects in the AudioPlayer component
+  useEffect(() => {
+    const handleStopAllAudio = () => {
+      globalAudioManager.stop();
+    };
+    window.addEventListener('stop-all-audio', handleStopAllAudio);
+    document.addEventListener('stop-all-audio', handleStopAllAudio);
+    return () => {
+      window.removeEventListener('stop-all-audio', handleStopAllAudio);
+      document.removeEventListener('stop-all-audio', handleStopAllAudio);
+    };
+  }, []);
+  
+  // Stop audio on unmount
+  useEffect(() => {
+    return () => {
+      globalAudioManager.stop();
+    };
+  }, []);
+
   return (
     <div 
       className={`relative border-b border-[#1A1A1A] ${isHovering || isInteracting || isStemsOpen ? 'bg-[#232323]' : 'bg-[#121212]'}`}

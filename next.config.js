@@ -1,3 +1,5 @@
+const { getCdnDomain } = require('./src/utils/cdn-url');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -32,7 +34,11 @@ const nextConfig = {
         hostname: 'd1r94114aksajj.cloudfront.net',
         pathname: '**'
       }
-    ]
+    ],
+    domains: [
+      'localhost',
+      getCdnDomain(),
+    ],
   },
   async headers() {
     return [

@@ -1,6 +1,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { Track } from '../../types';
+import { toCdnUrl } from '../../utils/cdn-url';
 
 interface TrackImageProps {
   track: Track;
@@ -18,7 +19,7 @@ export const TrackImage = ({ track, isPlaying, onClick }: TrackImageProps) => {
       {/* Track Image */}
       <div className="w-full h-full relative">
         <Image
-          src={track.imageUrl || '/placeholder-image.jpg'}
+          src={track.imageUrl ? toCdnUrl(track.imageUrl) : '/placeholder-image.jpg'}
           alt={`${track.title} cover`}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"

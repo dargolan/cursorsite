@@ -9,20 +9,17 @@ export async function POST(request: NextRequest) {
     const data = await request.json();
     // data should include: title, bpm, duration, tags, stems, audioUrl, imageUrl, trackId, etc.
 
-    // Prepare payload for Strapi
+    // Prepare payload for Strapi (all lowercase field names)
     const payload = {
       data: {
-        Title: data.title,
-        BPM: data.bpm,
-        Duration: data.duration,
+        title: data.title,
+        bpm: data.bpm,
+        duration: data.duration,
         audioUrl: data.audioUrl,
-        ImageUrl: data.imageUrl,
-        Stems: data.stems,
+        imageUrl: data.imageUrl,
+        stems: data.stems,
         trackId: data.trackId,
-        // Handle tags - expect an array of tag IDs
-        tags: {
-          connect: data.tags.map((tagId: string) => ({ id: parseInt(tagId, 10) }))
-        }
+        tags: data.tags, // send as array of IDs if that's what Strapi expects
       }
     };
 

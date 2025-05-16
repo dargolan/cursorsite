@@ -4,6 +4,7 @@ export interface Tag {
   type: 'genre' | 'mood' | 'instrument';
   parent?: string;
   count?: number;
+  image?: { url: string } | null;
 }
 
 export interface Stem {

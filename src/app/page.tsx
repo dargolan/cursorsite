@@ -3,16 +3,19 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import FilterSidebar from '../components/FilterSidebar/index';
 import ContentWrapper from '../components/ContentWrapper';
 import { getTracks, getTags } from '../services/strapi';
 import { Track, Tag } from '../types';
+import { toCdnUrl } from '../utils/cdn-url';
+import { unifiedAudioManager } from '../lib/unified-audio-manager';
 
 export default function HomePage() {
   const router = useRouter();
+  const pathname = usePathname();
   const [featuredTracks, setFeaturedTracks] = useState<Track[]>([]);
   const [genres, setGenres] = useState<Tag[]>([]);
   const [moods, setMoods] = useState<Tag[]>([]);
@@ -45,6 +48,7 @@ export default function HomePage() {
   ]);
   
   const [loading, setLoading] = useState(true);
+  const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null);
 
   // Navigate to explore page with filters
   const navigateToExploreWithFilters = (params: {
@@ -168,6 +172,20 @@ export default function HomePage() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    // Stop audio playback if navigating to homepage from explore or any other route
+    if (pathname !== '/explore') {
+      unifiedAudioManager.stop();
+    }
+  }, [pathname]);
+
+  useEffect(() => {
+    fetch('/api/hero-image')
+      .then(res => res.json())
+      .then(data => setHeroImageUrl(data.url))
+      .catch(() => setHeroImageUrl(null));
+  }, []);
+
   return (
     <main className="min-h-screen bg-[#121212] text-white pb-8">
       <FilterSidebar
@@ -205,9 +223,10 @@ export default function HomePage() {
             <div className="w-full md:w-1/2 flex items-stretch">
               <div className="w-full h-full relative">
                 <Image
-                  src="/images/herotest.png"
+                  src={heroImageUrl || '/images/hero-fallback.jpg'}
                   alt="Music studio workspace"
                   fill
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                   className="object-contain w-full h-full"
                   priority
                 />
@@ -243,18 +262,20 @@ export default function HomePage() {
                   </div>
                 ))
               ) : (
-                featuredTracks.map(track => (
-                  <div key={track.id} className="bg-[#1E1E1E] rounded-lg overflow-hidden transition-transform hover:scale-[1.02] duration-200">
+                featuredTracks.map(track => {
+                  // Only show genre and mood tags
+                  const tagsToShow = track.tags.filter(tag => tag.type === 'genre' || tag.type === 'mood');
+                  return (
+                    <Link key={track.id} href={`/explore?search=${encodeURIComponent(track.title)}`} className="bg-[#1E1E1E] rounded-lg overflow-hidden transition-transform hover:scale-[1.02] duration-200 block">
                     <div className="relative w-full h-48 bg-gray-900 flex items-center justify-center">
                       {track.imageUrl ? (
-                        <Link href={`/explore?track=${track.id}`}>
                           <Image
-                            src={track.imageUrl}
+                            src={toCdnUrl(track.imageUrl)}
                             alt={track.title}
                             fill
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                             className="object-cover"
                           />
-                        </Link>
                       ) : (
                         <div className="w-16 h-16 rounded-full bg-[#282828] flex items-center justify-center">
                           <svg className="w-8 h-8 text-[#1DF7CE]" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -264,22 +285,17 @@ export default function HomePage() {
                         </div>
                       )}
                     </div>
-                    <Link href={`/explore?track=${track.id}`}>
                       <div className="p-4">
                         <h3 className="text-white font-medium text-lg mb-1">{track.title}</h3>
-                        <p className="text-gray-400 text-sm">{track.tags[0]?.name}</p>
-                        <div className="flex items-center justify-between mt-3">
-                          <span className="text-gray-400 text-sm">{formatDuration(track.duration)} • {track.tags[0]?.name}</span>
-                          <button className="text-white hover:text-[#1DF7CE] transition-colors">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                        </button>
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {tagsToShow.map(tag => (
+                            <span key={tag.id} className="bg-[#353535] text-[#CDCDCD] text-xs px-2 py-1 rounded-full font-medium">{tag.name}</span>
+                          ))}
                         </div>
                       </div>
                     </Link>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -299,19 +315,38 @@ export default function HomePage() {
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {(() => { console.log('Genres for Browse by Genre:', genres); console.table(genres); return null; })()}
               {loading ? (
                 // Loading skeletons for genres
                 Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="bg-gradient-to-b from-[#1E1E1E] to-[#101010] rounded-lg h-48 animate-pulse"></div>
                 ))
               ) : (
-                genres.map(genre => (
-                  <Link key={genre.id} href={`/explore?genre=${genre.id}`} className="relative block overflow-hidden rounded-lg h-48 group">
+                genres.slice(0, 8).map(genre => (
+                  <Link key={genre.id} href={`/explore?tags=${genre.id}`} className="relative block overflow-hidden rounded-lg h-48 group">
+                    {/* Genre image if available */}
+                    {genre.image?.url ? (
+                      <Image
+                        src={toCdnUrl(genre.image.url)}
+                        alt={genre.name}
+                        fill
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-[#1E1E1E] to-[#101010]">
+                        <svg className="w-12 h-12 text-[#1DF7CE]" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+                          <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="1.5" />
+                          <circle cx="12" cy="12" r="2" stroke="currentColor" strokeWidth="1.5" />
+                          <path d="M12 12L18 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black opacity-70"></div>
                     <div className="absolute inset-0 flex flex-col justify-end p-6">
                       <h3 className="text-white font-bold text-xl mb-1">{genre.name}</h3>
-                      <p className="text-gray-300 text-sm">{genre.count || 0} tracks</p>
-                </div>
+                    </div>
                   </Link>
                 ))
               )}
@@ -335,6 +370,7 @@ export default function HomePage() {
                       src={project.image}
                       alt={project.title}
                       fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       className="object-cover"
                     />
                   </div>

@@ -1,0 +1,398 @@
+#### Future Roadmap
+
+While the current implementation focuses on full track playback only, there are plans to reintroduce stem functionality in the future with a more refined approach:
+
+1. **Enhanced Stem Architecture**:
+   - More modular component design for better maintenance
+   - Improved stem audio synchronization
+   - Optimized loading patterns to reduce initial overhead
+
+2. **Improved User Experience**:
+   - Simplified stem interface focused on most common use cases
+   - Better visualization of stem components
+   - More intuitive controls for stem mixing
+
+3. **Technical Improvements**:
+   - Web Audio API integration for better stem isolation
+   - WebAssembly processing for real-time effects
+   - Service worker caching for faster repeat access
+
+This planned evolution will maintain the current streamlined design while carefully reintroducing the most valuable stem functionality in a more efficient and user-friendly implementation. 
+
+Upload Page Documentation
+Overview
+The Upload Page provides a comprehensive interface for adding new content to the Wave Cave platform. It enables uploading tracks, associated metadata, and supplementary files while automating the storage organization and integration with content management systems.
+
+Core Functionality
+Content Upload Capabilities
+Primary Content:
+
+Main track audio file (MP3, WAV, FLAC)
+
+Cover image (JPEG, PNG, recommended size: 1200 x 1200 px)
+
+Track title and description
+
+Metadata:
+
+Tags categorized by type (genre, mood, instruments)
+
+BPM (beats per minute)
+
+Duration (auto-extracted)
+
+Release date
+
+Premium Content (future feature):
+
+Stem files with individual pricing
+
+Premium track versions with pricing
+
+## Automatic Audio Analysis
+
+The platform implements automatic analysis of audio files during upload to extract important metadata:
+
+### Duration Detection
+- Automatically extracts precise track duration using the Web Audio API
+- Process:
+  1. Audio file is read as ArrayBuffer when selected
+  2. Web Audio API's `AudioContext.decodeAudioData()` processes the file
+  3. Duration is extracted directly from the decoded AudioBuffer
+  4. Value is stored in seconds and formatted as MM:SS for display
+  5. Saved to Strapi as track metadata for filtering
+
+### BPM Detection
+- Automatically analyzes beats per minute using peak detection algorithm
+- Results are immediately displayed to user during upload
+- User can override BPM if needed
+
+### Implementation Details
+- Audio analysis happens client-side using browser APIs
+- No server processing required, improving upload speed
+- Both duration and BPM detection are performed in a single file read
+- Results are displayed to users in real-time before final upload
+- Values are included in the track metadata sent to Strapi
+- Used by the filtering system to enable duration-based track discovery
+
+Technical Implementation
+Storage Architecture:
+
+Files automatically uploaded to wave-cave-audio S3 bucket
+
+Folder structure organized by track name for scalable management
+
+Cloudflare CDN integration for optimized content delivery
+
+Backend Integration:
+
+Automatic synchronization with Strapi CMS
+
+Metadata indexing for search functionality
+
+Content revision management
+
+Frontend Approach:
+
+Dynamic content loading from Strapi
+
+No hardcoded track or image references
+
+Responsive design for all device sizes
+
+### Dynamic Genre Images from Strapi (May 2025)
+
+The homepage now dynamically displays genre images fetched from Strapi, with no hardcoding or local images. The normalization logic for genres supports both Strapi v4+ (where the `image` field is an array directly on the tag object) and older Strapi formats (where the image is nested under `attributes`).
+
+**Key implementation details:**
+- The code checks for `item.image` (current Strapi API) and falls back to `item.attributes?.image` (older style).
+- If the image is an array, the first image is used.
+- If the image is an object with a `data` property, the first image in `data` is used.
+- The image URL is normalized and passed to the frontend for display.
+
+**Example normalization logic:**
+```js
+const img = item.image || item.attributes?.image;
+if (!img) return null;
+if (Array.isArray(img) && img.length > 0) {
+  return { url: toCdnUrl(getStrapiMedia(String(img[0]?.url || ''))) };
+}
+if (img.data) {
+  const imgData = Array.isArray(img.data) ? img.data[0] : img.data;
+  return { url: toCdnUrl(getStrapiMedia(String(imgData?.attributes?.url || ''))) };
+}
+return null;
+```
+
+This ensures that all genres with images in Strapi will display their images on the homepage, regardless of the Strapi version or API response format.
+
+### S3 Storage Organization
+
+#### Folder Naming Convention
+To improve track organization and file management in S3, tracks are now stored in descriptive folders that include both the track title and a unique identifier. This makes browsing the bucket content significantly easier when dealing with hundreds of tracks.
+
+**Folder Structure:**
+```
+tracks/
+  ├── awesome-track-name_by_artist-name_083248f9/
+  │   ├── main.mp3
+  │   ├── cover.jpg
+  │   └── stems/
+  │       ├── drums.mp3
+  │       ├── bass.mp3
+  │       └── ...
+  ├── another-track-title_12345678/
+  │   ├── main.mp3
+  │   └── ...
+  └── ...
+```
+
+**Implementation Details:**
+- The `getTrackFolderName` function in `src/lib/upload-helpers.ts` creates folder names using:
+  - Sanitized track title (lowercase, spaces replaced with hyphens)
+  - Artist name (if provided)
+  - First 8 characters of the track ID for uniqueness
+- The `getS3Key` function builds the complete S3 key including the folder name
+- The upload handlers in `src/app/api/upload/route.ts` use these functions to define the S3 path when uploading files
+
+**Benefits:**
+- Easier navigation and browsing of S3 bucket contents
+- Self-documenting folder structure that indicates track content
+- Maintained uniqueness with ID suffix to prevent name collisions
+- Organized separation of main tracks, cover images, and stems
+
+**Technical Note:**
+File encoding issues can break the upload functionality. If the route.ts file contains invalid UTF-8 characters, the Next.js server will fail to compile it properly. This manifests as "stream did not contain valid UTF-8" errors in the server logs. The solution is to recreate the file with proper UTF-8 encoding.
+
+User Experience Features
+Upload Guidance:
+
+File size recommendations:
+
+Audio tracks: Maximum 50 MB (optimally 192-320 kbps for MP3)
+
+Cover images: 1-2 MB, 1200 x 1200 px
+
+Stems: Maximum 30 MB per stem
+
+Status Indicators:
+
+Progress visualization for large uploads
+
+Estimated time remaining
+
+Transfer speed indicator
+
+Feedback Mechanisms:
+
+Success confirmations with direct links to uploaded content
+
+Specific error messages with troubleshooting guidance
+
+Warning indicators for potential issues (low-quality files, missing metadata)
+
+Error Handling & Validation
+Pre-upload Validation:
+
+File format verification
+
+Size limit enforcement
+
+Metadata completeness check
+
+Upload Process Protection:
+
+Network interruption recovery
+
+Automatic retries for failed segments
+
+Session persistence for large uploads
+
+Post-upload Verification:
+
+File integrity confirmation
+
+CDN propagation status
+
+Strapi integration verification
+
+Additional Considerations
+Security Measures:
+
+Authentication requirements for upload access
+
+Proper S3 bucket permissions
+
+File and path sanitization
+
+Workflow Management:
+
+Draft/publish workflow
+
+Approval process integration
+
+Versioning for track updates
+
+Performance Optimization:
+
+Chunked uploads for large files
+
+Background processing for waveform generation
+
+Asynchronous metadata extraction
+
+This comprehensive upload system ensures a smooth content management workflow while maintaining scalability for hundreds or thousands of tracks. 
+
+#### CDN, CloudFront, and CORS Architecture (2024 Update)
+
+**Background:**
+To ensure secure, performant, and cross-origin compatible delivery of audio and image files, the platform now serves all media assets (audio, images) via AWS CloudFront CDN rather than directly from S3. This change was required to resolve browser CORS/COEP errors (notably missing `Cross-Origin-Resource-Policy` headers) that prevented images from loading when accessed directly from S3.
+
+**Key Changes:**
+- **CloudFront as the Only Public Media Endpoint:**
+  - All public media URLs (audio, images) must use the CloudFront domain (e.g., `d1r94114aksajj.cloudfront.net`).
+  - S3 URLs are never exposed to the client; only CloudFront can inject the required CORS and cross-origin headers.
+- **CloudFront Response Headers:**
+  - CloudFront is configured to add the following headers to all media responses:
+    - `Access-Control-Allow-Origin: *`
+    - `Access-Control-Allow-Methods: GET, HEAD, OPTIONS`
+    - `Access-Control-Allow-Headers: *`
+    - `Cross-Origin-Opener-Policy: same-origin`
+    - `Cross-Origin-Embedder-Policy: require-corp`
+    - `Cross-Origin-Resource-Policy: cross-origin`
+  - This ensures compatibility with browsers' cross-origin resource policies for both audio and image files.
+- **Cache Invalidation:**
+  - After header policy changes, CloudFront cache must be invalidated to propagate new headers to all edge locations.
+- **Dynamic CDN Domain Configuration:**
+  - The CDN domain is now set via the environment variable `NEXT_PUBLIC_CDN_DOMAIN` (e.g., in `.env.local`).
+  - This allows seamless switching between CloudFront distributions or environments without code changes.
+- **`toCdnUrl` Utility:**
+  - A utility function (`src/utils/cdn-url.ts`) rewrites any S3 URL to the CloudFront equivalent, ensuring all media links are CDN-routed.
+  - Example:
+    ```ts
+    export function toCdnUrl(url: string) {
+      if (!url) return '';
+      if (url.includes(S3_DOMAIN)) {
+        return url.replace(S3_DOMAIN, CDN_DOMAIN);
+      }
+      return url;
+    }
+    ```
+  - All image and audio URL logic now uses this helper, making the solution future-proof and dynamic.
+- **Codebase Refactor:**
+  - Removed deprecated `/api/direct-s3/` fallback logic.
+  - Updated all relevant components and normalization logic to use the CloudFront domain via `toCdnUrl`.
+  - No need to re-upload tracks or images; the change is purely in delivery and URL resolution.
+
+**Result:**
+- Images and audio now load reliably in all browsers with correct CORS and cross-origin headers.
+- The architecture is robust, scalable, and ready for future CDN or S3 changes with minimal code impact.
+
+## Data Backup Strategy (2024)
+
+To ensure the safety and integrity of our Strapi content, we've implemented a comprehensive backup system.
+
+### Backup Implementation
+
+1. **Automated Backup Script**
+   - Located in `scripts/backup-strapi.js`
+   - Creates timestamped backups of:
+     - SQLite database
+     - Uploaded files
+     - Compressed into a single zip file
+   - Run manually with: `npm run backup` in the Strapi backend directory
+
+2. **Backup Contents**
+   - Database file (`.tmp/data.db`)
+   - Uploaded media files (`public/uploads/`)
+   - Timestamp in filename format: `strapi-backup-YYYY-MM-DDTHH-mm-ss-sssZ.zip`
+
+3. **Storage Location**
+   - Backups stored in project root's `backups/` directory
+   - Each backup is a self-contained zip file
+   - Recommended to copy backups to secure cloud storage
+
+### Future Improvements
+
+1. **Automated Scheduling**
+   - Set up daily automated backups using:
+     - Windows Task Scheduler
+     - Linux/Mac cron jobs
+   - Configure backup retention policy
+
+2. **Cloud Storage Integration**
+   - Implement automatic upload to:
+     - AWS S3
+     - Google Cloud Storage
+     - Dropbox
+   - Add backup rotation/cleanup
+
+3. **Database Migration**
+   - Plan migration from SQLite to PostgreSQL/MySQL
+   - Implement database replication
+   - Set up point-in-time recovery
+
+4. **Backup Verification**
+   - Add automated backup testing
+   - Implement backup integrity checks
+   - Create backup restoration documentation
+
+5. **Monitoring and Alerts**
+   - Set up backup success/failure notifications
+   - Monitor backup storage usage
+   - Implement backup health checks
+
+### Restore Process
+
+To restore from a backup:
+1. Stop Strapi server
+2. Unzip backup file
+3. Copy `database.db` to `.tmp/` directory
+4. Copy `uploads/` to `public/` directory
+5. Restart Strapi server
+
+# Appendix: AudioPlayer Component (Current Implementation)
+Below is the main component and its props as of 05-MAY-2025. Update this section if the implementation changes.
+
+
+interface AudioPlayerProps {
+  track: Track;
+  isPlaying: boolean;
+  onPlay: () => void;
+  onStop: () => void;
+  onTagClick: (tag: Tag) => void;
+  openStemsTrackId: string | null;
+  setOpenStemsTrackId: (id: string | null) => void;
+}
+
+export default function AudioPlayer({ 
+  track, 
+  isPlaying,
+  onPlay,
+  onStop,
+  onTagClick,
+  openStemsTrackId,
+  setOpenStemsTrackId
+}: AudioPlayerProps): React.ReactElement {
+  // ...component logic and hooks...
+
+  // Example: Toggle stems panel
+  const isStemsOpen = openStemsTrackId === track.id;
+  const toggleStems = () => {
+    if (isStemsOpen) {
+      setOpenStemsTrackId(null);
+    } else {
+      setOpenStemsTrackId(track.id);
+    }
+  };
+
+  // ...more logic, effects, and rendering...
+
+  return (
+    <div className="bg-[#1E1E1E] rounded-lg overflow-hidden flex flex-col mb-6">
+      {/* Track header section */}
+      {/* Progress bar section */}
+      {/* Stems panel, controls, etc. */}
+    </div>
+  );
+}

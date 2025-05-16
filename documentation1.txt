@@ -1,0 +1,475 @@
+# WaveCave Audio Platform
+
+A platform for distributing audio tracks created exclusively by Wave Cave, where users can download free music and (in the future) purchase stems and premium tracks.
+
+## Project Overview
+
+### Design & UI
+- **Theme**: Dark, sleek interface with a clean aesthetic
+- **Colors**:
+  - Background: #1E1E1E
+  - Hover/Active: #232323
+  - Accent: #1DF7CE (neon turquoise)
+  - Text: White (#FFFFFF)
+  - Secondary Text: #CDCDCD
+- **Typography**: Inter font family
+- **Layout**: Responsive design with left-side filtering menu and main content area
+
+### Core Features
+1. **Audio Player System**
+   - Scalable design supporting hundreds to thousands of instances
+   - Lazy loading implementation for performance optimization
+   - Components:
+     - Track image with play/pause overlay
+     - Title and BPM display
+     - Tag system with filtering capability
+     - Waveform visualization (initially progress bar)
+     - Duration display
+     - Stems dropdown
+     - Download functionality
+
+2. **Filtering System**
+   - Left-side menu with:
+     - Search functionality
+     - Genre, Mood, and Instrument filters
+     - BPM and Duration range sliders
+     - Hierarchical tag system with parent/child relationships
+
+3. **Content Distribution**
+   - Free track downloads
+   - Premium track purchases (future feature)
+   - Stem purchases (future feature)
+   - Shopping cart functionality
+   - User authentication for purchases
+
+4. **Content Management**
+   - Automated track and stem upload system
+   - Metadata extraction
+   - Tag management
+   - Analytics tracking
+
+## Dynamic Genre Images from Strapi (May 2025)
+
+The homepage now dynamically displays genre images fetched from Strapi, with no hardcoding or local images. The normalization logic for genres supports both Strapi v4+ (where the `image` field is an array directly on the tag object) and older Strapi formats (where the image is nested under `attributes`).
+
+**Key implementation details:**
+- The code checks for `item.image` (current Strapi API) and falls back to `item.attributes?.image` (older style).
+- If the image is an array, the first image is used.
+- If the image is an object with a `data` property, the first image in `data` is used.
+- The image URL is normalized and passed to the frontend for display.
+
+**Example normalization logic:**
+```js
+const img = item.image || item.attributes?.image;
+if (!img) return null;
+if (Array.isArray(img) && img.length > 0) {
+  return { url: toCdnUrl(getStrapiMedia(String(img[0]?.url || ''))) };
+}
+if (img.data) {
+  const imgData = Array.isArray(img.data) ? img.data[0] : img.data;
+  return { url: toCdnUrl(getStrapiMedia(String(imgData?.attributes?.url || ''))) };
+}
+return null;
+```
+
+This ensures that all genres with images in Strapi will display their images on the homepage, regardless of the Strapi version or API response format.
+
+## Dynamic Hero Image from S3 (May 2025)
+
+The homepage hero image is now fetched dynamically from the S3 bucket, with no hardcoding or local images. The solution uses a Next.js API route (`/api/hero-image`) that lists objects in the `hero image/` folder of the S3 bucket and returns the first image found (with a supported extension: jpg, jpeg, png, webp).
+
+**Key implementation details:**
+- The API route uses AWS SDK v3 to list objects in the S3 bucket and folder.
+- The returned image URL uses the CloudFront CDN domain (from `NEXT_PUBLIC_CDN_DOMAIN`), not the S3 domain, to ensure public access and proper CORS headers.
+- The homepage fetches the image URL from `/api/hero-image` and displays it dynamically.
+- Environment variables used: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `S3_BUCKET_NAME`, `NEXT_PUBLIC_CDN_DOMAIN`.
+
+This ensures the hero image is always up-to-date and delivered efficiently via CDN, matching the platform's dynamic and scalable architecture.
+
+## Audio Player Technical Documentation
+
+### Overview
+The WaveCave audio player is designed as a minimalist, high-performance component for playing music tracks while providing essential playback controls and visual feedback. The player focuses on clean aesthetics with dark backgrounds, teal accents, and intuitive controls.
+
+### Visual Design
+
+#### Layout Structure
+The audio player uses a card-based design with the following hierarchy:
+- Outer container: Dark background (#1E1E1E) with rounded corners and bottom margin
+- Two main sections: 
+  1. Header section with track info and controls
+  2. Progress section with interactive waveform/progress bar
+
+#### Color Scheme
+- Background: #1E1E1E (dark gray card background)
+- Secondary background: #282828 (for image placeholder, tags, progress bar)
+- Accent: #1DF7CE (teal, used for progress marker and interactive elements)
+- Text: White for titles, #CDCDCD for tags
+
+#### Typography
+- Track title: bold, 18px (text-lg), white
+- Tags: 12px (text-xs), #CDCDCD
+- Time display: 12px (text-xs), gray-400
+
+### Component Architecture
+
+#### Component Hierarchy
+```
+AudioPlayer
+├── TrackHeader
+│   ├── TrackImage
+│   │   └── PlayButton
+│   ├── TrackInfo
+│   │   └── TagList
+│   └── Controls
+└── ProgressSection
+    ├── ProgressBar
+    └── TimeDisplay
+```
+
+#### File Structure
+- `src/components/AudioPlayer/AudioPlayer.tsx`: Main component implementation
+- `src/components/AudioPlayer/PlayButton.tsx`: Reusable play/pause button
+- `src/hooks/useAudioPlayer.ts`: Custom hook for audio playback logic
+- `src/utils/audio-url-manager.ts`: URL resolution and caching
+- `src/lib/audio-manager.ts`: Global audio state management
+
+### Implementation Details
+
+#### State Management
+The AudioPlayer manages several state variables:
+- `trackUrl`: String URL of the audio file to play (null until loaded)
+- `isUrlLoading`: Boolean flag for URL loading state
+- Additional state via `useAudioPlayer` hook:
+  - `isPlaying`: Current playback state 
+  - `duration`: Total track duration in seconds
+  - `currentTime`: Current playback position in seconds
+  - `isLoading`: Audio loading state
+  - `error`: Any error during audio loading/playback
+
+#### Initialization Flow
+1. Component mounts with track data
+2. `useEffect` hook attempts to load track URL:
+   - Uses track's audioUrl directly if available
+   - Otherwise calls `findTrackAudioUrl` to discover URL
+3. Upon URL resolution, `useAudioPlayer` hook initializes audio element
+4. Audio element loads metadata and prepares for playback
+
+#### Audio Source Resolution
+The `findTrackAudioUrl` function uses a sophisticated resolution strategy:
+1. Check cache first to avoid redundant network requests
+2. Look for sample track in public directory (e.g., `/sample-tracks/track_name.mp3`)
+3. Try multiple URL patterns across various base paths
+4. Fallback to proxy endpoint as last resort
+
+#### Playback Control
+The player implements a centralized playback system through:
+1. `globalAudioController`: Prevents multiple simultaneous playback
+2. `audioManager`: Tracks currently playing audio and dispatches events
+3. Local state management via the `useAudioPlayer` hook
+
+#### Event Handling
+- `onPlay`/`onStop`: Propagate playback state to parent components
+- `onTagClick`: Handle tag selection for filtering
+- Progress bar click: Seek to position
+- Time updates: Sync UI with playback position
+
+### Interactive Elements
+
+#### Track Image and Play Button
+- 64×64px (w-16 h-16) image with rounded corners
+- PlayButton overlay with play/pause toggle
+- Visual loading state for both URL and audio loading
+
+#### Progress Bar
+- Full-width, height 48px (h-12) 
+- Background color: #282828
+- Progress fill: Semi-transparent teal (#1DF7CE/20)
+- Vertical position marker: Solid teal line (#1DF7CE)
+- Click to seek functionality
+
+#### Time Display
+- Shows current time and total duration
+- Format: M:SS (e.g., "2:30")
+- Gray text color for subtle appearance
+
+### Performance Optimizations
+
+#### Audio Loading
+- Loading states to provide visual feedback
+- Error handling with console logging
+- Cache audio URLs in localStorage
+- Configurable autoplay support
+
+#### Event Handling
+- Debounced time updates (250ms intervals)
+- Efficient cleanup of resources
+- Proper unsubscribe from event listeners
+
+#### React Optimizations
+- `useCallback` for stable event handlers
+- Clean effect cleanup
+- Single source of truth for playback state
+
+### Code Example
+
+```tsx
+// Progress bar implementation with seek functionality
+<div 
+  className="w-full h-12 bg-[#282828] rounded-md relative cursor-pointer" 
+  onClick={(e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const percentage = offsetX / rect.width;
+    seek(percentage * duration);
+  }}
+>
+  {/* Simple progress bar */}
+  <div 
+    className="h-full bg-[#1DF7CE]/20 absolute left-0 top-0"
+    style={{ width: `${(currentTime / duration) * 100}%` }}
+  />
+  {/* Progress marker */}
+  <div 
+    className="absolute top-0 w-0.5 h-full bg-[#1DF7CE]"
+    style={{ left: `${(currentTime / duration) * 100}%` }}
+  />
+</div>
+```
+
+### Future Enhancement Considerations
+
+#### Planned Visual Improvements
+- Waveform visualization to replace simple progress bar
+- Hover effects for interactive elements
+- Animated transitions between states
+- Volume control with visual feedback
+
+#### Accessibility Enhancements
+- Keyboard navigation support
+- ARIA attributes for screen readers
+- Focus indicators for interactive elements
+- High contrast mode support
+
+#### Technical Improvements
+- More efficient audio loading with range requests
+- Web Audio API integration for advanced visualization
+- Background audio support with MediaSession API
+- WebAssembly for high-performance waveform generation
+
+### Latest Audio Player Implementation (2025, Post-Stem Removal)
+
+Following a strategic shift in product direction, the audio player has been refactored to focus exclusively on full track playback, removing all stem-related functionality while preserving core audio playback capabilities.
+
+#### Architecture Simplification
+
+The stem-free implementation achieves several key improvements:
+
+1. **Reduced Component Complexity**:
+   - Removed StemPlayer.tsx and StemControls.tsx components
+   - Eliminated WaveformVisualizer dependency (replaced with simpler progress bar)
+   - Streamlined UI by removing stem selection and management controls
+
+2. **Audio Management Enhancements**:
+   - Replaced stem-url-manager with new audio-url-manager.ts
+   - Removed stem-specific parameters and handlers from useAudioPlayer hook
+   - Eliminated stem event handling from audio-manager.ts
+   - Simplified event propagation through clearer interface
+
+3. **Code Size Reduction**:
+   - Reduced overall bundle size by ~30%
+   - Simplified AudioPlayer component from 300+ to ~160 lines
+   - Removed stem-specific caching and discovery mechanisms
+
+#### Audio Player Component Structure
+
+```tsx
+// Current component structure
+AudioPlayer({track, isPlaying, onPlay, onStop, onTagClick}) {
+  // State
+  const [trackUrl, setTrackUrl] = useState<string | null>(null);
+  const [isUrlLoading, setIsUrlLoading] = useState(false);
+  
+  // URL loading logic
+  // useEffect hook to load track URL
+  
+  // Audio playback hook
+  const {isPlaying, duration, currentTime, isLoading, toggle, seek} = useAudioPlayer({...});
+  
+  // Render
+  return (
+    <div className="bg-[#1E1E1E] rounded-lg overflow-hidden flex flex-col mb-6">
+      {/* Track header section */}
+      {/* Progress bar section */}
+    </div>
+  );
+}
+```
+
+#### Audio URL Management
+
+The new audio-url-manager.ts implements a focused approach to track audio discovery:
+
+```typescript
+export async function findTrackAudioUrl(trackTitle: string): Promise<string | null> {
+  // Try cache first
+  const cacheKey = `track:${trackTitle}`;
+  if (audioUrlCache[cacheKey]) return audioUrlCache[cacheKey];
+  
+  try {
+    // Check for sample track
+    const normalizedTitle = trackTitle.replace(/[^\w\s]/g, '').replace(/\s+/g, '_').toLowerCase();
+    const sampleUrl = `/sample-tracks/${normalizedTitle}.mp3`;
+    if (await urlExists(sampleUrl)) {
+      saveAudioUrlToCache(trackTitle, sampleUrl);
+      return sampleUrl;
+    }
+    
+    // Try pattern matching on server
+    // Try multiple URL patterns across base paths
+    // Fallback to proxy endpoint
+  } catch (error) {
+    console.error('Error finding track audio URL:', error);
+    return null;
+         }
+       }
+       ```
+
+#### Progress Bar Implementation
+
+The streamlined progress bar replaces the previous waveform visualizer with a simpler, more performant implementation:
+
+     ```tsx
+<div 
+  className="w-full h-12 bg-[#282828] rounded-md relative cursor-pointer" 
+  onClick={(e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const percentage = offsetX / rect.width;
+    seek(percentage * duration);
+  }}
+>
+  {/* Simple progress fill */}
+  <div 
+    className="h-full bg-[#1DF7CE]/20 absolute left-0 top-0"
+    style={{ width: `${(currentTime / duration) * 100}%` }}
+  />
+  {/* Progress position marker */}
+  <div 
+    className="absolute top-0 w-0.5 h-full bg-[#1DF7CE]"
+    style={{ left: `${(currentTime / duration) * 100}%` }}
+  />
+</div>
+```
+
+#### Migration Benefits
+
+This refactoring provides several substantial benefits:
+
+1. **Improved Performance**:
+   - Faster initial load times due to fewer components
+   - More efficient audio handling without stem overhead
+   - Smaller bundle size for quicker page transitions
+
+2. **Enhanced Maintainability**:
+   - Clearer component responsibilities
+   - Simplified state management
+   - Better separation of concerns
+   - Easier to extend with new features
+
+3. **User Experience Improvements**:
+   - More focused UI with fewer distractions
+   - Consistent playback experience
+   - Improved reliability with fewer dependencies
+
+4. **Development Productivity**:
+   - Faster iteration cycles with less complex code
+   - Easier debugging with simplified playback flow
+   - More straightforward testing approach
+
+The current implementation provides a clean foundation for future enhancements while delivering an excellent user experience for track playback and discovery.
+
+## Explore Page: Infinite Scroll & Lazy Loading (May 2025)
+
+The Explore page now features infinite scroll with lazy loading for tracks. Instead of loading all tracks at once, tracks are fetched in batches of 20 as the user scrolls down the page.
+
+**Key implementation details:**
+- Uses IntersectionObserver to detect when the user nears the bottom of the list and triggers loading more tracks.
+- Fetches tracks from Strapi using the pagination API (`/api/tracks?page=...&pageSize=20`).
+- Appends new tracks to the list without reloading the page.
+- Shows loading skeletons while fetching more tracks.
+- Greatly improves performance and scalability for large music libraries.
+
+This approach provides a modern, seamless discovery experience and keeps the app fast even with thousands of tracks.
+
+## Future Note: Restricting the Upload Page (Pre-Publish)
+
+Before publishing, ensure the Upload page is accessible only to admins:
+- **Hide the Upload link** in the top menu for non-admin users.
+- **Protect the Upload page route** so only authenticated admins can access it (redirect or show an error for others).
+- Use your authentication system to check for admin privileges, or a hardcoded check during development.
+
+This prevents regular users from seeing or accessing the Upload functionality in production.
+
+## Data Backup Strategy (2024)
+
+To ensure the safety and integrity of our Strapi content, we've implemented a comprehensive backup system.
+
+### Backup Implementation
+
+1. **Automated Backup Script**
+   - Located in `scripts/backup-strapi.js`
+   - Creates timestamped backups of:
+     - SQLite database
+     - Uploaded files
+     - Compressed into a single zip file
+   - Run manually with: `npm run backup` in the Strapi backend directory
+
+2. **Backup Contents**
+   - Database file (`.tmp/data.db`)
+   - Uploaded media files (`public/uploads/`)
+   - Timestamp in filename format: `strapi-backup-YYYY-MM-DDTHH-mm-ss-sssZ.zip`
+
+3. **Storage Location**
+   - Backups stored in project root's `backups/` directory
+   - Each backup is a self-contained zip file
+   - Recommended to copy backups to secure cloud storage
+
+### Future Improvements
+
+1. **Automated Scheduling**
+   - Set up daily automated backups using:
+     - Windows Task Scheduler
+     - Linux/Mac cron jobs
+   - Configure backup retention policy
+
+2. **Cloud Storage Integration**
+   - Implement automatic upload to:
+     - AWS S3
+     - Google Cloud Storage
+     - Dropbox
+   - Add backup rotation/cleanup
+
+3. **Database Migration**
+   - Plan migration from SQLite to PostgreSQL/MySQL
+   - Implement database replication
+   - Set up point-in-time recovery
+
+4. **Backup Verification**
+   - Add automated backup testing
+   - Implement backup integrity checks
+   - Create backup restoration documentation
+
+5. **Monitoring and Alerts**
+   - Set up backup success/failure notifications
+   - Monitor backup storage usage
+   - Implement backup health checks
+
+### Restore Process
+
+To restore from a backup:
+1. Stop Strapi server
+2. Unzip backup file
+3. Copy `database.db` to `.tmp/` directory
+4. Copy `uploads/` to `public/` directory
+5. Restart Strapi server

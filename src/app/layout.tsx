@@ -48,9 +48,6 @@ export default function RootLayout({
             <main className="min-h-screen">
               {children}
             </main>
-            
-            {/* Global audio status indicator */}
-            <AudioStatusIndicator />
           </SidebarProvider>
         </CartProvider>
       </body>

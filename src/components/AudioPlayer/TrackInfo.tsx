@@ -1,6 +1,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { Tag, Track } from '../../types';
+import { toCdnUrl } from '../../utils/cdn-url';
 
 interface TrackInfoProps {
   track: Track;
@@ -12,7 +13,7 @@ export function TrackInfo({ track, onTagClick }: TrackInfoProps) {
     <div className="flex space-x-4">
       <div className="relative w-16 h-16 flex-shrink-0">
         <Image
-          src={track.imageUrl}
+          src={track.imageUrl ? toCdnUrl(track.imageUrl) : '/placeholder-image.jpg'}
           alt={track.title}
           fill
           className="object-cover rounded"

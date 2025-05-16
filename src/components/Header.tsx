@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useCart } from '@/contexts/CartContext';
 import { useSidebar } from '@/contexts/SidebarContext';
+import { toCdnUrl } from '../utils/cdn-url';
 
 export default function Header(): React.ReactElement {
   const [showCart, setShowCart] = useState(false);
@@ -151,7 +152,7 @@ export default function Header(): React.ReactElement {
                           <div className="mr-3">
                             {item.imageUrl && (
                               <Image
-                                src={item.imageUrl}
+                                src={toCdnUrl(item.imageUrl)}
                                 alt={item.name}
                                 width={40}
                                 height={40}

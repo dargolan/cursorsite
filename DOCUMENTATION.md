@@ -48,531 +48,35 @@ A platform for distributing audio tracks created exclusively by Wave Cave, where
    - Tag management
    - Analytics tracking
 
-[... existing documentation content ...]
+## Dynamic Genre Images from Strapi (May 2025)
 
-## Audio Player Technical Documentation
+The homepage now dynamically displays genre images fetched from Strapi, with no hardcoding or local images. The normalization logic for genres supports both Strapi v4+ (where the `image` field is an array directly on the tag object) and older Strapi formats (where the image is nested under `attributes`).
 
-### Overview
-The WaveCave audio player is designed as a minimalist, high-performance component for playing music tracks while providing essential playback controls and visual feedback. The player focuses on clean aesthetics with dark backgrounds, teal accents, and intuitive controls.
+**Key implementation details:**
+- The code checks for `item.image` (current Strapi API) and falls back to `item.attributes?.image` (older style).
+- If the image is an array, the first image is used.
+- If the image is an object with a `data` property, the first image in `data` is used.
+- The image URL is normalized and passed to the frontend for display.
 
-### Visual Design
-
-#### Layout Structure
-The audio player uses a card-based design with the following hierarchy:
-- Outer container: Dark background (#1E1E1E) with rounded corners and bottom margin
-- Two main sections: 
-  1. Header section with track info and controls
-  2. Progress section with interactive waveform/progress bar
-
-#### Color Scheme
-- Background: #1E1E1E (dark gray card background)
-- Secondary background: #282828 (for image placeholder, tags, progress bar)
-- Accent: #1DF7CE (teal, used for progress marker and interactive elements)
-- Text: White for titles, #CDCDCD for tags
-
-#### Typography
-- Track title: bold, 18px (text-lg), white
-- Tags: 12px (text-xs), #CDCDCD
-- Time display: 12px (text-xs), gray-400
-
-### Component Architecture
-
-#### Component Hierarchy
-```
-AudioPlayer
-├── TrackHeader
-│   ├── TrackImage
-│   │   └── PlayButton
-│   ├── TrackInfo
-│   │   └── TagList
-│   └── Controls
-└── ProgressSection
-    ├── ProgressBar
-    └── TimeDisplay
-```
-
-#### File Structure
-- `src/components/AudioPlayer/AudioPlayer.tsx`: Main component implementation
-- `src/components/AudioPlayer/PlayButton.tsx`: Reusable play/pause button
-- `src/hooks/useAudioPlayer.ts`: Custom hook for audio playback logic
-- `src/utils/audio-url-manager.ts`: URL resolution and caching
-- `src/lib/audio-manager.ts`: Global audio state management
-
-### Implementation Details
-
-#### State Management
-The AudioPlayer manages several state variables:
-- `trackUrl`: String URL of the audio file to play (null until loaded)
-- `isUrlLoading`: Boolean flag for URL loading state
-- Additional state via `useAudioPlayer` hook:
-  - `isPlaying`: Current playback state 
-  - `duration`: Total track duration in seconds
-  - `currentTime`: Current playback position in seconds
-  - `isLoading`: Audio loading state
-  - `error`: Any error during audio loading/playback
-
-#### Initialization Flow
-1. Component mounts with track data
-2. `useEffect` hook attempts to load track URL:
-   - Uses track's audioUrl directly if available
-   - Otherwise calls `findTrackAudioUrl` to discover URL
-3. Upon URL resolution, `useAudioPlayer` hook initializes audio element
-4. Audio element loads metadata and prepares for playback
-
-#### Audio Source Resolution
-The `findTrackAudioUrl` function uses a sophisticated resolution strategy:
-1. Check cache first to avoid redundant network requests
-2. Look for sample track in public directory (e.g., `/sample-tracks/track_name.mp3`)
-3. Try multiple URL patterns across various base paths
-4. Fallback to proxy endpoint as last resort
-
-#### Playback Control
-The player implements a centralized playback system through:
-1. `globalAudioController`: Prevents multiple simultaneous playback
-2. `audioManager`: Tracks currently playing audio and dispatches events
-3. Local state management via the `useAudioPlayer` hook
-
-#### Event Handling
-- `onPlay`/`onStop`: Propagate playback state to parent components
-- `onTagClick`: Handle tag selection for filtering
-- Progress bar click: Seek to position
-- Time updates: Sync UI with playback position
-
-### Interactive Elements
-
-#### Track Image and Play Button
-- 64×64px (w-16 h-16) image with rounded corners
-- PlayButton overlay with play/pause toggle
-- Visual loading state for both URL and audio loading
-
-#### Progress Bar
-- Full-width, height 48px (h-12) 
-- Background color: #282828
-- Progress fill: Semi-transparent teal (#1DF7CE/20)
-- Vertical position marker: Solid teal line (#1DF7CE)
-- Click to seek functionality
-
-#### Time Display
-- Shows current time and total duration
-- Format: M:SS (e.g., "2:30")
-- Gray text color for subtle appearance
-
-### Performance Optimizations
-
-#### Audio Loading
-- Loading states to provide visual feedback
-- Error handling with console logging
-- Cache audio URLs in localStorage
-- Configurable autoplay support
-
-#### Event Handling
-- Debounced time updates (250ms intervals)
-- Efficient cleanup of resources
-- Proper unsubscribe from event listeners
-
-#### React Optimizations
-- `useCallback` for stable event handlers
-- Clean effect cleanup
-- Single source of truth for playback state
-
-### Code Example
-
-```tsx
-// Progress bar implementation with seek functionality
-<div 
-  className="w-full h-12 bg-[#282828] rounded-md relative cursor-pointer" 
-  onClick={(e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const offsetX = e.clientX - rect.left;
-    const percentage = offsetX / rect.width;
-    seek(percentage * duration);
-  }}
->
-  {/* Simple progress bar */}
-  <div 
-    className="h-full bg-[#1DF7CE]/20 absolute left-0 top-0"
-    style={{ width: `${(currentTime / duration) * 100}%` }}
-  />
-  {/* Progress marker */}
-  <div 
-    className="absolute top-0 w-0.5 h-full bg-[#1DF7CE]"
-    style={{ left: `${(currentTime / duration) * 100}%` }}
-  />
-</div>
-```
-
-### Future Enhancement Considerations
-
-#### Planned Visual Improvements
-- Waveform visualization to replace simple progress bar
-- Hover effects for interactive elements
-- Animated transitions between states
-- Volume control with visual feedback
-
-#### Accessibility Enhancements
-- Keyboard navigation support
-- ARIA attributes for screen readers
-- Focus indicators for interactive elements
-- High contrast mode support
-
-#### Technical Improvements
-- More efficient audio loading with range requests
-- Web Audio API integration for advanced visualization
-- Background audio support with MediaSession API
-- WebAssembly for high-performance waveform generation
-
-### Latest Audio Player Implementation (2025, Post-Stem Removal)
-
-Following a strategic shift in product direction, the audio player has been refactored to focus exclusively on full track playback, removing all stem-related functionality while preserving core audio playback capabilities.
-
-#### Architecture Simplification
-
-The stem-free implementation achieves several key improvements:
-
-1. **Reduced Component Complexity**:
-   - Removed StemPlayer.tsx and StemControls.tsx components
-   - Eliminated WaveformVisualizer dependency (replaced with simpler progress bar)
-   - Streamlined UI by removing stem selection and management controls
-
-2. **Audio Management Enhancements**:
-   - Replaced stem-url-manager with new audio-url-manager.ts
-   - Removed stem-specific parameters and handlers from useAudioPlayer hook
-   - Eliminated stem event handling from audio-manager.ts
-   - Simplified event propagation through clearer interface
-
-3. **Code Size Reduction**:
-   - Reduced overall bundle size by ~30%
-   - Simplified AudioPlayer component from 300+ to ~160 lines
-   - Removed stem-specific caching and discovery mechanisms
-
-#### Audio Player Component Structure
-
-```tsx
-// Current component structure
-AudioPlayer({track, isPlaying, onPlay, onStop, onTagClick}) {
-  // State
-  const [trackUrl, setTrackUrl] = useState<string | null>(null);
-  const [isUrlLoading, setIsUrlLoading] = useState(false);
-  
-  // URL loading logic
-  // useEffect hook to load track URL
-  
-  // Audio playback hook
-  const {isPlaying, duration, currentTime, isLoading, toggle, seek} = useAudioPlayer({...});
-  
-  // Render
-  return (
-    <div className="bg-[#1E1E1E] rounded-lg overflow-hidden flex flex-col mb-6">
-      {/* Track header section */}
-      {/* Progress bar section */}
-    </div>
-  );
+**Example normalization logic:**
+```js
+const img = item.image || item.attributes?.image;
+if (!img) return null;
+if (Array.isArray(img) && img.length > 0) {
+  return { url: toCdnUrl(getStrapiMedia(String(img[0]?.url || ''))) };
 }
+if (img.data) {
+  const imgData = Array.isArray(img.data) ? img.data[0] : img.data;
+  return { url: toCdnUrl(getStrapiMedia(String(imgData?.attributes?.url || ''))) };
+}
+return null;
 ```
 
-#### Audio URL Management
+This ensures that all genres with images in Strapi will display their images on the homepage, regardless of the Strapi version or API response format.
 
-The new audio-url-manager.ts implements a focused approach to track audio discovery:
+## Infrastructure and Media Delivery
 
-```typescript
-export async function findTrackAudioUrl(trackTitle: string): Promise<string | null> {
-  // Try cache first
-  const cacheKey = `track:${trackTitle}`;
-  if (audioUrlCache[cacheKey]) return audioUrlCache[cacheKey];
-  
-  try {
-    // Check for sample track
-    const normalizedTitle = trackTitle.replace(/[^\w\s]/g, '').replace(/\s+/g, '_').toLowerCase();
-    const sampleUrl = `/sample-tracks/${normalizedTitle}.mp3`;
-    if (await urlExists(sampleUrl)) {
-      saveAudioUrlToCache(trackTitle, sampleUrl);
-      return sampleUrl;
-    }
-    
-    // Try pattern matching on server
-    // Try multiple URL patterns across base paths
-    // Fallback to proxy endpoint
-  } catch (error) {
-    console.error('Error finding track audio URL:', error);
-    return null;
-         }
-       }
-       ```
-
-#### Progress Bar Implementation
-
-The streamlined progress bar replaces the previous waveform visualizer with a simpler, more performant implementation:
-
-     ```tsx
-<div 
-  className="w-full h-12 bg-[#282828] rounded-md relative cursor-pointer" 
-  onClick={(e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const offsetX = e.clientX - rect.left;
-    const percentage = offsetX / rect.width;
-    seek(percentage * duration);
-  }}
->
-  {/* Simple progress fill */}
-  <div 
-    className="h-full bg-[#1DF7CE]/20 absolute left-0 top-0"
-    style={{ width: `${(currentTime / duration) * 100}%` }}
-  />
-  {/* Progress position marker */}
-  <div 
-    className="absolute top-0 w-0.5 h-full bg-[#1DF7CE]"
-    style={{ left: `${(currentTime / duration) * 100}%` }}
-  />
-</div>
-```
-
-#### Migration Benefits
-
-This refactoring provides several substantial benefits:
-
-1. **Improved Performance**:
-   - Faster initial load times due to fewer components
-   - More efficient audio handling without stem overhead
-   - Smaller bundle size for quicker page transitions
-
-2. **Enhanced Maintainability**:
-   - Clearer component responsibilities
-   - Simplified state management
-   - Better separation of concerns
-   - Easier to extend with new features
-
-3. **User Experience Improvements**:
-   - More focused UI with fewer distractions
-   - Consistent playback experience
-   - Improved reliability with fewer dependencies
-
-4. **Development Productivity**:
-   - Faster iteration cycles with less complex code
-   - Easier debugging with simplified playback flow
-   - More straightforward testing approach
-
-The current implementation provides a clean foundation for future enhancements while delivering an excellent user experience for track playback and discovery.
-
-#### Future Roadmap
-
-While the current implementation focuses on full track playback only, there are plans to reintroduce stem functionality in the future with a more refined approach:
-
-1. **Enhanced Stem Architecture**:
-   - More modular component design for better maintenance
-   - Improved stem audio synchronization
-   - Optimized loading patterns to reduce initial overhead
-
-2. **Improved User Experience**:
-   - Simplified stem interface focused on most common use cases
-   - Better visualization of stem components
-   - More intuitive controls for stem mixing
-
-3. **Technical Improvements**:
-   - Web Audio API integration for better stem isolation
-   - WebAssembly processing for real-time effects
-   - Service worker caching for faster repeat access
-
-This planned evolution will maintain the current streamlined design while carefully reintroducing the most valuable stem functionality in a more efficient and user-friendly implementation. 
-
-Upload Page Documentation
-Overview
-The Upload Page provides a comprehensive interface for adding new content to the Wave Cave platform. It enables uploading tracks, associated metadata, and supplementary files while automating the storage organization and integration with content management systems.
-
-Core Functionality
-Content Upload Capabilities
-Primary Content:
-
-Main track audio file (MP3, WAV, FLAC)
-
-Cover image (JPEG, PNG, recommended size: 1200 x 1200 px)
-
-Track title and description
-
-Metadata:
-
-Tags categorized by type (genre, mood, instruments)
-
-BPM (beats per minute)
-
-Duration (auto-extracted)
-
-Release date
-
-Premium Content (future feature):
-
-Stem files with individual pricing
-
-Premium track versions with pricing
-
-## Automatic Audio Analysis
-
-The platform implements automatic analysis of audio files during upload to extract important metadata:
-
-### Duration Detection
-- Automatically extracts precise track duration using the Web Audio API
-- Process:
-  1. Audio file is read as ArrayBuffer when selected
-  2. Web Audio API's `AudioContext.decodeAudioData()` processes the file
-  3. Duration is extracted directly from the decoded AudioBuffer
-  4. Value is stored in seconds and formatted as MM:SS for display
-  5. Saved to Strapi as track metadata for filtering
-
-### BPM Detection
-- Automatically analyzes beats per minute using peak detection algorithm
-- Results are immediately displayed to user during upload
-- User can override BPM if needed
-
-### Implementation Details
-- Audio analysis happens client-side using browser APIs
-- No server processing required, improving upload speed
-- Both duration and BPM detection are performed in a single file read
-- Results are displayed to users in real-time before final upload
-- Values are included in the track metadata sent to Strapi
-- Used by the filtering system to enable duration-based track discovery
-
-Technical Implementation
-Storage Architecture:
-
-Files automatically uploaded to wave-cave-audio S3 bucket
-
-Folder structure organized by track name for scalable management
-
-Cloudflare CDN integration for optimized content delivery
-
-Backend Integration:
-
-Automatic synchronization with Strapi CMS
-
-Metadata indexing for search functionality
-
-Content revision management
-
-Frontend Approach:
-
-Dynamic content loading from Strapi
-
-No hardcoded track or image references
-
-Responsive design for all device sizes
-
-### S3 Storage Organization
-
-#### Folder Naming Convention
-To improve track organization and file management in S3, tracks are now stored in descriptive folders that include both the track title and a unique identifier. This makes browsing the bucket content significantly easier when dealing with hundreds of tracks.
-
-**Folder Structure:**
-```
-tracks/
-  ├── awesome-track-name_by_artist-name_083248f9/
-  │   ├── main.mp3
-  │   ├── cover.jpg
-  │   └── stems/
-  │       ├── drums.mp3
-  │       ├── bass.mp3
-  │       └── ...
-  ├── another-track-title_12345678/
-  │   ├── main.mp3
-  │   └── ...
-  └── ...
-```
-
-**Implementation Details:**
-- The `getTrackFolderName` function in `src/lib/upload-helpers.ts` creates folder names using:
-  - Sanitized track title (lowercase, spaces replaced with hyphens)
-  - Artist name (if provided)
-  - First 8 characters of the track ID for uniqueness
-- The `getS3Key` function builds the complete S3 key including the folder name
-- The upload handlers in `src/app/api/upload/route.ts` use these functions to define the S3 path when uploading files
-
-**Benefits:**
-- Easier navigation and browsing of S3 bucket contents
-- Self-documenting folder structure that indicates track content
-- Maintained uniqueness with ID suffix to prevent name collisions
-- Organized separation of main tracks, cover images, and stems
-
-**Technical Note:**
-File encoding issues can break the upload functionality. If the route.ts file contains invalid UTF-8 characters, the Next.js server will fail to compile it properly. This manifests as "stream did not contain valid UTF-8" errors in the server logs. The solution is to recreate the file with proper UTF-8 encoding.
-
-User Experience Features
-Upload Guidance:
-
-File size recommendations:
-
-Audio tracks: Maximum 50 MB (optimally 192-320 kbps for MP3)
-
-Cover images: 1-2 MB, 1200 x 1200 px
-
-Stems: Maximum 30 MB per stem
-
-Status Indicators:
-
-Progress visualization for large uploads
-
-Estimated time remaining
-
-Transfer speed indicator
-
-Feedback Mechanisms:
-
-Success confirmations with direct links to uploaded content
-
-Specific error messages with troubleshooting guidance
-
-Warning indicators for potential issues (low-quality files, missing metadata)
-
-Error Handling & Validation
-Pre-upload Validation:
-
-File format verification
-
-Size limit enforcement
-
-Metadata completeness check
-
-Upload Process Protection:
-
-Network interruption recovery
-
-Automatic retries for failed segments
-
-Session persistence for large uploads
-
-Post-upload Verification:
-
-File integrity confirmation
-
-CDN propagation status
-
-Strapi integration verification
-
-Additional Considerations
-Security Measures:
-
-Authentication requirements for upload access
-
-Proper S3 bucket permissions
-
-File and path sanitization
-
-Workflow Management:
-
-Draft/publish workflow
-
-Approval process integration
-
-Versioning for track updates
-
-Performance Optimization:
-
-Chunked uploads for large files
-
-Background processing for waveform generation
-
-Asynchronous metadata extraction
-
-This comprehensive upload system ensures a smooth content management workflow while maintaining scalability for hundreds or thousands of tracks. 
-
-#### CDN, CloudFront, and CORS Architecture (2024 Update)
+### CDN, CloudFront, and CORS Architecture (2024 Update)
 
 **Background:**
 To ensure secure, performant, and cross-origin compatible delivery of audio and image files, the platform now serves all media assets (audio, images) via AWS CloudFront CDN rather than directly from S3. This change was required to resolve browser CORS/COEP errors (notably missing `Cross-Origin-Resource-Policy` headers) that prevented images from loading when accessed directly from S3.
@@ -617,13 +121,153 @@ To ensure secure, performant, and cross-origin compatible delivery of audio and 
 - Images and audio now load reliably in all browsers with correct CORS and cross-origin headers.
 - The architecture is robust, scalable, and ready for future CDN or S3 changes with minimal code impact.
 
+#### CORS/COEP Implementation and Troubleshooting (2025 Update)
 
+**Problem:**
+Despite implementing the CloudFront CDN architecture described above, we encountered persistent CORS/COEP issues with certain image assets. Browsers were throwing `ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep` errors when attempting to load images directly from S3 URLs, even though we had configured CloudFront with the necessary headers.
 
+**Root Causes Identified:**
+1. **Inconsistent URL transformation:** Some components weren't consistently using the `toCdnUrl` utility function, resulting in direct S3 URL exposure to the browser.
+2. **Missing crossOrigin attributes:** HTML `<img>` tags lacked the `crossOrigin="anonymous"` attribute needed for CORS requests.
+3. **Fallback to direct S3 URLs:** In certain scenarios (especially with track cover images), the code would fall back to using direct S3 URLs when CloudFront transformation failed.
+
+**Comprehensive Solution:**
+
+1. **Component Image Handling Updates:**
+   - Updated all components that display track images to consistently use the `toCdnUrl` function:
+     - `src/components/AudioPlayer.tsx` - Added crossOrigin attribute to img tag and ensured proper URL transformation:
+       ```tsx
+       <img 
+         src={trackImageUrl} 
+         alt={track.title}
+         className="object-cover w-14 h-14"
+         crossOrigin="anonymous"
+         onError={(e) => {
+           console.error(`[AudioPlayer] Failed to load image: ${trackImageUrl}`);
+           setImageLoadFailed(true);
+         }}
+       />
+       ```
+     - `src/components/track/TrackImage.tsx` - Ensured proper URL transformation:
+       ```tsx
+       <Image
+         src={track.imageUrl ? toCdnUrl(track.imageUrl) : '/placeholder-image.jpg'}
+         alt={`${track.title} cover`}
+         fill
+         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+         className={`object-cover transition-opacity duration-300 ${isPlaying ? 'opacity-80' : 'group-hover:opacity-80'}`}
+       />
+       ```
+     - `src/components/TrackListItem.tsx`
+     - `src/components/AudioPlayer/TrackInfo.tsx`
+     - `src/components/Header.tsx` - For cart item images:
+       ```tsx
+       <Image
+         src={toCdnUrl(item.imageUrl)}
+         alt={item.name}
+         width={40}
+         height={40}
+         className="rounded"
+       />
+       ```
+
+2. **Audio & Download URL Handling:**
+   - Updated download functionality to use `toCdnUrl` for audio URLs in `src/components/AudioPlayer.tsx`:
+     ```tsx
+     const audioUrl = track.audioUrl ? toCdnUrl(track.audioUrl) : '';
+     if (!audioUrl) {
+       console.error('[AudioPlayer] No audio URL available for download');
+       return;
+     }
+     
+     const response = await fetch(audioUrl);
+     const blob = await response.blob();
+     ```
+   - Added proper URL transformation in stem components:
+     - `src/components/stem/StemItem.tsx`:
+       ```tsx
+       const handleAddToCart = () => {
+         addItem({
+           id: stem.id,
+           name: stem.name,
+           trackName: track.title,
+           price: stem.price,
+           imageUrl: track.imageUrl ? toCdnUrl(track.imageUrl) : '',
+           type: 'stem'
+         });
+       };
+       ```
+     - `src/components/stem/StemContainer.tsx`
+
+3. **Dynamic Approach to URL Handling:**
+   Instead of hardcoding specific transformations, we implemented a fully dynamic approach using the `toCdnUrl` utility function from `src/utils/cdn-url.ts`:
+   ```typescript
+   import { CDN_DOMAIN, S3_DOMAIN } from './constants';
+
+   export function isCdnUrl(url: string): boolean {
+     if (!url) return false;
+     return url.includes(CDN_DOMAIN);
+   }
+
+   export function toCdnUrl(url: string): string {
+     if (!url) return '';
+     if (isCdnUrl(url)) return url; // Already a CDN URL
+     if (url.includes(S3_DOMAIN)) {
+       return url.replace(S3_DOMAIN, CDN_DOMAIN);
+     }
+     return url; // Not an S3 URL, return as is
+   }
+   ```
+
+**Testing and Verification:**
+- Verified that all track images load properly with the implemented changes
+- Confirmed that audio tracks play and download without CORS errors
+- Ensured proper fallback behavior when images fail to load
+- Checked browser console for any remaining CORS/COEP errors
+
+**Key Technical Insights:**
+1. The browser error `ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep` indicates a mismatch between the Cross-Origin-Embedder-Policy and the Cross-Origin-Resource-Policy headers.
+2. The `crossOrigin="anonymous"` attribute is required on all `<img>` tags loading external resources when COEP headers are present.
+3. Converting S3 URLs to CloudFront URLs must be done consistently throughout the application, with no exceptions.
+4. Error handling with proper fallbacks is essential, as network errors can still occur even with correct CORS configuration.
+
+**Future Troubleshooting Guidelines:**
+If CORS/COEP issues reappear, check the following:
+
+1. Verify that all image rendering components use the `toCdnUrl` utility:
+   ```tsx
+   import { toCdnUrl } from '../utils/cdn-url';
+   
+   // Later in the component:
+   <img src={toCdnUrl(imageUrl)} crossOrigin="anonymous" />
+   ```
+
+2. Confirm that CloudFront is properly configured with all required headers:
+   - Navigate to AWS CloudFront console
+   - Check the distribution's behavior settings
+   - Verify origin response header policy includes all six CORS/COEP headers
+
+3. Check for any direct S3 URL references using grep:
+   ```
+   grep -r "s3\..*amazonaws\.com" --include="*.tsx" --include="*.ts" src/
+   ```
+
+4. For media elements, ensure they have proper crossOrigin attributes:
+   ```tsx
+   <img crossOrigin="anonymous" />
+   <audio crossOrigin="anonymous" />
+   ```
+
+5. Examine network requests in the browser's developer tools to identify which specific resources are triggering CORS errors
+
+6. Verify that the CDN_DOMAIN and S3_DOMAIN constants are correctly set in environment variables
+
+By following these guidelines and maintaining a consistent approach to media URL handling, the platform can avoid future CORS/COEP issues even as browsers continue to strengthen their cross-origin policies.
 
 # Appendix: AudioPlayer Component (Current Implementation)
 Below is the main component and its props as of 05-MAY-2025. Update this section if the implementation changes.
 
-
+     ```tsx
 interface AudioPlayerProps {
   track: Track;
   isPlaying: boolean;
@@ -665,3 +309,67 @@ export default function AudioPlayer({
     </div>
   );
 }
+```
+
+## Data Backup Strategy (2024)
+
+To ensure the safety and integrity of our Strapi content, we've implemented a comprehensive backup system.
+
+### Backup Implementation
+
+1. **Automated Backup Script**
+   - Located in `scripts/backup-strapi.js`
+   - Creates timestamped backups of:
+     - SQLite database
+     - Uploaded files
+     - Compressed into a single zip file
+   - Run manually with: `npm run backup` in the Strapi backend directory
+
+2. **Backup Contents**
+   - Database file (`.tmp/data.db`)
+   - Uploaded media files (`public/uploads/`)
+   - Timestamp in filename format: `strapi-backup-YYYY-MM-DDTHH-mm-ss-sssZ.zip`
+
+3. **Storage Location**
+   - Backups stored in project root's `backups/` directory
+   - Each backup is a self-contained zip file
+   - Recommended to copy backups to secure cloud storage
+
+### Future Improvements
+
+1. **Automated Scheduling**
+   - Set up daily automated backups using:
+     - Windows Task Scheduler
+     - Linux/Mac cron jobs
+   - Configure backup retention policy
+
+2. **Cloud Storage Integration**
+   - Implement automatic upload to:
+     - AWS S3
+     - Google Cloud Storage
+     - Dropbox
+   - Add backup rotation/cleanup
+
+3. **Database Migration**
+   - Plan migration from SQLite to PostgreSQL/MySQL
+   - Implement database replication
+   - Set up point-in-time recovery
+
+4. **Backup Verification**
+   - Add automated backup testing
+   - Implement backup integrity checks
+   - Create backup restoration documentation
+
+5. **Monitoring and Alerts**
+   - Set up backup success/failure notifications
+   - Monitor backup storage usage
+   - Implement backup health checks
+
+### Restore Process
+
+To restore from a backup:
+1. Stop Strapi server
+2. Unzip backup file
+3. Copy `database.db` to `.tmp/` directory
+4. Copy `uploads/` to `public/` directory
+5. Restart Strapi server

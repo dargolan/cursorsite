@@ -42,6 +42,8 @@ export default function FilterSidebar({
   const [localBpmRange, setLocalBpmRange] = useState<[number, number]>(bpmRange);
   const [localDurationRange, setLocalDurationRange] = useState<[number, number]>(durationRange);
   const { isCollapsed, toggleCollapse } = useSidebar();
+  const [bpmExpanded, setBpmExpanded] = useState(true);
+  const [durationExpanded, setDurationExpanded] = useState(true);
   
   // Format duration for display
   const formatDurationForDisplay = (seconds: number) => {
@@ -68,6 +70,7 @@ export default function FilterSidebar({
   // Handle BPM range drags (real-time updates)
   const handleBpmDrag = (range: [number, number]) => {
     setLocalBpmRange(range);
+    onBpmChange(range);
   };
   
   // Handle Duration range changes (final changes)
@@ -79,6 +82,7 @@ export default function FilterSidebar({
   // Handle Duration range drags (real-time updates)
   const handleDurationDrag = (range: [number, number]) => {
     setLocalDurationRange(range);
+    onDurationChange(range);
   };
   
   // Check if tag is selected
@@ -399,44 +403,42 @@ export default function FilterSidebar({
               )}
             </div>
             
-            {/* BPM Range Slider */}
-            <div className="mb-8">
-              <h3 className="text-white font-normal text-sm mb-3">BPM Range</h3>
-              <div className="flex justify-between mb-2">
-                <span className="text-white text-sm font-normal">{localBpmRange[0]}</span>
-                <span className="text-white text-sm font-normal">{localBpmRange[1] === 200 ? "200+" : localBpmRange[1]}</span>
+            {/* BPM Range Slider as dropdown */}
+            <FilterSection
+              title="BPM Range"
+              isExpanded={bpmExpanded}
+              onToggle={() => setBpmExpanded((open) => !open)}
+            >
+              <div className="flex justify-between mb-0 text-white text-sm font-normal">
+                <span>{localBpmRange[0]}</span>
+                <span>{localBpmRange[1] === 200 ? "200+" : localBpmRange[1]}</span>
               </div>
+              <div style={{ height: '8px' }} />
               <RangeSlider
                 min={0}
                 max={200}
                 value={localBpmRange}
-                onChange={handleBpmChange}
-                onDrag={handleBpmDrag}
-                accentColor="#1DF7CE"
-                height={3}
-                hideLabels={true}
+                onChange={handleBpmDrag}
               />
-            </div>
-            
-            {/* Duration Range Slider */}
-            <div className="mb-6">
-              <h3 className="text-white font-normal text-sm mb-3">Duration</h3>
-              <div className="flex justify-between mb-2">
-                <span className="text-white text-sm font-normal">{formatDurationForDisplay(localDurationRange[0])}</span>
-                <span className="text-white text-sm font-normal">{localDurationRange[1] === 600 ? "10:00+" : formatDurationForDisplay(localDurationRange[1])}</span>
+            </FilterSection>
+            {/* Duration Range Slider as dropdown */}
+            <FilterSection
+              title="Duration"
+              isExpanded={durationExpanded}
+              onToggle={() => setDurationExpanded((open) => !open)}
+            >
+              <div className="flex justify-between mb-0 text-white text-sm font-normal">
+                <span>{formatDurationForDisplay(localDurationRange[0])}</span>
+                <span>{localDurationRange[1] === 600 ? "10:00+" : formatDurationForDisplay(localDurationRange[1])}</span>
               </div>
+              <div style={{ height: '8px' }} />
               <RangeSlider
                 min={0}
                 max={600}
                 value={localDurationRange}
-                onChange={handleDurationChange}
-                onDrag={handleDurationDrag}
-                formatLabel={formatDurationForDisplay}
-                accentColor="#1DF7CE"
-                height={3}
-                hideLabels={true}
+                onChange={handleDurationDrag}
               />
-            </div>
+            </FilterSection>
           </div>
         </div>
       )}

@@ -408,7 +408,7 @@ export default function FilterSidebar({
             <span className="text-white text-sm">{localDurationMax === 600 ? "10:00+" : formatDurationForDisplay(localDurationMax)}</span>
           </div>
           
-          <div className="relative h-0.5 pt-3 pb-3 mt-3">
+          <div className="relative h-8 mt-2 mb-2">
             {/* Background track */}
             <div className="absolute w-full h-0.5 bg-[#2C2C2C] top-1/2 transform -translate-y-1/2"></div>
             

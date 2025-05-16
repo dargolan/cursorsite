@@ -3,6 +3,7 @@
  */
 
 import { STRAPI_URL } from '../config/strapi';
+import { toCdnUrl } from './cdn-url';
 
 /**
  * Converts a media URL to a proxied version to avoid CORS issues
@@ -11,50 +12,12 @@ import { STRAPI_URL } from '../config/strapi';
  */
 export function getProxiedMediaUrl(url: string): string {
   if (!url) return '';
-  
-  // If already a proxy URL, return as is
-  if (url.startsWith('/api/proxy/') || url.startsWith('/api/proxy-media')) {
-    return url;
-  }
-
-  // If it's a direct-s3 URL, keep it as is (already handled internally)
-  if (url.startsWith('/api/direct-s3/')) {
-    return url;
-  }
-  
-  // Handle URLs with /uploads/ path
-  if (url.includes('/uploads/')) {
-    try {
-      // For fully qualified URLs
-      if (url.startsWith('http')) {
-        // Extract just the filename part after /uploads/
-        const uploadsPath = url.split('/uploads/')[1];
-        return `/api/proxy/uploads/${uploadsPath}`;
-      } 
-      // For relative URLs starting with /uploads/
-      else if (url.startsWith('/uploads/')) {
-        const path = url.substring(1); // remove leading slash
-        return `/api/proxy/${path}`;
-      }
-    } catch (error) {
-      console.error(`[getProxiedMediaUrl] Error converting URL ${url}:`, error);
-    }
-  }
-  
-  // Special case for relative paths that need to be prefixed with STRAPI_URL
-  if (url.startsWith('/') && !url.startsWith('/api/')) {
-    const fullUrl = `${STRAPI_URL}${url}`;
-    return `/api/proxy-media?url=${encodeURIComponent(fullUrl)}`;
-  }
-  
-  // For absolute URLs that aren't already handled
-  if (url.startsWith('http')) {
-    return `/api/proxy-media?url=${encodeURIComponent(url)}`;
-  }
-  
-  // If we couldn't process the URL through other methods, return it unchanged
-  console.warn(`[getProxiedMediaUrl] Could not convert URL to proxy format: ${url}`);
-  return url;
+  // Convert S3 URLs to CDN URLs
+  const cdnUrl = toCdnUrl(url);
+  // If the URL is already absolute (http/https), return as is
+  if (/^https?:\/\//.test(cdnUrl)) return cdnUrl;
+  // Otherwise, return as is (or add proxy logic if needed for local dev)
+  return cdnUrl;
 }
 
 /**
@@ -91,13 +54,12 @@ export function getAbsoluteUrl(url: string): string {
  * @param track The track object with id and optional imageUrl
  * @returns The image URL to use for the track cover
  */
-export function getTrackCoverImageUrl(track: { id?: string, imageUrl?: string }): string {
-  // If track has an imageUrl, use it
-  if (track.imageUrl && track.imageUrl.trim() !== '') {
-    // Ensure the URL is properly proxied
-    return getProxiedMediaUrl(track.imageUrl);
+export function getTrackCoverImageUrl(track: { id?: string, imageUrl?: string, image?: { url?: string } }): string {
+  // Use Strapi-provided imageUrl or nested image.url
+  const url = track.imageUrl || (track.image && track.image.url) || '';
+  if (url && url.trim() !== '') {
+    return toCdnUrl(url);
   }
-  
   // If we have no image URL, this is an error case
   console.error(`[getTrackCoverImageUrl] No image URL available for track: ${track.id}`);
   return '';

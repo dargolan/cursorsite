@@ -94,6 +94,32 @@ These configure the app to use the production S3 bucket (`wave-cave-audio`) and 
 - **Migration plan**: Added a comprehensive website overview and executed a step-by-step migration plan for the tag system.
 - **Development servers**: Started the Next.js development server and Strapi backend. The app is running and proxying requests to Strapi. Proxy errors for missing media files were observed, but the main application and tag system refactor are functioning as intended.
 
+## Dynamic Genre Images from Strapi (May 2025)
+
+The homepage now dynamically displays genre images fetched from Strapi, with no hardcoding or local images. The normalization logic in `getTags` was updated to support both Strapi v4+ (where the `image` field is an array directly on the tag object) and older Strapi formats (where the image is nested under `attributes`).
+
+**Key implementation details:**
+- The code checks for `item.image` (current Strapi API) and falls back to `item.attributes?.image` (older style).
+- If the image is an array, the first image is used.
+- If the image is an object with a `data` property, the first image in `data` is used.
+- The image URL is normalized and passed to the frontend for display.
+
+**Example normalization logic:**
+```js
+const img = item.image || item.attributes?.image;
+if (!img) return null;
+if (Array.isArray(img) && img.length > 0) {
+  return { url: toCdnUrl(getStrapiMedia(String(img[0]?.url || ''))) };
+}
+if (img.data) {
+  const imgData = Array.isArray(img.data) ? img.data[0] : img.data;
+  return { url: toCdnUrl(getStrapiMedia(String(imgData?.attributes?.url || ''))) };
+}
+return null;
+```
+
+This ensures that all genres with images in Strapi will display their images on the homepage, regardless of the Strapi version or API response format.
+
 ## Getting Started
 
 ```bash

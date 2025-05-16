@@ -36,7 +36,7 @@ export default function SearchBar({ onSearch, existingSearch }: SearchBarProps) 
   // Determine placeholder text based on whether we already have search terms
   const placeholderText = existingSearch 
     ? "Add another search term..."
-    : "Search Tracks...";
+    : "Search";
 
   return (
     <div className="mb-6">

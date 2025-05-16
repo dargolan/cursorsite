@@ -64,34 +64,33 @@ export async function GET(request: Request) {
         return NextResponse.redirect(stemAudioUrl);
       }
       
-      return NextResponse.json({
-        error: `Target returned ${response.status}: ${response.statusText}`
-      }, { status: response.status });
+      throw new Error(`Failed to fetch media: ${response.statusText}`);
     }
     
     // Get the content type from the response
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
     
-    // Get the response body as an ArrayBuffer
-    const data = await response.arrayBuffer();
+    // Get the content as an array buffer
+    const buffer = await response.arrayBuffer();
     
     // Return the response with appropriate headers
-    return new NextResponse(data, {
+    return new NextResponse(buffer, {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Content-Length': Buffer.byteLength(data).toString(),
-        'Cache-Control': 'public, max-age=3600',
+        'Content-Length': buffer.byteLength.toString(),
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Range',
-        'X-Proxied-By': 'WaveCave-Media-Proxy'
+        'Cross-Origin-Resource-Policy': 'cross-origin',
+        'Cross-Origin-Embedder-Policy': 'require-corp',
+        'Cross-Origin-Opener-Policy': 'same-origin'
       }
     });
   } catch (error) {
-    console.error(`[PROXY-MEDIA] Error: ${(error as Error).message}`);
+    console.error('[PROXY-MEDIA] Error:', error);
     return NextResponse.json({
-      error: `Server error: ${(error as Error).message}`
+      error: 'Failed to proxy media request'
     }, { status: 500 });
   }
 }

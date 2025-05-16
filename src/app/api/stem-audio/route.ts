@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getCdnDomain } from '../../../utils/cdn-url';
 
 // Map of stem types to frequencies for simple tones
 const STEM_FREQUENCIES: Record<string, number> = {
@@ -32,12 +33,12 @@ export async function GET(request: Request) {
   
   // First check if a real stem file exists on CloudFront
   try {
-    const CDN_DOMAIN = process.env.NEXT_PUBLIC_CDN_DOMAIN || 'd1r94114aksajj.cloudfront.net';
+    const cdnDomain = getCdnDomain();
     // Format the track name consistently for all tracks
     const formattedTrack = trackTitle.replace(/\s+/g, '_');
     
     // Try CloudFront URL with proper formatting
-    const cdnUrl = `https://${CDN_DOMAIN}/tracks/795b6819-cdff-4a14-9ea0-95ee9df5fedd/stems/${stemName}_-_${formattedTrack}.mp3`;
+    const cdnUrl = `https://${cdnDomain}/tracks/795b6819-cdff-4a14-9ea0-95ee9df5fedd/stems/${stemName}_-_${formattedTrack}.mp3`;
     
     console.log(`[STEM-AUDIO] Checking CDN URL: ${cdnUrl}`);
     

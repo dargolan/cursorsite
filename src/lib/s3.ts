@@ -1,5 +1,6 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { toCdnUrl } from '../utils/cdn-url';
 
 // Initialize S3 client
 const s3Client = new S3Client({
@@ -24,15 +25,7 @@ export async function uploadToS3(file: Buffer, key: string, contentType: string)
   try {
     await s3Client.send(command);
     const s3Url = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
-    const cdnDomain = process.env.CDN_DOMAIN || 'd1r94114aksajj.cloudfront.net';
-    if (cdnDomain) {
-      // Replace the S3 domain with the CloudFront domain
-      return s3Url.replace(
-        `${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com`,
-        cdnDomain
-      );
-    }
-    return s3Url;
+    return toCdnUrl(s3Url);
   } catch (error) {
     console.error('Error uploading to S3:', error);
     throw error;
@@ -68,5 +61,22 @@ export async function deleteFromS3(key: string) {
   } catch (error) {
     console.error('Error deleting from S3:', error);
     throw error;
+  }
+}
+
+export async function checkFileExists(key: string): Promise<boolean> {
+  try {
+    const command = new HeadObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    });
+    await s3Client.send(command);
+    return true;
+  } catch (error: any) {
+    if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+      return false;
+    }
+    console.error('Error checking file existence in S3:', error);
+    return false;
   }
 } 

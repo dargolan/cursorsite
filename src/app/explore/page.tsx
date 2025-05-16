@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, usePathname } from 'next/navigation';
 import FilterSidebar from '../../components/FilterSidebar/index';
 import ContentWrapper from '../../components/ContentWrapper';
 import TagFilter from '../../components/TagFilter';
@@ -14,6 +14,8 @@ import { STRAPI_URL } from '../../config/strapi';
 import { useCart } from '../../contexts/CartContext';
 import Footer from '../../components/Footer';
 import { useDebounce } from '../../hooks/useDebounce';
+import { unifiedAudioManager } from '../../lib/unified-audio-manager';
+import { globalAudioManager } from '../../components/AudioPlayer';
 
 // Lazy load the AudioPlayer component to improve performance
 const AudioPlayerComponent = dynamic(() => import('../../components/AudioPlayer'), {
@@ -24,12 +26,18 @@ const AudioPlayerComponent = dynamic(() => import('../../components/AudioPlayer'
 export default function MusicLibrary() {
   // Get search params from URL
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   
   // State for tracks data
   const [tracks, setTracks] = useState<Track[]>([]);
   const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const observer = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const isFetchingRef = useRef(false);
   
   // Add a ref to track if we've already fetched data to prevent double fetching
   const dataFetchedRef = useRef(false);
@@ -54,149 +62,111 @@ export default function MusicLibrary() {
   // Global state to track which track's stems are open (can only be one at a time)
   const [openStemsTrackId, setOpenStemsTrackId] = useState<string | null>(null);
 
-  // Define fetchData function for reuse
-  const fetchData = async () => {
-    setLoading(true);
+  // Fetch a page of tracks
+  const fetchTracksPage = async (pageNum: number) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    
+    // Only set loading to true for initial page load
+    if (pageNum === 1) {
+      setLoading(true);
+    }
+    
     try {
-      console.log('Fetching tracks and tags...');
+      const pageSize = 20;
+      console.log(`[fetchTracksPage] Fetching page ${pageNum} with size ${pageSize}`);
       
-      // Add more detailed logging
-      console.log('Environment variables:');
-      console.log('STRAPI_API_URL:', process.env.NEXT_PUBLIC_STRAPI_API_URL);
-      console.log('Has API Token:', !!process.env.NEXT_PUBLIC_STRAPI_API_TOKEN);
-      
-      // Test direct fetch to check API connection
-      try {
-        const testUrl = 'http://localhost:1337/api/tracks?populate=*';
-        console.log('Testing API connection directly to:', testUrl);
-        
-        const testResponse = await fetch(testUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-        });
-        
-        if (!testResponse.ok) {
-          console.error(`API test failed with status: ${testResponse.status} ${testResponse.statusText}`);
-          const errorText = await testResponse.text();
-          console.error('Error response:', errorText);
-          throw new Error(`API returned ${testResponse.status}`);
-        }
-        
-        const testData = await testResponse.json();
-        console.log('Direct API test successful. Full response:', JSON.stringify(testData, null, 2));
-      } catch (e) {
-        console.error('Direct API test failed:', e);
+      const response = await fetch(`/api/tracks?page=${pageNum}&pageSize=${pageSize}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch tracks: ${response.status}`);
       }
       
-      // Fetch tracks using the new enhanced function that handles ID/UUID mapping properly
-      const tracksData = await getTracksWithMapping();
-      console.log('Tracks fetched with proper mapping:', tracksData.length);
+      const data = await response.json();
+      const newTracks = data.tracks || [];
+      console.log(`[fetchTracksPage] Received ${newTracks.length} tracks for page ${pageNum}`);
       
-      // The tracks from getTracksWithMapping already have proper IDs and URLs
-      // No need for additional validation or UUID extraction
-      setTracks(tracksData);
-      setFilteredTracks(tracksData);
+      // Preload waveforms for the new tracks
+      newTracks.forEach((track: Track) => {
+        if (track.audioUrl) {
+          // Create a new audio element to preload the audio
+          const audio = new Audio();
+          audio.src = track.audioUrl;
+          audio.preload = 'metadata'; // Only load metadata to save bandwidth
+          audio.load();
+        }
+      });
       
-      // Fetch tags
-      const tagsData = await getTags();
-      console.log('Tags fetched:', tagsData.length);
-      
-      // Categorize tags
-      const genresList = tagsData.filter(tag => tag.type === 'genre');
-      const moodsList = tagsData.filter(tag => tag.type === 'mood');
-      const instrumentsList = tagsData.filter(tag => tag.type === 'instrument');
-      
-      console.log('Genres:', genresList.length);
-      console.log('Moods:', moodsList.length);
-      console.log('Instruments:', instrumentsList.length);
-      
-      // Count tag occurrences in tracks
-      const tagCounts = new Map<string, number>();
-      tracksData.forEach(track => {
-        track.tags.forEach(tag => {
-          const count = tagCounts.get(tag.id) || 0;
-          tagCounts.set(tag.id, count + 1);
+      setTracks(prev => {
+        const all = [...prev, ...newTracks];
+        const seen = new Set();
+        return all.filter(track => {
+          if (seen.has(track.id)) return false;
+          seen.add(track.id);
+          return true;
         });
       });
       
-      // Add count property to tags
-      genresList.forEach(tag => tag.count = tagCounts.get(tag.id) || 0);
-      moodsList.forEach(tag => tag.count = tagCounts.get(tag.id) || 0);
-      instrumentsList.forEach(tag => tag.count = tagCounts.get(tag.id) || 0);
-      
-      setGenres(genresList);
-      setMoods(moodsList);
-      setInstruments(instrumentsList);
-      
-      // Apply URL filters after data is loaded
-      applyFiltersFromURL(tagsData);
-      
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      // If API fails, use an empty state
-      setTracks([]);
-      setFilteredTracks([]);
-      setGenres([]);
-      setMoods([]);
-      setInstruments([]);
+      // Update hasMore based on the pagination data from the API
+      setHasMore(data.pagination?.total > pageNum * pageSize);
+      console.log(`[fetchTracksPage] Has more tracks: ${data.pagination?.total > pageNum * pageSize}`);
+    } catch (err) {
+      console.error('[fetchTracksPage] Error:', err);
+      setHasMore(false);
     } finally {
       setLoading(false);
-      // Mark that we've completed a fetch to prevent duplicate fetches
-      dataFetchedRef.current = true;
+      isFetchingRef.current = false;
     }
   };
 
-  // Apply filters from URL parameters
-  const applyFiltersFromURL = useCallback((allTags: Tag[]) => {
-    // Get tags from URL
-    const tagsParam = searchParams.get('tags');
-    if (tagsParam) {
-      const tagIds = tagsParam.split(',');
-      const matchedTags = allTags.filter(tag => tagIds.includes(tag.id));
-      setSelectedTags(matchedTags);
-    }
-    
-    // Get BPM range from URL
-    const bpmMinParam = searchParams.get('bpmMin');
-    const bpmMaxParam = searchParams.get('bpmMax');
-    if (bpmMinParam !== null && bpmMaxParam !== null) {
-      const bpmMin = parseInt(bpmMinParam) || 0;
-      const bpmMax = parseInt(bpmMaxParam) || 200;
-      
-      console.log(`Setting BPM range from URL: [${bpmMin}, ${bpmMax}]`);
-      setBpmRange([bpmMin, bpmMax]);
-    }
-    
-    // Get duration range from URL
-    const durationMinParam = searchParams.get('durationMin');
-    const durationMaxParam = searchParams.get('durationMax');
-    if (durationMinParam !== null && durationMaxParam !== null) {
-      const durationMin = parseInt(durationMinParam) || 0;
-      const durationMax = parseInt(durationMaxParam) || 600;
-      
-      console.log(`Setting duration range from URL: [${durationMin}, ${durationMax}]`);
-      setDurationRange([durationMin, durationMax]);
-    }
-    
-    // Get search query from URL
-    const searchParam = searchParams.get('search');
-    if (searchParam) {
-      // URL encoding may have replaced commas, ensure they're restored properly
-      const decodedSearch = decodeURIComponent(searchParam).replace(/\+/g, ' ');
-      setSearchQuery(decodedSearch);
-    }
-  }, [searchParams, setBpmRange, setDurationRange, setSelectedTags, setSearchQuery]);
-
-  // Fetch data from Strapi
+  // Initial load: fetch page 1
   useEffect(() => {
-    // Skip if we've already fetched data (prevents double fetch in StrictMode)
-    if (dataFetchedRef.current) return;
-    
-    fetchData();
+    setLoading(true);
+    setTracks([]);
+    setPage(1);
+    setHasMore(true);
+    fetchTracksPage(1);
   }, []);
+
+  // Fetch tracks when page changes (except for initial load)
+  useEffect(() => {
+    if (page === 1) return;
+    console.log('[useEffect] Page changed to:', page);
+    fetchTracksPage(page);
+  }, [page]);
+
+  // Infinite scroll observer: only increments page
+  useEffect(() => {
+    if (!hasMore || loading || isFetchingRef.current) return;
+    
+    console.log('[useEffect] Setting up intersection observer');
+    if (observer.current) observer.current.disconnect();
+    
+    observer.current = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && !isFetchingRef.current) {
+          console.log('[IntersectionObserver] Load more triggered, incrementing page');
+          setPage(prev => prev + 1);
+        }
+      },
+      { 
+        root: null,
+        rootMargin: '100px', // Start loading before reaching the bottom
+        threshold: 0.1 // Trigger when 10% of the element is visible
+      }
+    );
+    
+    if (loadMoreRef.current) {
+      console.log('[useEffect] Observing loadMoreRef element');
+      observer.current.observe(loadMoreRef.current);
+    }
+    
+    return () => {
+      if (observer.current) {
+        console.log('[useEffect] Disconnecting observer');
+        observer.current.disconnect();
+      }
+    };
+  }, [hasMore, loading]);
 
   // Filter tracks based on selected tags, search query, and ranges
   useEffect(() => {
@@ -318,12 +288,12 @@ export default function MusicLibrary() {
 
   // Display loading state or no results message
   const renderContent = () => {
-    if (loading) {
+    if (loading && tracks.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center h-64">
           <div className="w-12 h-12 border-4 border-[#1DF7CE] border-t-transparent rounded-full animate-spin mb-4"></div>
           <p className="text-gray-400">Loading tracks...</p>
-              </div>
+        </div>
       );
     }
 
@@ -352,12 +322,9 @@ export default function MusicLibrary() {
               <button
                 onClick={() => {
                   console.log('Retrying connection to API...');
-                  // Reset the fetched flag so we can try again
                   dataFetchedRef.current = false;
-                  // Show loading state
                   setLoading(true);
-                  // Re-fetch data
-                  fetchData();
+                  fetchTracksPage(1);
                 }}
                 className="mt-4 px-4 py-2 bg-[#1DF7CE]/20 hover:bg-[#1DF7CE]/30 text-[#1DF7CE] rounded transition-colors text-sm"
               >
@@ -415,9 +382,50 @@ export default function MusicLibrary() {
             </div>
           );
         })}
+        <div ref={loadMoreRef}></div>
       </div>
     );
   };
+
+  useEffect(() => {
+    // Stop audio playback if navigating away from explore page
+    if (pathname !== '/explore') {
+      unifiedAudioManager.stop();
+      window.dispatchEvent(new Event('stop-all-audio'));
+    }
+  }, [pathname]);
+
+  // Fetch tags for filters on mount
+  useEffect(() => {
+    async function fetchTagsForFilters() {
+      const tags = await getTags();
+      setGenres(tags.filter(tag => tag.type === 'genre'));
+      setMoods(tags.filter(tag => tag.type === 'mood'));
+      setInstruments(tags.filter(tag => tag.type === 'instrument'));
+    }
+    fetchTagsForFilters();
+  }, []);
+
+  // After tags are loaded, sync URL params to state
+  useEffect(() => {
+    // Only run if tags are loaded
+    if (genres.length === 0 && moods.length === 0 && instruments.length === 0) return;
+    if (!searchParams) return;
+
+    // Get params
+    const search = searchParams.get('search') || '';
+    const tagsParam = searchParams.get('tags') || '';
+    const tagIds = tagsParam.split(',').map(t => t.trim()).filter(Boolean);
+
+    // Set search query
+    setSearchQuery(search);
+
+    // Find all tags by ID
+    const allTags = [...genres, ...moods, ...instruments];
+    const foundTags = allTags.filter(tag => tagIds.includes(tag.id));
+    setSelectedTags(foundTags);
+    // eslint-disable-next-line
+  }, [genres, moods, instruments, searchParams]);
 
   return (
     <div className="min-h-screen bg-[#121212] text-white overflow-x-hidden">
@@ -499,6 +507,18 @@ export default function MusicLibrary() {
           
             {/* Tracks list */}
             {renderContent()}
+            
+            {/* Load more trigger with loading indicator */}
+            {hasMore && (
+              <div 
+                ref={loadMoreRef} 
+                className="h-20 w-full flex items-center justify-center"
+              >
+                {isFetchingRef.current && (
+                  <div className="w-8 h-8 border-2 border-[#1DF7CE] border-t-transparent rounded-full animate-spin"></div>
+                )}
+              </div>
+            )}
           </div>
         </ContentWrapper>
       </main>

@@ -2,6 +2,7 @@ import React from 'react';
 import { Stem, Track } from '../../types';
 import StemItem from './StemItem';
 import { useCart } from '@/contexts/CartContext';
+import { toCdnUrl } from '../../utils/cdn-url';
 
 interface StemContainerProps {
   track: Track;
@@ -29,7 +30,7 @@ export const StemContainer = ({ track, isPlaying, isOpen }: StemContainerProps) 
         name: stem.name,
         trackName: track.title,
         price: stem.price * 0.75, // Apply 25% discount
-        imageUrl: track.imageUrl,
+        imageUrl: track.imageUrl ? toCdnUrl(track.imageUrl) : '',
         type: 'stem'
       })
     );
@@ -52,20 +53,6 @@ export const StemContainer = ({ track, isPlaying, isOpen }: StemContainerProps) 
             </button>
           </div>
         </div>
-        
-        <div className="space-y-2">
-          {track.stems.map(stem => (
-            <StemItem
-              key={stem.id}
-              stem={stem}
-              track={track}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}; 
         
         <div className="space-y-2">
           {track.stems.map(stem => (

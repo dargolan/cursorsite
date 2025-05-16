@@ -198,17 +198,17 @@ export default function RangeSlider({
   const maxPercentage = ((localMax - min) / (max - min)) * 100;
   
   return (
-    <div className="py-2">
+    <div className="py-0">
       {!hideLabels && (
         <div className="flex justify-between mb-2 text-sm text-white">
           <span>{formatLabel(localMin)}</span>
           <span>{formatLabel(localMax)}</span>
         </div>
       )}
-      
+      <div style={{ height: '8px' }} />
       <div 
         ref={trackRef}
-        className="relative w-full cursor-pointer mt-4"
+        className="relative w-full cursor-pointer"
         style={{ height: `${height}px` }}
         onClick={handleTrackClick}
       >

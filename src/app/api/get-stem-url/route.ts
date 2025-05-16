@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { API_URL, STRAPI_URL } from '../../../config/strapi';
 import { getHeaders } from '../../../services/strapi';
+import { getCdnDomain } from '../../../utils/cdn-url';
 
 /**
  * API endpoint to find stem URLs
@@ -165,45 +166,30 @@ export async function GET(request: Request) {
     }
     
     // Look for direct match in CloudFront CDN
-    try {
-      const CDN_DOMAIN = process.env.NEXT_PUBLIC_CDN_DOMAIN || 'd1r94114aksajj.cloudfront.net';
-      // Format the track name consistently for all tracks
-      const formattedTrack = trackTitle.replace(/\s+/g, '_');
-      
-      const cdnUrl = `https://${CDN_DOMAIN}/tracks/795b6819-cdff-4a14-9ea0-95ee9df5fedd/stems/${stemName}_-_${formattedTrack}.mp3`;
-      
-      console.log(`[GET-STEM-URL] Trying direct CDN URL: ${cdnUrl}`);
-      
-      // Instead of returning a full URL for mock-stem, return an absolute URL for the mock API
-      const baseUrl = new URL(request.url).origin;
-      const mockUrl = `${baseUrl}/api/mock-stem?name=${encodeURIComponent(stemName)}&track=${encodeURIComponent(trackTitle)}`;
-      
-      // Check if the CDN URL is directly accessible
-      const headResponse = await fetch(cdnUrl, { method: 'HEAD' }).catch(() => null);
-      if (headResponse && headResponse.ok) {
-        console.log(`[GET-STEM-URL] CDN URL exists and is accessible: ${cdnUrl}`);
-        return NextResponse.json({ url: cdnUrl });
-      }
-      
-      // If no URL was found, return null with an explanation
-      console.log(`[GET-STEM-URL] No stem URL found for ${stemName} (${trackTitle})`);
-      return NextResponse.json({ 
-        url: null,
-        message: `No stem URL found for ${stemName} (${trackTitle})`,
-        mockUrl
-      });
-    } catch (error) {
-      console.error(`[GET-STEM-URL] Error checking CDN URL:`, error);
-      
-      // Ensure we return an absolute URL for the mock API
-      const baseUrl = new URL(request.url).origin;
-      const mockUrl = `${baseUrl}/api/mock-stem?name=${encodeURIComponent(stemName)}&track=${encodeURIComponent(trackTitle)}`;
-      
-      return NextResponse.json({
-        error: `Failed to find stem URL: ${(error as Error).message}`,
-        mockUrl
-      }, { status: 500 });
+    const cdnDomain = getCdnDomain();
+    const formattedTrack = trackTitle.replace(/\s+/g, '_');
+    const cdnUrl = `https://${cdnDomain}/tracks/795b6819-cdff-4a14-9ea0-95ee9df5fedd/stems/${stemName}_-_${formattedTrack}.mp3`;
+    
+    console.log(`[GET-STEM-URL] Trying direct CDN URL: ${cdnUrl}`);
+    
+    // Instead of returning a full URL for mock-stem, return an absolute URL for the mock API
+    const baseUrl = new URL(request.url).origin;
+    const mockUrl = `${baseUrl}/api/mock-stem?name=${encodeURIComponent(stemName)}&track=${encodeURIComponent(trackTitle)}`;
+    
+    // Check if the CDN URL is directly accessible
+    const headResponse = await fetch(cdnUrl, { method: 'HEAD' }).catch(() => null);
+    if (headResponse && headResponse.ok) {
+      console.log(`[GET-STEM-URL] CDN URL exists and is accessible: ${cdnUrl}`);
+      return NextResponse.json({ url: cdnUrl });
     }
+    
+    // If no URL was found, return null with an explanation
+    console.log(`[GET-STEM-URL] No stem URL found for ${stemName} (${trackTitle})`);
+    return NextResponse.json({ 
+      url: null,
+      message: `No stem URL found for ${stemName} (${trackTitle})`,
+      mockUrl
+    });
     
   } catch (error) {
     console.error(`[GET-STEM-URL] Error finding stem URL:`, error);

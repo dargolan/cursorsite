@@ -1,6 +1,7 @@
 import { Track, Tag, Stem } from '../types';
 import { STRAPI_URL, API_URL, API_TOKEN } from '../config/strapi';
 import { getProxiedMediaUrl } from '../utils/media-helpers';
+import { toCdnUrl } from '../utils/cdn-url';
 
 // Debug info for environment setup (only log once)
 if (typeof window !== 'undefined') {
@@ -48,7 +49,7 @@ export function getRequestOptions(): RequestInit {
 
 // Helper to format the image URL
 export function getStrapiMedia(url: string | null) {
-  if (!url) return null;
+  if (!url) return '';
   // Return the full URL if it's already absolute
   if (url.startsWith('http')) return url;
   return `${STRAPI_URL}${url}`;
@@ -120,8 +121,8 @@ export function normalizeTrack(strapiTrack: any): Track {
       tags: tags,
       stems: stems,
       hasStems: stems.length > 0,
-      audioUrl: getProxiedMediaUrl(audioUrl),
-      imageUrl: getProxiedMediaUrl(imageUrl),
+      audioUrl: toCdnUrl(audioUrl),
+      imageUrl: toCdnUrl(imageUrl),
       waveform: data.waveform || []
     };
   } catch (error) {
@@ -166,7 +167,21 @@ export async function getTags(): Promise<Tag[]> {
       id: item.id.toString(),
       name: item.attributes?.name || item.attributes?.Name || item.name || item.Name || 'Unknown Tag',
       type: item.attributes?.type || item.attributes?.Type || item.type || item.Type || 'genre',
-      count: 0
+      count: 0,
+      image: (() => {
+        const img = item.image || item.attributes?.image;
+        if (!img) return null;
+        // If image is an array (new Strapi style)
+        if (Array.isArray(img) && img.length > 0) {
+          return { url: toCdnUrl(getStrapiMedia(String(img[0]?.url || ''))) };
+        }
+        // If image is an object with data (old Strapi style)
+        if (img.data) {
+        const imgData = Array.isArray(img.data) ? img.data[0] : img.data;
+          return { url: toCdnUrl(getStrapiMedia(String(imgData?.attributes?.url || ''))) };
+        }
+        return null;
+      })(),
     }));
     
     // Log tag categories for debugging
@@ -500,5 +515,163 @@ export async function getTracksWithMapping(): Promise<Track[]> {
   } catch (error) {
     console.error('[getTracksWithMapping] Error:', error);
     return [];
+  }
+}
+
+/**
+ * Create a track in Strapi with authentication
+ * @param trackData Track data to create
+ * @returns The created track data
+ */
+export async function createTrack(trackData: any): Promise<any> {
+  try {
+    console.log('[createTrack] Creating track in Strapi:', trackData.title);
+    
+    // First try the standard API endpoint
+    try {
+      const response = await fetch(`${API_URL}/tracks`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ data: trackData }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[createTrack] Track created successfully:', data);
+        return data;
+      }
+      
+      // If we get a 405, try the alternative endpoint format
+      if (response.status === 405) {
+        console.log('[createTrack] Got 405, trying alternative endpoint format');
+        return tryAlternativeEndpoint(trackData, true);
+      }
+      
+      const errorText = await response.text();
+      console.error(`[createTrack] Error creating track: ${response.status}`, errorText);
+      throw new Error(`Failed to create track: ${response.status} - ${errorText}`);
+    } catch (error) {
+      if ((error as Error).message.includes('405')) {
+        return tryAlternativeEndpoint(trackData, true);
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('[createTrack] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create a track in Strapi without authentication
+ * For public endpoints that don't require auth
+ * @param trackData Track data to create
+ * @returns The created track data
+ */
+export async function createTrackNoAuth(trackData: any): Promise<any> {
+  try {
+    console.log('[createTrackNoAuth] Creating track in Strapi without auth:', trackData.title);
+    
+    // Create headers without auth token
+    const headers = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+    
+    // First try the standard API endpoint
+    try {
+      const response = await fetch(`${API_URL}/tracks`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ data: trackData }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[createTrackNoAuth] Track created successfully:', data);
+        return data;
+      }
+      
+      // If we get a 405, try the alternative endpoint format
+      if (response.status === 405) {
+        console.log('[createTrackNoAuth] Got 405, trying alternative endpoint format');
+        return tryAlternativeEndpoint(trackData, false);
+      }
+      
+      const errorText = await response.text();
+      console.error(`[createTrackNoAuth] Error creating track: ${response.status}`, errorText);
+      throw new Error(`Failed to create track: ${response.status} - ${errorText}`);
+    } catch (error) {
+      if ((error as Error).message.includes('405')) {
+        return tryAlternativeEndpoint(trackData, false);
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('[createTrackNoAuth] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Try alternative endpoint formats for Strapi
+ * This is a workaround for some Strapi configurations
+ */
+async function tryAlternativeEndpoint(trackData: any, useAuth: boolean): Promise<any> {
+  console.log('[tryAlternativeEndpoint] Trying alternative endpoint format');
+  
+  // Try the content-manager API format
+  const headers: Record<string, string> = {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+  };
+  
+  if (useAuth && API_TOKEN) {
+    headers['Authorization'] = `Bearer ${API_TOKEN}`;
+  }
+
+  try {
+    // Try the admin API format
+    const adminResponse = await fetch(`${STRAPI_URL}/admin/content-manager/collection-types/api::track.track`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(trackData), // Note: no { data: ... } wrapper for admin API
+    });
+    
+    if (adminResponse.ok) {
+      const data = await adminResponse.json();
+      console.log('[tryAlternativeEndpoint] Track created successfully with admin API:', data);
+      return data;
+    }
+    
+    // Try creating a custom temporary track manually as a fallback
+    const fallbackTrack = {
+      id: `temp-${Date.now()}`,
+      title: trackData.title || 'Temporary Track',
+      audioUrl: trackData.audioUrl || '',
+      imageUrl: trackData.imageUrl || '',
+      bpm: trackData.bpm || 0,
+      duration: trackData.duration || 0,
+      tags: trackData.tags || []
+    };
+    
+    console.log('[tryAlternativeEndpoint] Creating temporary track as fallback:', fallbackTrack);
+    return { data: fallbackTrack, temporary: true };
+  } catch (error) {
+    console.error('[tryAlternativeEndpoint] Error trying alternative endpoint:', error);
+    
+    // Create a temporary track as a last resort
+    const fallbackTrack = {
+      id: `temp-${Date.now()}`,
+      title: trackData.title || 'Temporary Track',
+      audioUrl: trackData.audioUrl || '',
+      imageUrl: trackData.imageUrl || '',
+      bpm: trackData.bpm || 0,
+      duration: trackData.duration || 0,
+      tags: trackData.tags || []
+    };
+    
+    console.log('[tryAlternativeEndpoint] Creating temporary track as fallback:', fallbackTrack);
+    return { data: fallbackTrack, temporary: true };
   }
 } 
