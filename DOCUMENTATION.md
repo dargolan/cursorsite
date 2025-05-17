@@ -74,6 +74,55 @@ return null;
 
 This ensures that all genres with images in Strapi will display their images on the homepage, regardless of the Strapi version or API response format.
 
+## GalleryStrip Carousel Component (May 2025)
+
+The Explore page features a dynamic, scrollable carousel (GalleryStrip) that displays videos and images from the Gallery Item collection in Strapi.
+
+### Purpose
+- Showcase featured media (videos/images) at the top of the Explore page
+- Support both internal navigation (to site pages) and external links (to outside resources)
+- Provide a visually engaging, auto-advancing gallery for users
+
+### Technical Details
+- Uses the `keen-slider` library for smooth, performant carousel functionality
+- Fetches gallery items from Strapi via the `getGalleryItems` service
+- Supports both video and image media types
+- Videos autoplay and loop when their slide is active
+- Carousel auto-advances every 10 seconds
+
+### Link Handling
+- Each gallery item can have a `LinkURL` field in Strapi
+- **Internal links** (starting with `/`) use Next.js `<Link>` for client-side navigation in the same tab
+- **External links** (starting with `http` and not matching the site domain) open in a new tab
+- Absolute URLs pointing to your own domain are best entered as relative paths (e.g. `/upload`) for correct behavior
+
+#### Example Link Handling Logic
+```js
+const isInternal = item.linkUrl && item.linkUrl.startsWith('/');
+// For internal links, use <Link href={item.linkUrl}>...</Link>
+// For external links, use <a href={item.linkUrl} target="_blank" rel="noopener noreferrer">...</a>
+```
+
+### Best Practices for LinkURL in Strapi
+- **Internal navigation:** Enter as `/your-path` (e.g. `/upload`)
+- **External navigation:** Enter as full URL (e.g. `https://youtube.com/...`)
+- Avoid using absolute URLs for your own site (e.g. `http://localhost:3000/upload`); use relative paths instead
+
+### Media URL Normalization
+- All media URLs are normalized to use the CloudFront CDN for proper CORS/COEP headers
+- Videos and images will not display if served directly from S3 without the correct headers
+
+### Example Gallery Item in Strapi
+- Title: `My Video`
+- Type: `video`
+- MediaUrl: `https://d1r94114aksajj.cloudfront.net/uploads/myvideo.mp4`
+- LinkURL: `/upload` (internal) or `https://youtube.com/...` (external)
+
+### Troubleshooting
+- If videos/images do not display, check that the MediaUrl is using the CDN domain and not a direct S3 link
+- For internal navigation, ensure LinkURL is a relative path
+- For external navigation, ensure LinkURL is a full URL
+
 ## Infrastructure and Media Delivery
 
 ### CDN, CloudFront, and CORS Architecture (2024 Update)
