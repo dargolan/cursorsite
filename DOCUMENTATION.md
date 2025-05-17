@@ -422,3 +422,51 @@ To restore from a backup:
 3. Copy `database.db` to `.tmp/` directory
 4. Copy `uploads/` to `public/` directory
 5. Restart Strapi server
+
+## Stems 2.0: New Implementation Plan (May 2025)
+
+### Overview
+Stems are being reintroduced with a new, scalable, and user-focused approach. This plan outlines the requirements and technical direction for the new stems system.
+
+### Key Requirements
+- **Purchasable Stems:**
+  - Each stem costs 1.99 EUR.
+  - Users can buy all stems for a track as a bundle (25% discount).
+  - No custom bundles; bundle = all stems for a track.
+- **Formats:**
+  - Each stem is available in both MP3 and WAV formats.
+  - After purchase, users can download either or both formats.
+- **Scalability:**
+  - Tracks may have 2–10 stems each; site-wide, there may be hundreds or thousands of stems.
+  - The system must be highly performant and dynamic.
+- **Mixing & Synchronization:**
+  - Users can mute/solo stems and scrub through the track.
+  - All stems are always perfectly synchronized (including during scrubbing).
+- **Waveform Visualization:**
+  - Waveform data for each stem is generated and stored at upload time (server-side).
+  - Waveforms are displayed in the UI with zero lag.
+- **UI/UX:**
+  - Desktop-first, but mobile compatibility considered for the future.
+  - Stems will be presented in a popup window for performance and flexibility (can be revisited later).
+
+### Technical Approach
+- **Data Model:**
+  - Each stem: id, name, price, duration, parentTrackId, waveformData, audioUrls: { mp3, wav }
+  - Each track: id, title, stems: Stem[]
+- **Audio Engine:**
+  - Use Web Audio API for synchronized playback, mute/solo, and scrubbing.
+  - All stems are loaded as AudioBufferSourceNodes and started together.
+  - Muting/soloing is handled by gain nodes.
+- **Waveform Handling:**
+  - Waveform data is generated server-side at upload and stored as JSON or image.
+  - Frontend loads waveform data only when the stems UI is opened.
+- **Cart & Purchase Flow:**
+  - Stems can be added to cart individually or as a bundle.
+  - Bundle price = (number of stems × 1.99 EUR) × 0.75.
+  - After purchase, user can download any or all formats for purchased stems.
+
+### Next Steps
+1. Update Strapi schema for stems (multiple formats, waveform data, etc.)
+2. Prototype audio engine (Web Audio API) for synchronized stem playback.
+3. Design popup UI for stem mixing, waveform display, and download options.
+4. Update upload pipeline to generate/store waveform data for each stem.
