@@ -4,7 +4,8 @@
   "info": {
     "singularName": "track",
     "pluralName": "tracks",
-    "displayName": "Track"
+    "displayName": "Track",
+    "description": ""
   },
   "options": {
     "draftAndPublish": true
@@ -26,9 +27,6 @@
     "ImageUrl": {
       "type": "string"
     },
-    "Stems": {
-      "type": "json"
-    },
     "trackId": {
       "type": "uid"
     },
@@ -37,6 +35,11 @@
       "relation": "manyToMany",
       "target": "api::tag.tag",
       "mappedBy": "tracks"
+    },
+    "stems": {
+      "type": "component",
+      "repeatable": true,
+      "component": "track.track-stem"
     }
   }
 }

@@ -16,12 +16,23 @@ interface UploadedFile {
   size: number;
   url: string;
   fileType: 'main' | 'stem' | 'image';
+  duration?: number;
+  waveform?: number[];
 }
 
 export default function UploadPage() {
   const [mainTrack, setMainTrack] = useState<UploadedFile | null>(null);
   const [trackImage, setTrackImage] = useState<UploadedFile | null>(null);
-  const [stems, setStems] = useState<UploadedFile[]>([]);
+  const [stems, setStems] = useState<{
+    name: string;
+    mp3File: File | null;
+    wavFile: File | null;
+    price: number;
+    duration?: number;
+    waveform?: number[];
+    mp3Status?: 'idle' | 'uploading' | 'success' | 'error';
+    wavStatus?: 'idle' | 'uploading' | 'success' | 'error';
+  }[]>([]);
   const [stemPrices, setStemPrices] = useState<{[key: string]: string}>({});
   const [trackTitle, setTrackTitle] = useState('');
   const [genreTags, setGenreTags] = useState<Tag[]>([]);
@@ -36,10 +47,8 @@ export default function UploadPage() {
   const [trackId, setTrackId] = useState<string>(uuidv4());
   const [selectedMainFile, setSelectedMainFile] = useState<File | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
-  const [selectedStemFiles, setSelectedStemFiles] = useState<File[]>([]);
   const [isUploadingMain, setIsUploadingMain] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [isUploadingStems, setIsUploadingStems] = useState(false);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [mainUploadProgress, setMainUploadProgress] = useState(0);
   const [mainUploadSpeed, setMainUploadSpeed] = useState(0);
@@ -51,6 +60,7 @@ export default function UploadPage() {
   const [stemUploadSpeed, setStemUploadSpeed] = useState(0);
   const [stemTimeRemaining, setStemTimeRemaining] = useState(0);
   const [artistName, setArtistName] = useState('');
+  const [waveformGenerated, setWaveformGenerated] = useState(false);
 
   useEffect(() => {
     async function fetchTags() {
@@ -142,8 +152,6 @@ export default function UploadPage() {
         setIsUploadingMain(true);
       } else if (fileType === 'image') {
         setIsUploadingImage(true);
-      } else {
-        setIsUploadingStems(true);
       }
       
       // Update progress states
@@ -171,13 +179,6 @@ export default function UploadPage() {
             setImageUploadProgress(progress);
             setImageUploadSpeed(speed);
             setImageTimeRemaining(timeRemaining);
-          }
-          break;
-        case 'stem':
-          if (selectedStemFiles.length > 0) {
-            setStemUploadProgress(progress);
-            setStemUploadSpeed(speed);
-            setStemTimeRemaining(timeRemaining);
           }
           break;
       }
@@ -271,7 +272,9 @@ export default function UploadPage() {
                 originalName: data.originalName,
                 size: data.size,
                 url: data.url,
-                fileType
+                fileType,
+                duration: data.duration,
+                waveform: data.waveform
               };
             }
             
@@ -299,9 +302,6 @@ export default function UploadPage() {
       } else if (fileType === 'image') {
         setSubmitError('Failed to upload cover image. Please try again.');
         setIsUploadingImage(false);
-      } else {
-        setSubmitError('Failed to upload stem files. Please try again.');
-        setIsUploadingStems(false);
       }
       throw error;
     } finally {
@@ -310,8 +310,6 @@ export default function UploadPage() {
         setIsUploadingMain(false);
       } else if (fileType === 'image') {
         setIsUploadingImage(false);
-      } else {
-        setIsUploadingStems(false);
       }
     }
   };
@@ -330,7 +328,6 @@ export default function UploadPage() {
 
   // New handlers for file selection
   const handleImageFileSelected = (file: File) => setSelectedImageFile(file);
-  const handleStemFilesSelected = (files: File[]) => setSelectedStemFiles(files);
 
   // Replace the existing upload handlers with chunked versions
   const handleUploadMainTrack = async () => {
@@ -437,64 +434,6 @@ export default function UploadPage() {
       setIsUploadingImage(false);
     }
   };
-  
-  const handleUploadStems = async () => {
-    if (!selectedStemFiles.length) return;
-    setIsUploadingStems(true);
-    setSubmitError(null);
-    
-    const uploadedStems: UploadedFile[] = [];
-    const newPrices = { ...stemPrices };
-    const failedUploads: string[] = [];
-    
-    for (const file of selectedStemFiles) {
-      try {
-        // Use chunked upload for large files
-        let fileData;
-        if (file.size > 5 * 1024 * 1024) {
-          fileData = await uploadFileInChunks(file, 'stem');
-        } else {
-          // Use existing upload for small files
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('fileType', 'stem');
-          formData.append('trackId', trackId);
-          const res = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-          });
-          if (!res.ok) throw new Error('Upload failed');
-          fileData = await res.json();
-        }
-        
-        uploadedStems.push(fileData);
-        newPrices[fileData.filename] = '1.99';
-      } catch (err) {
-        console.error(`Failed to upload stem ${file.name}:`, err);
-        failedUploads.push(file.name);
-      }
-    }
-    
-    setStemPrices(newPrices);
-    setStems(prev => [...prev, ...uploadedStems]);
-    setSelectedStemFiles([]);
-    
-    if (failedUploads.length > 0) {
-      setSubmitError(`Failed to upload ${failedUploads.length} stem(s): ${failedUploads.join(', ')}`);
-    } else if (uploadedStems.length > 0) {
-      // Show success message
-      const successMessage = document.getElementById('upload-success-message');
-      if (successMessage) {
-        successMessage.textContent = `${uploadedStems.length} stem(s) uploaded successfully!`;
-        successMessage.classList.remove('hidden');
-        setTimeout(() => {
-          successMessage.classList.add('hidden');
-        }, 3000);
-      }
-    }
-    
-    setIsUploadingStems(false);
-  };
 
   const handleBpmDetected = (detectedBpm: number) => {
     setBpm(detectedBpm.toString());
@@ -505,16 +444,18 @@ export default function UploadPage() {
     setTrackDuration(Math.round(duration));
   };
 
+  const addStem = () => {
+    setStems([...stems, { name: '', mp3File: null, wavFile: null, price: 1.99 }]);
+  };
+
+  const updateStem = (index: number, field: string, value: any) => {
+    const newStems = [...stems];
+    (newStems[index] as any)[field] = value;
+    setStems(newStems);
+  };
+
   const removeStem = (index: number) => {
-    const stem = stems[index];
-    setStems(prev => prev.filter((_, i) => i !== index));
-    
-    // Remove price for this stem
-    setStemPrices(prev => {
-      const newPrices = {...prev};
-      delete newPrices[stem.filename];
-      return newPrices;
-    });
+    setStems(stems.filter((_, i) => i !== index));
   };
 
   const removeMainTrack = () => {
@@ -551,14 +492,43 @@ export default function UploadPage() {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      // Prepare stems data for backend
-      const stemsData = stems.map(stem => ({
-        name: stem.originalName,
-        url: stem.url,
-        price: parseFloat(stemPrices[stem.filename] || '0'),
-        duration: 0 // You can add duration extraction if available
-      }));
-      
+      // Upload stems files and collect URLs, duration, waveform
+      const stemsData = [];
+      for (let i = 0; i < stems.length; i++) {
+        const stem = stems[i];
+        let mp3Url = '';
+        let wavUrl = '';
+        let duration = 0;
+        let waveform: number[] = [];
+        if (stem.mp3File) {
+          const mp3Upload = await uploadFileInChunks(stem.mp3File, 'stem');
+          mp3Url = mp3Upload.url;
+          if (mp3Upload.duration) duration = mp3Upload.duration;
+          if (mp3Upload.waveform) waveform = mp3Upload.waveform;
+        }
+        if (stem.wavFile) {
+          const wavUpload = await uploadFileInChunks(stem.wavFile, 'stem');
+          wavUrl = wavUpload.url;
+          // Prefer duration/waveform from WAV if available
+          if (wavUpload.duration) duration = wavUpload.duration;
+          if (wavUpload.waveform) waveform = wavUpload.waveform;
+        }
+        // Update stems state with duration and waveform for UI feedback (optional)
+        setStems(prev => {
+          const updated = [...prev];
+          updated[i] = { ...updated[i], duration, waveform };
+          return updated;
+        });
+        stemsData.push({
+          name: stem.name,
+          mp3Url,
+          wavUrl,
+          price: stem.price,
+          duration,
+          waveform,
+        });
+      }
+
       // Prepare track payload
       const trackData = {
         Title: trackTitle,
@@ -567,7 +537,7 @@ export default function UploadPage() {
         tags: [...genreTags, ...moodTags, ...instrumentTags].map(tag => tag.id),
         audioUrl: mainTrack.url,
         ImageUrl: trackImage.url,
-        Stems: stemsData,
+        stems: stemsData,
         trackId,
       };
       
@@ -685,6 +655,7 @@ export default function UploadPage() {
       if (successMessage) {
         if (data.success) {
           successMessage.textContent = 'Waveform generated successfully!';
+          setWaveformGenerated(true);
         } else {
           successMessage.textContent = 'Error: ' + (data.error || 'Failed to generate waveform');
           successMessage.className = 'fixed top-4 right-4 bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded z-50 shadow-lg';
@@ -692,7 +663,6 @@ export default function UploadPage() {
         
         setTimeout(() => {
           successMessage.classList.add('hidden');
-          // Reset class if it was changed to error
           successMessage.className = 'fixed top-4 right-4 bg-green-50 border border-green-400 text-green-700 px-4 py-3 rounded hidden z-50 shadow-lg';
         }, 3000);
       }
@@ -843,13 +813,15 @@ export default function UploadPage() {
                         {/* Add Generate Waveform button after main track is uploaded */}
                         {mainTrack && (
                           <button 
+                            type="button"
                             onClick={handleGenerateWaveform} 
-                            className="mt-2 bg-accent text-white rounded px-4 py-2 flex items-center"
+                            className={`mt-2 rounded px-4 py-2 flex items-center ${waveformGenerated ? 'bg-green-500 text-white' : 'bg-accent text-white'}`}
+                            disabled={waveformGenerated}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M12 5v14m7-7H5" />
                             </svg>
-                            Generate Waveform
+                            {waveformGenerated ? 'Waveform Generated ✓' : 'Generate Waveform'}
                           </button>
                         )}
                       </div>
@@ -886,64 +858,100 @@ export default function UploadPage() {
                     </p>
                     
                     <div className="space-y-4">
-                      <FileUpload
-                        label="Upload stem files"
-                        onMultipleFilesSelected={handleStemFilesSelected}
-                        acceptedTypes="audio/mpeg,audio/wav,audio/mp3,audio/flac"
-                        maxSizeMB={30}
-                        fileType="stem"
-                        multiple={true}
-                        onProgress={handleStemProgress}
-                      />
-                      {selectedStemFiles.length > 0 && (
-                        <button onClick={handleUploadStems} disabled={isUploadingStems} className="mt-2 bg-accent text-white rounded px-4 py-2">
-                          {isUploadingStems ? 'Uploading...' : `Upload ${selectedStemFiles.length} Stems`}
+                      <h3 className="text-lg font-semibold mt-8 mb-2">Stems</h3>
+                      <div className="space-y-4 mb-4">
+                        {stems.map((stem, idx) => (
+                          <div key={idx} className="mb-4 p-4 bg-gray-50 rounded border">
+                            <label className="block text-sm font-medium mb-1">Stem Name</label>
+                            <input
+                              type="text"
+                              className="w-full p-2 border rounded bg-white text-black"
+                              value={stem.name}
+                              onChange={e => updateStem(idx, 'name', e.target.value)}
+                              placeholder="e.g. Drums"
+                            />
+                            <div className="flex gap-4 mt-2">
+                              <div className="flex-1">
+                                <label className="block text-xs font-medium mb-1">Upload MP3 file</label>
+                                <input
+                                  type="file"
+                                  accept="audio/mp3"
+                                  className="w-full p-1 border rounded bg-white text-black"
+                                  onChange={e => {
+                                    updateStem(idx, 'mp3File', e.target.files?.[0] || null);
+                                    if (e.target.files?.[0]) updateStem(idx, 'mp3Status', 'idle');
+                                  }}
+                                />
+                                {stem.mp3File && <span className="text-green-600 text-xs ml-2">Loaded ✓</span>}
+                                {/* Status indicator for MP3 upload */}
+                                {stem.mp3Status === 'uploading' && <span className="text-xs text-blue-500 ml-2">Uploading...</span>}
+                                {stem.mp3Status === 'success' && <span className="text-xs text-green-600 ml-2">Uploaded</span>}
+                                {stem.mp3Status === 'error' && <span className="text-xs text-red-600 ml-2">Error</span>}
+                              </div>
+                              <div className="flex-1">
+                                <label className="block text-xs font-medium mb-1">Upload WAV file</label>
+                                <input
+                                  type="file"
+                                  accept="audio/wav"
+                                  className="w-full p-1 border rounded bg-white text-black"
+                                  onChange={e => {
+                                    updateStem(idx, 'wavFile', e.target.files?.[0] || null);
+                                    if (e.target.files?.[0]) updateStem(idx, 'wavStatus', 'idle');
+                                  }}
+                                />
+                                {stem.wavFile && <span className="text-green-600 text-xs ml-2">Loaded ✓</span>}
+                                {/* Status indicator for WAV upload */}
+                                {stem.wavStatus === 'uploading' && <span className="text-xs text-blue-500 ml-2">Uploading...</span>}
+                                {stem.wavStatus === 'success' && <span className="text-xs text-green-600 ml-2">Uploaded</span>}
+                                {stem.wavStatus === 'error' && <span className="text-xs text-red-600 ml-2">Error</span>}
+                              </div>
+                              <div className="flex-1">
+                                <label className="block text-xs font-medium mb-1">Price (EUR)</label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={0.01}
+                                  className="w-full p-2 border rounded bg-white text-black"
+                                  value={stem.price}
+                                  onChange={e => updateStem(idx, 'price', parseFloat(e.target.value))}
+                                />
+                              </div>
+                            </div>
+                            <button type="button" className="mt-2 text-red-500 text-xs" onClick={() => removeStem(idx)}>Remove</button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={addStem}
+                          className="flex items-center gap-2 px-3 py-1 bg-accent text-white rounded hover:bg-accent-hover"
+                        >
+                          <PlusCircleIcon className="h-5 w-5" /> Add Stem
                         </button>
-                      )}
-                      
-                      {stems.length > 0 && (
-                        <div className="mt-4">
-                          <h3 className="text-sm font-medium text-gray-700 mb-2">Uploaded Stems:</h3>
-                          <ul className="divide-y divide-gray-200 border border-gray-200 rounded-md overflow-hidden">
-                            {stems.map((stem, index) => (
-                              <li key={index} className="px-4 py-3 flex items-center justify-between bg-white">
-                                <div className="flex items-center min-w-0 flex-1">
-                                  <span className="text-sm font-medium text-gray-900 truncate">
-                                    {stem.originalName}
-                                  </span>
-                                  <span className="ml-2 text-xs text-gray-500">
-                                    ({(stem.size / (1024 * 1024)).toFixed(2)} MB)
-                                  </span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <div className="w-24">
-                                    <div className="relative rounded-md shadow-sm">
-                                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2">
-                                        <span className="text-gray-500 sm:text-sm">€</span>
-                                      </div>
-                                      <input
-                                        type="number"
-                                        value={stemPrices[stem.filename] || '1.99'}
-                                        onChange={(e) => handleStemPriceChange(stem.filename, e.target.value)}
-                                        min="0"
-                                        step="0.01"
-                                        className="block w-full rounded-md border-0 py-1.5 pl-7 pr-2 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-accent sm:text-sm sm:leading-6"
-                                      />
-                                    </div>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => removeStem(index)}
-                                    className="ml-2 p-1 text-gray-500 hover:text-red-500"
-                                  >
-                                    <TrashIcon className="h-5 w-5" />
-                                  </button>
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {showStemUpload && stems.length > 0 && (
+                  <div className="bg-white shadow rounded-lg p-6 mt-6 border border-gray-200 text-gray-900">
+                    <h2 className="text-lg font-medium text-gray-900 mb-4">Uploaded Stems</h2>
+                    <div className="space-y-4">
+                      {stems.map((stem, idx) => (
+                        <div key={idx} className="p-4 bg-gray-50 rounded border">
+                          <h3 className="font-medium">{stem.name}</h3>
+                          <div className="mt-2">
+                            <p>MP3: {stem.mp3Status === 'success' ? 'Uploaded' : stem.mp3Status === 'error' ? 'Error' : 'Not uploaded'}</p>
+                            <p>WAV: {stem.wavStatus === 'success' ? 'Uploaded' : stem.wavStatus === 'error' ? 'Error' : 'Not uploaded'}</p>
+                            {/* Optionally, add a preview link if the stem has a URL */}
+                            {stem.mp3File && stem.mp3Status === 'success' && (
+                              <a href={URL.createObjectURL(stem.mp3File)} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Preview MP3</a>
+                            )}
+                            {stem.wavFile && stem.wavStatus === 'success' && (
+                              <a href={URL.createObjectURL(stem.wavFile)} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline ml-4">Preview WAV</a>
+                            )}
+                          </div>
                         </div>
-                      )}
+                      ))}
                     </div>
                   </div>
                 )}

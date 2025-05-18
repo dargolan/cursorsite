@@ -17,7 +17,8 @@ export async function getTracks(): Promise<Track[]> {
   console.log(`API URL: ${apiUrl}, Has token: ${hasToken}, Environment: ${typeof window === 'undefined' ? 'server' : 'browser'}`);
 
   try {
-    let url = `${process.env.NEXT_PUBLIC_STRAPI_API_URL}/api/tracks?populate=*`;
+    // Always request stems and all their fields
+    let url = `${process.env.NEXT_PUBLIC_STRAPI_API_URL}/api/tracks?populate[stems][populate]=*`;
     console.log(`Fetching from URL: ${url}`);
     
     const res = await fetch(url, {
@@ -35,7 +36,24 @@ export async function getTracks(): Promise<Track[]> {
     }
 
     const responseData = await res.json();
-    console.log("API response received");
+    
+    // Add detailed debug logging
+    console.log("=== FULL STRAPI API RESPONSE ===");
+    console.log(JSON.stringify(responseData, null, 2));
+    
+    // Log the first track's structure if available
+    if (responseData.data && responseData.data.length > 0) {
+      console.log("=== FIRST TRACK STRUCTURE ===");
+      console.log(JSON.stringify(responseData.data[0], null, 2));
+      
+      // Specifically log stems data if it exists
+      if (responseData.data[0].attributes?.stems) {
+        console.log("=== STEMS DATA STRUCTURE ===");
+        console.log(JSON.stringify(responseData.data[0].attributes.stems, null, 2));
+      } else {
+        console.log("No stems data found in first track");
+      }
+    }
 
     // Handle no tracks case
     if (!responseData.data || !Array.isArray(responseData.data)) {
@@ -43,13 +61,8 @@ export async function getTracks(): Promise<Track[]> {
       return mockTracks;
     }
 
-    // Debug info for the first track
-    if (responseData.data.length > 0) {
-      console.log("First track structure:", JSON.stringify(responseData.data[0], null, 2));
-    }
-
     // Transform the data
-    const tracks = responseData.data.map((item: any) => {
+    const tracks = responseData.data.map((item: any, idx: number) => {
       try {
         // Extract attributes, handling both new and old Strapi formats
         const data = item.attributes || item;
@@ -57,6 +70,8 @@ export async function getTracks(): Promise<Track[]> {
         // Debug stems
         if (data.stems && Array.isArray(data.stems.data)) {
           console.log(`Track ${data.title} has ${data.stems.data.length} stems`);
+        } else {
+          console.log(`Track ${data.title} stems structure:`, data.stems);
         }
         
         // Process tags - handle both formats
@@ -107,6 +122,14 @@ export async function getTracks(): Promise<Track[]> {
           }
           hasStems = stems.length > 0;
         }
+        
+        // Debug log for each track after mapping
+        console.log(`[getTracks] Track ${idx}:`, {
+          id: item.id,
+          title: data.title,
+          stems,
+          hasStems
+        });
         
         // Create waveform array from URL if needed
         const waveform = data.waveform?.data ? [1, 0.8, 0.6, 0.4, 0.6, 0.8, 1] : undefined; // Placeholder waveform

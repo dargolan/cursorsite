@@ -61,20 +61,16 @@ function normalizeTrack(strapiTrack: any) {
     }
     
     // Process stems with validation
-    const stems = data.stems?.data?.map((stem: any) => {
-      const stemData = stem.attributes || stem;
-      if (!stem.id) {
-        console.warn(`[normalizeTrack] Stem missing ID for track ${trackId}`);
-        return null;
-      }
-      return {
-        id: stem.id.toString(),
-        name: stemData?.name || 'Unknown Stem',
-        url: getProxiedMediaUrl(stemData?.url || ''),
-        price: Number(stemData?.price) || 0,
-        duration: Number(stemData?.duration) || 0
-      };
-    }).filter(Boolean) || [];
+    const stems = Array.isArray(data.stems)
+      ? data.stems.map((stem: any, idx: number) => ({
+          id: stem.id?.toString() || `stem-${idx}`,
+          name: stem.name || 'Unknown Stem',
+          wavUrl: stem.wavUrl || '',
+          mp3Url: stem.mp3Url || '',
+          price: Number(stem.price) || 0,
+          duration: Number(stem.duration) || 0
+        }))
+      : [];
     
     // Validate numeric fields
     const bpm = Number(data.bpm || data.BPM) || 0;

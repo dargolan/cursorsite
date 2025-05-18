@@ -1,0 +1,30 @@
+{
+  "collectionName": "components_track_track_stems",
+  "info": {
+    "displayName": "track.stem"
+  },
+  "options": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "mp3Url": {
+      "type": "string",
+      "required": true
+    },
+    "wavUrl": {
+      "type": "string",
+      "required": true
+    },
+    "duration": {
+      "type": "decimal"
+    },
+    "waveform": {
+      "type": "json"
+    },
+    "price": {
+      "type": "decimal"
+    }
+  }
+}

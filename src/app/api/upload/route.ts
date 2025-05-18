@@ -5,6 +5,7 @@ import { validateFileType, getExtensionFromMimeType, getTrackFolderName, getS3Ke
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { extractAudioFeatures } from '@/lib/audio-analysis';
 
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks for better upload performance
 
@@ -136,6 +137,22 @@ export async function POST(request: NextRequest) {
         );
       }
       
+      let duration = 0;
+      let waveform: number[] = [];
+      if (fileType === 'stem') {
+        // Save the file temporarily to disk for analysis
+        const tempPath = path.join(os.tmpdir(), `${filename}`);
+        fs.writeFileSync(tempPath, buffer);
+        try {
+          const features = await extractAudioFeatures(tempPath);
+          duration = features.duration;
+          waveform = features.waveform;
+        } catch (err) {
+          console.error('Audio analysis failed:', err);
+        }
+        fs.unlinkSync(tempPath);
+      }
+      
       // Return response with file details and trackId
       return NextResponse.json({
         success: true,
@@ -145,7 +162,9 @@ export async function POST(request: NextRequest) {
         size: file.size,
         url: s3Url,
         fileType,
-        folderName // Return the folder name for reference
+        folderName, // Return the folder name for reference
+        duration,
+        waveform
       });
     } catch (s3Error: any) {
       console.error('S3 upload error:', s3Error);
@@ -287,6 +306,22 @@ async function handleChunkedUpload(
         );
       }
       
+      let duration = 0;
+      let waveform: number[] = [];
+      if (fileType === 'stem') {
+        // Save the file temporarily to disk for analysis
+        const tempPath = path.join(os.tmpdir(), `${filename}`);
+        fs.writeFileSync(tempPath, fileBuffer);
+        try {
+          const features = await extractAudioFeatures(tempPath);
+          duration = features.duration;
+          waveform = features.waveform;
+        } catch (err) {
+          console.error('Audio analysis failed:', err);
+        }
+        fs.unlinkSync(tempPath);
+      }
+      
       // Clean up the temp file
       try {
         fs.unlinkSync(uploadData.filePath);
@@ -308,7 +343,9 @@ async function handleChunkedUpload(
         fileType,
         chunked: true,
         chunks: totalChunks,
-        folderName // Return the folder name for reference
+        folderName, // Return the folder name for reference
+        duration,
+        waveform
       });
     }
     

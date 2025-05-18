@@ -11,6 +11,8 @@ export interface Stem {
   id: string;
   name: string;
   url: string;
+  wavUrl?: string;
+  mp3Url?: string;
   alternativeUrl?: string;
   price: number;
   duration: number;

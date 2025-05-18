@@ -102,16 +102,16 @@ export function normalizeTrack(strapiTrack: any): Track {
     }
     
     // Process stems directly from Strapi data
-    const stems = data.stems?.data?.map((stem: any) => {
-      const stemData = stem.attributes || stem;
-      return {
-        id: stem.id.toString(),
-        name: stemData?.name || 'Unknown Stem',
-        url: getProxiedMediaUrl(stemData?.url || ''),
-        price: Number(stemData?.price) || 0,
-        duration: Number(stemData?.duration) || 0
-      };
-    }) || [];
+    const stems = Array.isArray(data.stems)
+      ? data.stems.map((stem: any, idx: number) => ({
+          id: stem.id?.toString() || `stem-${idx}`,
+          name: stem.name || 'Unknown Stem',
+          wavUrl: stem.wavUrl || '',
+          mp3Url: stem.mp3Url || '',
+          price: Number(stem.price) || 0,
+          duration: Number(stem.duration) || 0
+        }))
+      : [];
     
     return {
       id: trackId,

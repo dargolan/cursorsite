@@ -13,6 +13,7 @@ import PlayButton from './AudioPlayer/PlayButton';
 import { getTags } from '../services/strapi';
 import { toCdnUrl } from '../utils/cdn-url';
 import WaveformProgressBar from './WaveformProgressBar';
+import StemsPopup from '@/components/stem/StemPopup';
 
 // Global audio manager to ensure only one audio source plays at a time
 export const globalAudioManager = {
@@ -1684,23 +1685,14 @@ export default function AudioPlayer({
 
   // Stem button rendering
   const renderStemsButton = () => {
-    // Check for stems
     const hasStems = track.hasStems || (track.stems && track.stems.length > 0);
-    
-    // Enhanced logging for debugging
-    console.log(`[AudioPlayer] Track ${track.title} (ID: ${track.id}):`);
-    console.log(`[AudioPlayer]   - hasStems property: ${track.hasStems}`);
-    console.log(`[AudioPlayer]   - stems array: ${track.stems ? `${track.stems.length} items` : 'undefined'}`);
-    console.log(`[AudioPlayer]   - Final hasStems value: ${hasStems}`);
-    
-    // Always show the button if we have a stems folder in S3, even if no stems are linked in the database
-    // This is because we might have stems in S3 that aren't linked in the database yet
+    if (!hasStems) return null;
     return (
       <div className="flex items-center mt-1">
         <button
           className={`flex items-center py-1 px-3 rounded-full text-sm
-            ${isStemsOpen ? 'bg-[#1DF7CE] text-black' : 'bg-[#232323] text-white hover:bg-[#2a2a2a]'}`}
-          onClick={toggleStems}
+            ${isStemsPopupOpen ? 'bg-[#1DF7CE] text-black' : 'bg-[#232323] text-white hover:bg-[#2a2a2a]'}`}
+          onClick={() => setIsStemsPopupOpen(true)}
         >
           <svg 
             className="w-3 h-3 mr-1" 
@@ -1716,11 +1708,9 @@ export default function AudioPlayer({
             />
           </svg>
           Stems
-          {hasStems && (
-            <span className="ml-1 text-xs">
-              ({track.stems?.length || '...'})
-            </span>
-          )}
+          <span className="ml-1 text-xs">
+            ({track.stems?.length || '...'})
+          </span>
         </button>
       </div>
     );
@@ -1750,6 +1740,10 @@ export default function AudioPlayer({
       globalAudioManager.stop();
     };
   }, []);
+
+  // Add state at the top of the component
+  const [isStemsPopupOpen, setIsStemsPopupOpen] = useState(false);
+  const [selectedTrackForStems, setSelectedTrackForStems] = useState<Track | null>(null);
 
   return (
     <div 
@@ -1878,17 +1872,7 @@ export default function AudioPlayer({
           <div className="flex items-center space-x-3 flex-shrink-0 min-w-[110px]">
             {/* Consistent width container for Stems button or placeholder */}
             <div className="w-[68px] flex justify-end">
-              {(track.hasStems || (track.stems && track.stems.length > 0)) && (
-                <button 
-                  onClick={() => setOpenStemsTrackId(isStemsOpen ? null : track.id)}
-                  className="text-white hover:text-[#1DF7CE] px-3 py-1 text-sm flex items-center transition-colors"
-                >
-                  <span>Stems</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points={isStemsOpen ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}></polyline>
-                  </svg>
-                </button>
-              )}
+              {renderStemsButton()}
             </div>
             {/* Hide the Generate Waveform Button as it should only be in the upload page */}
             {/* 
@@ -2217,6 +2201,11 @@ export default function AudioPlayer({
         </button>
       </div>
       )}
+      <StemsPopup
+        isOpen={isStemsPopupOpen}
+        onClose={() => setIsStemsPopupOpen(false)}
+        track={selectedTrackForStems || track}
+      />
     </div>
   );
 } 

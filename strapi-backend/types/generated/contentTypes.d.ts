@@ -369,6 +369,43 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiGalleryItemGalleryItem extends Struct.CollectionTypeSchema {
+  collectionName: 'gallery_items';
+  info: {
+    description: '';
+    displayName: 'Gallery Item';
+    pluralName: 'gallery-items';
+    singularName: 'gallery-item';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    LinkURL: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::gallery-item.gallery-item'
+    > &
+      Schema.Attribute.Private;
+    MediaUrl: Schema.Attribute.String;
+    Order: Schema.Attribute.Integer;
+    publishedAt: Schema.Attribute.DateTime;
+    Thumbnail: Schema.Attribute.Media<
+      'images' | 'files' | 'videos' | 'audios',
+      true
+    >;
+    Title: Schema.Attribute.String;
+    Type: Schema.Attribute.Enumeration<['video', 'image']>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiTagTag extends Struct.CollectionTypeSchema {
   collectionName: 'tags';
   info: {
@@ -405,6 +442,7 @@ export interface ApiTagTag extends Struct.CollectionTypeSchema {
 export interface ApiTrackTrack extends Struct.CollectionTypeSchema {
   collectionName: 'tracks';
   info: {
+    description: '';
     displayName: 'Track';
     pluralName: 'tracks';
     singularName: 'track';
@@ -424,7 +462,7 @@ export interface ApiTrackTrack extends Struct.CollectionTypeSchema {
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::track.track'> &
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
-    Stems: Schema.Attribute.JSON;
+    stems: Schema.Attribute.Component<'track.track-stem', true>;
     tags: Schema.Attribute.Relation<'manyToMany', 'api::tag.tag'>;
     Title: Schema.Attribute.String & Schema.Attribute.Required;
     trackId: Schema.Attribute.UID;
@@ -943,6 +981,7 @@ declare module '@strapi/strapi' {
       'admin::transfer-token': AdminTransferToken;
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
+      'api::gallery-item.gallery-item': ApiGalleryItemGalleryItem;
       'api::tag.tag': ApiTagTag;
       'api::track.track': ApiTrackTrack;
       'plugin::content-releases.release': PluginContentReleasesRelease;

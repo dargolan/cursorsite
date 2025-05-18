@@ -1,0 +1,47 @@
+{
+  "kind": "collectionType",
+  "collectionName": "gallery_items",
+  "info": {
+    "singularName": "gallery-item",
+    "pluralName": "gallery-items",
+    "displayName": "Gallery Item",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "Title": {
+      "type": "string",
+      "required": false
+    },
+    "Type": {
+      "type": "enumeration",
+      "enum": [
+        "video",
+        "image"
+      ],
+      "required": false
+    },
+    "Thumbnail": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "LinkURL": {
+      "type": "string"
+    },
+    "Order": {
+      "type": "integer"
+    },
+    "MediaUrl": {
+      "type": "string"
+    }
+  }
+}

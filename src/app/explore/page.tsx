@@ -16,6 +16,7 @@ import Footer from '../../components/Footer';
 import { useDebounce } from '../../hooks/useDebounce';
 import { unifiedAudioManager } from '../../lib/unified-audio-manager';
 import { globalAudioManager } from '../../components/AudioPlayer';
+import GalleryStrip from '../../components/GalleryStrip';
 
 // Lazy load the AudioPlayer component to improve performance
 const AudioPlayerComponent = dynamic(() => import('../../components/AudioPlayer'), {
@@ -340,6 +341,7 @@ export default function MusicLibrary() {
       <div className="flex flex-col w-full">
         {/* Track row */}
         {filteredTracks.map((track, index) => {
+          console.log('Rendering AudioPlayerComponent for track:', track);
           // Debug log track ID to identify any issues
           console.log(`[Track ${index}] ID: ${track.id}, title: ${track.title}, imageUrl: ${track.imageUrl}`);
           
@@ -448,7 +450,7 @@ export default function MusicLibrary() {
         
         <ContentWrapper>
           <div className="p-8 pt-24">
-            
+            <GalleryStrip />
             {/* Fixed height container for selected tags */}
             <div className="h-[40px] mb-4">
               {/* Selected tags display with clear button */}
