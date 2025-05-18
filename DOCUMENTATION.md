@@ -123,6 +123,39 @@ const isInternal = item.linkUrl && item.linkUrl.startsWith('/');
 - For internal navigation, ensure LinkURL is a relative path
 - For external navigation, ensure LinkURL is a full URL
 
+## Stems System & Synchronized Playback (May 2025)
+
+The stems system now allows users to preview, solo/mute, and purchase individual audio stems for each track. Key features and improvements:
+
+1. **Direct S3/CDN Integration:**
+   - Stem audio files (mp3/wav) are uploaded directly to S3 via the upload page, not through Strapi's media library.
+   - Each stem in Strapi stores its S3/CDN URL in `mp3Url` and/or `wavUrl` fields.
+   - No hardcoded URLs: all stem URLs are dynamic and managed via Strapi and S3.
+
+2. **Frontend API & Normalization:**
+   - The frontend fetches stems using the Strapi API with `populate=*` for full data hydration.
+   - The normalization logic ensures stems are always an array and parses their URLs and metadata.
+
+3. **Web Audio API Modal for Stems:**
+   - The stems modal uses the Web Audio API for sample-accurate, perfectly synchronized playback of all stems.
+   - Features custom Play/Pause and seek controls, with a progress bar and loading indicator.
+   - Solo (S) and Mute (M) buttons instantly control the gain (volume) of each stem, allowing for DAW-like auditioning.
+   - All stems are loaded and decoded as `AudioBuffer`s for smooth, professional playback.
+
+4. **Cart Integration:**
+   - Users can add individual stems or all stems (with a 25% discount) to the cart using the new CartContext system.
+
+5. **Robust Error Handling:**
+   - The modal displays loading and error states if stems fail to load or decode.
+
+**How to use:**
+- Open a track's stems modal from the Explore page.
+- Wait for stems to load (from S3/CDN).
+- Use Play All, Solo, Mute, and seek controls to preview stems in perfect sync.
+- Add stems to cart as needed.
+
+This system is fully dynamic, scalable, and does not rely on hardcoded media or static assets. All stem management is handled via Strapi and S3/CDN, and playback is powered by the Web Audio API for a modern, DAW-like user experience.
+
 ## Infrastructure and Media Delivery
 
 ### CDN, CloudFront, and CORS Architecture (2024 Update)
