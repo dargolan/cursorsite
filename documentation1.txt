@@ -435,6 +435,24 @@ The stems system now allows users to preview, solo/mute, and purchase individual
 
 This system is fully dynamic, scalable, and does not rely on hardcoded media or static assets. All stem management is handled via Strapi and S3/CDN, and playback is powered by the Web Audio API for a modern, DAW-like user experience.
 
+## Stems Pause/Resume Solution (May 2025)
+
+To achieve true DAW-style pause/resume with perfect sync and solo/mute for stems playback, the stems modal uses a refined Web Audio API approach:
+
+- **Problem:**
+  - Previously, pausing playback would reset the position to 0 because stopping sources triggered their `onended` handlers, which reset state intended for natural playback end.
+- **Solution:**
+  - Introduce a `isPausingRef` flag (React ref) to distinguish between user-initiated pause and natural end.
+  - When the user clicks Pause, set `isPausingRef.current = true` before stopping sources.
+  - In each source's `onended` handler, only reset playback state if `isPausingRef.current` is `false` (i.e., playback ended naturally).
+  - After pausing, reset `isPausingRef.current` to `false` after a short timeout.
+- **Result:**
+  - Pausing preserves the current playback position and allows seamless resume from the same point.
+  - Natural end of playback still resets the state as expected.
+  - Solo/mute and waveform visualization remain perfectly in sync.
+
+This approach enables a professional, DAW-like user experience for stem playback, matching the best-in-class music platforms.
+
 ## Future Note: Restricting the Upload Page (Pre-Publish)
 
 Before publishing, ensure the Upload page is accessible only to admins:
