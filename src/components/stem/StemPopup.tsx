@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Track, Stem } from '../../types';
 import { useCart } from '../../contexts/CartContext';
+import { StaticWaveform, WaveformPlayer } from '../waveform/WaveformPlayer';
+import { getWaveformUrl } from '../../utils/waveform';
 
 interface StemsPopupProps {
   isOpen: boolean;
@@ -13,7 +15,7 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [soloed, setSoloed] = useState<string | null>(null);
+  const [soloed, setSoloed] = useState<Set<string>>(new Set());
   const [muted, setMuted] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [buffers, setBuffers] = useState<Record<string, AudioBuffer | null>>({});
@@ -24,6 +26,10 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
   const gainNodesRef = useRef<Record<string, GainNode>>({});
   const startTimeRef = useRef<number>(0);
   const pausedAtRef = useRef<number>(0);
+  const waveformCache = useRef<Record<string, number[]>>({});
+  const activeSourcesRef = useRef(0);
+  const wasPlayingRef = useRef(false);
+  const isPausingRef = useRef(false);
 
   // Load and decode all stems when modal opens
   useEffect(() => {
@@ -34,6 +40,7 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
     setDuration(0);
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     audioCtxRef.current = ctx;
+    console.log('[AudioContext] Created, currentTime:', ctx.currentTime);
     let isCancelled = false;
     const fetchAndDecode = async () => {
       try {
@@ -50,7 +57,7 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
         if (isCancelled) return;
         const bufferMap: Record<string, AudioBuffer> = Object.fromEntries(entries.filter(([id, buf]) => buf));
         setBuffers(bufferMap);
-        // Set duration to the max buffer duration
+        console.log('[Buffers] Set:', Object.keys(bufferMap));
         setDuration(Math.max(...Object.values(bufferMap).map(b => b.duration)) || 0);
         setLoading(false);
       } catch (e) {
@@ -73,33 +80,62 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
     sourcesRef.current = {};
   };
 
+  // Update gain nodes on solo/mute change and after play/resume
+  useEffect(() => {
+    Object.entries(gainNodesRef.current).forEach(([id, gain]) => {
+      if (gain) {
+        if (soloed.size > 0) {
+          gain.gain.value = soloed.has(id) && !muted[id] ? 1 : 0;
+        } else {
+          gain.gain.value = muted[id] ? 0 : 1;
+        }
+      }
+    });
+  }, [soloed, muted, isPlaying]);
+
   // Play all stems in sync
   const handlePlay = () => {
     if (!audioCtxRef.current) return;
+    isPausingRef.current = false;
+    console.log('[Play] AudioContext currentTime:', audioCtxRef.current.currentTime);
     stopAll();
     const ctx = audioCtxRef.current;
     const now = ctx.currentTime;
     startTimeRef.current = now - pausedAtRef.current;
+    console.log('[Play] startTimeRef.current:', startTimeRef.current, 'pausedAtRef.current:', pausedAtRef.current);
+    activeSourcesRef.current = 0;
     (track.stems || []).forEach(stem => {
       const buf = buffers[stem.id];
       if (!buf) return;
       const source = ctx.createBufferSource();
       source.buffer = buf;
-      const gain = ctx.createGain();
-      // Solo/mute logic
-      if (soloed) {
-        gain.gain.value = soloed === stem.id ? 1 : 0;
+      let gain = gainNodesRef.current[stem.id];
+      if (!gain) {
+        gain = ctx.createGain();
+        gainNodesRef.current[stem.id] = gain;
+      }
+      // Always use latest soloed/muted state
+      if (soloed.size > 0) {
+        gain.gain.value = soloed.has(stem.id) && !muted[stem.id] ? 1 : 0;
       } else {
         gain.gain.value = muted[stem.id] ? 0 : 1;
       }
       source.connect(gain).connect(ctx.destination);
       source.start(0, pausedAtRef.current);
       sourcesRef.current[stem.id] = source;
-      gainNodesRef.current[stem.id] = gain;
+      activeSourcesRef.current++;
       source.onended = () => {
-        setIsPlaying(false);
-        pausedAtRef.current = 0;
-        setCurrentTime(0);
+        activeSourcesRef.current--;
+        if (activeSourcesRef.current <= 0) {
+          setIsPlaying(false);
+          if (!isPausingRef.current) {
+            pausedAtRef.current = 0;
+            setCurrentTime(0);
+            console.log('[Ended] Resetting pausedAtRef.current');
+          } else {
+            console.log('[Paused] Not resetting pausedAtRef.current');
+          }
+        }
       };
     });
     setIsPlaying(true);
@@ -108,10 +144,15 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
   // Pause all
   const handlePause = () => {
     if (!audioCtxRef.current) return;
+    isPausingRef.current = true;
+    console.log('[Pause] AudioContext currentTime:', audioCtxRef.current.currentTime);
     const ctx = audioCtxRef.current;
     pausedAtRef.current = ctx.currentTime - startTimeRef.current;
+    setCurrentTime(pausedAtRef.current);
+    console.log('[Pause] pausedAtRef.current:', pausedAtRef.current);
     stopAll();
     setIsPlaying(false);
+    setTimeout(() => { isPausingRef.current = false; }, 100); // Reset after sources stop
   };
 
   // Seek
@@ -119,19 +160,24 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
     setCurrentTime(time);
     pausedAtRef.current = time;
     if (isPlaying) {
-      handlePlay();
+      wasPlayingRef.current = true;
+      handlePlay(); // Restart playback from new position
+    } else {
+      wasPlayingRef.current = false;
+      stopAll(); // Ensure all sources are stopped
     }
   };
 
-  // Solo
+  // Solo (multi-solo)
   const handleSolo = (stemId: string) => {
     setSoloed(prev => {
-      const newSolo = prev === stemId ? null : stemId;
-      // Update gain nodes
-      Object.entries(gainNodesRef.current).forEach(([id, gain]) => {
-        if (gain) gain.gain.value = newSolo ? (id === stemId ? 1 : 0) : (muted[id] ? 0 : 1);
-      });
-      return newSolo;
+      const next = new Set(prev);
+      if (next.has(stemId)) {
+        next.delete(stemId);
+      } else {
+        next.add(stemId);
+      }
+      return next;
     });
   };
 
@@ -139,10 +185,6 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
   const handleMute = (stemId: string) => {
     setMuted(prev => {
       const newMuted = { ...prev, [stemId]: !prev[stemId] };
-      // Update gain nodes
-      Object.entries(gainNodesRef.current).forEach(([id, gain]) => {
-        if (gain) gain.gain.value = soloed ? (id === soloed ? 1 : 0) : (newMuted[id] ? 0 : 1);
-      });
       return newMuted;
     });
   };
@@ -179,11 +221,12 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
   // Cleanup on close
   useEffect(() => {
     if (!isOpen) {
+      console.log('[Popup Close] Resetting pausedAtRef.current');
       stopAll();
       setIsPlaying(false);
       setCurrentTime(0);
       pausedAtRef.current = 0;
-      setSoloed(null);
+      setSoloed(new Set());
       setMuted({});
       setBuffers({});
       setDuration(0);
@@ -191,6 +234,110 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
       setError(null);
     }
   }, [isOpen]);
+
+  // Add this child component for each stem row
+  interface StemWaveformRowProps {
+    stem: Stem;
+    soloed: Set<string>;
+    muted: Record<string, boolean>;
+    handleSolo: (id: string) => void;
+    handleMute: (id: string) => void;
+    addItem: (item: any) => void;
+    track: Track;
+    isPlaying: boolean;
+    currentTime: number;
+    duration: number;
+    onScrub: (time: number) => void;
+  }
+  const StemWaveformRow: React.FC<StemWaveformRowProps> = ({ stem, soloed, muted, handleSolo, handleMute, addItem, track, isPlaying, currentTime, duration, onScrub }) => {
+    const [waveformData, setWaveformData] = useState<number[] | null>(null);
+    const [waveformLoading, setWaveformLoading] = useState(false);
+    // Load waveform as before
+    useEffect(() => {
+      let waveformUrl = '';
+      if (stem.mp3Url) {
+        waveformUrl = getWaveformUrl(stem.mp3Url);
+      } else if (stem.wavUrl) {
+        waveformUrl = getWaveformUrl(stem.wavUrl);
+      }
+      if (waveformCache.current[stem.id]) {
+        setWaveformData(waveformCache.current[stem.id]);
+        setWaveformLoading(false);
+        return;
+      }
+      if (waveformUrl) {
+        setWaveformLoading(true);
+        fetch(waveformUrl)
+          .then(res => res.json())
+          .then(data => {
+            let arr: number[] | null = null;
+            if (Array.isArray(data)) arr = data;
+            else if (Array.isArray(data.peaks)) arr = data.peaks;
+            else if (Array.isArray(data.data)) arr = data.data;
+            if (arr) {
+              waveformCache.current[stem.id] = arr;
+              setWaveformData(arr);
+            } else if (!waveformCache.current[stem.id]) {
+              setWaveformData(null);
+            }
+          })
+          .catch(() => {
+            if (!waveformCache.current[stem.id]) setWaveformData(null);
+          })
+          .finally(() => setWaveformLoading(false));
+      } else if (Array.isArray(stem.waveform)) {
+        waveformCache.current[stem.id] = stem.waveform;
+        setWaveformData(stem.waveform);
+      } else if (!waveformCache.current[stem.id]) {
+        setWaveformData(null);
+      }
+    }, [stem.id, stem.mp3Url, stem.wavUrl, stem.waveform]);
+    return (
+      <div className="flex items-center rounded-lg px-4 py-3">
+        <div className="flex-1 text-white font-medium">{stem.name}</div>
+        {/* Waveform visualization */}
+        <div className="w-64 h-10 flex items-center justify-center rounded mr-4">
+          {waveformLoading && !waveformData ? (
+            <span className="text-xs text-gray-400">Loading...</span>
+          ) : waveformData ? (
+            <StaticWaveform
+              data={waveformData}
+              progress={duration > 0 ? currentTime / duration : 0}
+              width="100%"
+              height={40}
+              onScrub={rel => onScrub(rel * duration)}
+            />
+          ) : (
+            <span className="text-xs text-gray-400">No waveform</span>
+          )}
+        </div>
+        {/* Solo/Mute Buttons */}
+        <div className="flex gap-2 mx-4">
+          <button
+            className={`w-8 h-8 rounded font-bold ${soloed.has(stem.id) ? 'bg-accent text-black' : 'bg-gray-700 text-white'} hover:bg-accent`}
+            onClick={() => handleSolo(stem.id)}
+          >S</button>
+          <button
+            className={`w-8 h-8 rounded font-bold ${muted[stem.id] ? 'bg-accent text-black' : 'bg-gray-700 text-white'} hover:bg-accent`}
+            onClick={() => handleMute(stem.id)}
+          >M</button>
+        </div>
+        {/* Add to Cart Button */}
+        <button onClick={() => addItem({
+          id: stem.id,
+          name: stem.name,
+          trackName: track.title,
+          price: stem.price,
+          imageUrl: track.imageUrl,
+          type: 'stem',
+        })} className="ml-2 bg-accent text-white px-3 py-2 rounded-lg font-semibold hover:bg-accent/90">Add to Cart</button>
+      </div>
+    );
+  };
+
+  useEffect(() => {
+    console.log('track.stems:', track.stems);
+  }, [track.stems, isOpen]);
 
   if (!isOpen) return null;
 
@@ -213,29 +360,20 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
         {!loading && !error && (
           <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
             {track.stems?.map((stem: Stem) => (
-              <div key={stem.id} className="flex items-center bg-gray-800 rounded-lg px-4 py-3">
-                <div className="flex-1 text-white font-medium">{stem.name}</div>
-                {/* Solo/Mute Buttons */}
-                <div className="flex gap-2 mx-4">
-                  <button
-                    className={`w-8 h-8 rounded font-bold ${soloed === stem.id ? 'bg-accent text-black' : 'bg-gray-700 text-white'} hover:bg-accent`}
-                    onClick={() => handleSolo(stem.id)}
-                  >S</button>
-                  <button
-                    className={`w-8 h-8 rounded font-bold ${muted[stem.id] ? 'bg-accent text-black' : 'bg-gray-700 text-white'} hover:bg-accent`}
-                    onClick={() => handleMute(stem.id)}
-                  >M</button>
-                </div>
-                {/* Add to Cart Button */}
-                <button onClick={() => addItem({
-                  id: stem.id,
-                  name: stem.name,
-                  trackName: track.title,
-                  price: stem.price,
-                  imageUrl: track.imageUrl,
-                  type: 'stem',
-                })} className="ml-2 bg-accent text-white px-3 py-2 rounded-lg font-semibold hover:bg-accent/90">Add to Cart</button>
-              </div>
+              <StemWaveformRow
+                key={stem.id || stem.name}
+                stem={stem}
+                soloed={soloed}
+                muted={muted}
+                handleSolo={handleSolo}
+                handleMute={handleMute}
+                addItem={addItem}
+                track={track}
+                isPlaying={isPlaying}
+                currentTime={currentTime}
+                duration={duration}
+                onScrub={handleSeek}
+              />
             ))}
           </div>
         )}
@@ -245,9 +383,9 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
             <div className="w-full flex items-center gap-4 mb-2">
               <button
                 onClick={isPlaying ? handlePause : handlePlay}
-                className="bg-accent text-black px-6 py-2 rounded-lg font-semibold hover:bg-accent/90 text-lg"
+                className={`bg-accent text-black px-6 py-2 rounded-lg font-semibold hover:bg-accent/90 text-lg ${isPlaying ? 'active' : ''}`}
               >
-                {isPlaying ? 'Pause All' : 'Play All'}
+                {isPlaying ? 'Pause' : 'Play'} All
               </button>
               <input
                 type="range"

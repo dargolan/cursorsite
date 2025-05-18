@@ -15,6 +15,7 @@ interface WaveformPlayerProps {
   progressColor?: string;
   barWidth?: number;
   barGap?: number;
+  waveformData?: number[];
 }
 
 // Simple fallback waveform visualization
@@ -66,6 +67,7 @@ export const WaveformPlayer: React.FC<WaveformPlayerProps> = ({
   progressColor = '#3182ce',
   barWidth = 2,
   barGap = 1,
+  waveformData,
 }) => {
   const waveContainerRef = useRef<HTMLDivElement>(null);
   const wavesurfer = useRef<WaveSurfer | null>(null);
@@ -137,6 +139,8 @@ export const WaveformPlayer: React.FC<WaveformPlayerProps> = ({
           responsive: true,
           fillParent: true,
           backend: 'WebAudio',
+          // Add waveform data if available
+          peaks: waveformData || undefined,
         };
 
         console.log('WaveSurfer options:', options);
@@ -148,7 +152,7 @@ export const WaveformPlayer: React.FC<WaveformPlayerProps> = ({
 
         // Set up event listeners
         instance.on('ready', () => {
-          console.log('WaveSurfer ready event fired');
+          console.log('WaveSurfer instance ready');
           if (isMounted.current) {
             setLoading(false);
             if (onReady) onReady();
@@ -161,50 +165,36 @@ export const WaveformPlayer: React.FC<WaveformPlayerProps> = ({
           }
         });
 
-        instance.on('error', (err: any) => {
+        instance.on('error', (err: Error) => {
           console.error('WaveSurfer error:', err);
           if (isMounted.current) {
-            setError(`Failed to load audio waveform: ${err.message || 'Unknown error'}`);
+            setError('Failed to load audio');
             setLoading(false);
           }
         });
 
-        // Convert the audio URL to a proxy URL to avoid CORS issues
-        if (audioUrl) {
-          const proxyUrl = convertUrlToProxyUrl(audioUrl);
-          console.log('Loading audio URL in WaveSurfer:', proxyUrl);
-          instance.load(proxyUrl);
-        } else {
-          console.error('No audio URL provided');
-          if (isMounted.current) {
-            setError('No audio URL provided');
-            setLoading(false);
-          }
-        }
-
-        return instance;
-      } catch (err: any) {
+        // Load the audio file
+        instance.load(audioUrl);
+      } catch (err) {
         console.error('Error creating WaveSurfer instance:', err);
         if (isMounted.current) {
-          setError(`Failed to create waveform: ${err.message || 'Unknown error'}`);
+          setError('Failed to initialize waveform player');
           setLoading(false);
         }
-        return null;
       }
     };
 
-    // Create the wavesurfer instance
-    const instance = createWavesurfer();
+    createWavesurfer();
 
     // Cleanup function
     return () => {
-      if (instance) {
-        console.log('Cleaning up WaveSurfer instance on effect cleanup');
-        instance.destroy();
+      if (wavesurfer.current) {
+        wavesurfer.current.destroy();
+        wavesurfer.current = null;
       }
-      wavesurfer.current = null;
+      instanceCreated.current = false;
     };
-  }, [audioUrl, height, waveColor, progressColor, barWidth, barGap, onReady]);
+  }, [audioUrl, waveColor, progressColor, height, barWidth, barGap, waveformData]);
 
   // Control playback
   useEffect(() => {
@@ -283,34 +273,101 @@ export const WaveformPlayer: React.FC<WaveformPlayerProps> = ({
 
 // Also export a lighter version that doesn't actually load the audio
 // This is useful for thumbnails or lists where we don't want to load all waveforms
-export const StaticWaveform: React.FC<{ data: number[] }> = ({ data }) => {
-  // Create a simple SVG representing the waveform
+export const StaticWaveform: React.FC<{
+  data: number[],
+  progress?: number,
+  width?: number|string,
+  height?: number|string,
+  onScrub?: (relative: number) => void
+}> = ({ data, progress = 0, width = '100%', height = 40, onScrub }) => {
+  // Create a solid SVG waveform
   const maxValue = Math.max(...data, 1);
   const normalizedData = data.map(val => val / maxValue);
-  
-  const width = 100;
-  const height = 30;
-  const barWidth = 1;
-  const barGap = 0.5;
-  const totalBars = Math.floor(width / (barWidth + barGap));
-  const sampledData = normalizedData.length > totalBars 
-    ? normalizedData.filter((_, i) => i % Math.ceil(normalizedData.length / totalBars) === 0).slice(0, totalBars)
+
+  const svgWidth = typeof width === 'number' ? width : 400;
+  const svgHeight = typeof height === 'number' ? height : 40;
+  const totalPoints = Math.floor(svgWidth);
+  const sampledData = normalizedData.length > totalPoints
+    ? normalizedData.filter((_, i) => i % Math.ceil(normalizedData.length / totalPoints) === 0).slice(0, totalPoints)
     : normalizedData;
 
+  // Minimum visible amplitude (e.g. 10% of height)
+  const minAmp = 0.1;
+
+  // Build the path for the waveform area
+  const pathPoints = sampledData.map((value, i) => {
+    const x = (i / (sampledData.length - 1)) * svgWidth;
+    // Ensure min amplitude is visible
+    const y = ((1 - Math.max(value, minAmp)) * svgHeight) / 2;
+    return `${x},${y}`;
+  });
+  // Mirror for the bottom half
+  const pathPointsBottom = sampledData.map((value, i) => {
+    const x = ((sampledData.length - 1 - i) / (sampledData.length - 1)) * svgWidth;
+    const y = svgHeight - (((1 - Math.max(value, minAmp)) * svgHeight) / 2);
+    return `${x},${y}`;
+  });
+  const fullPath = `M${pathPoints[0]} L${pathPoints.slice(1).join(' ')} L${pathPointsBottom.join(' ')} Z`;
+
+  // Progress path (up to playhead)
+  const progressIdx = Math.floor((progress || 0) * sampledData.length);
+  const progressPoints = sampledData.slice(0, progressIdx).map((value, i) => {
+    const x = (i / (sampledData.length - 1)) * svgWidth;
+    const y = ((1 - Math.max(value, minAmp)) * svgHeight) / 2;
+    return `${x},${y}`;
+  });
+  const progressPointsBottom = sampledData.slice(0, progressIdx).map((value, i) => {
+    const x = ((progressIdx - 1 - i) / (sampledData.length - 1)) * svgWidth;
+    const y = svgHeight - (((1 - Math.max(value, minAmp)) * svgHeight) / 2);
+    return `${x},${y}`;
+  });
+  const progressPath = progressIdx > 1
+    ? `M${progressPoints[0]} L${progressPoints.slice(1).join(' ')} L${progressPointsBottom.join(' ')} Z`
+    : '';
+
+  // Add pointer event handler for scrubbing
+  const svgRef = useRef<SVGSVGElement>(null);
+  const handlePointer = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!onScrub) return;
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = e.clientX - rect.left;
+    const rel = Math.max(0, Math.min(1, x / rect.width));
+    onScrub(rel);
+  };
+  // Support dragging for continuous scrubbing
+  const isDragging = useRef(false);
+  const handlePointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    isDragging.current = true;
+    handlePointer(e);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+  };
+  const handlePointerMove = (e: PointerEvent) => {
+    if (!isDragging.current || !onScrub || !svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const rel = Math.max(0, Math.min(1, x / rect.width));
+    onScrub(rel);
+  };
+  const handlePointerUp = () => {
+    isDragging.current = false;
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', handlePointerUp);
+  };
+
   return (
-    <svg width="100%" height={height} className="w-full">
-      {sampledData.map((value, i) => (
-        <rect
-          key={i}
-          x={i * (barWidth + barGap)}
-          y={(height - value * height) / 2}
-          width={barWidth}
-          height={value * height}
-          fill="#4a5568"
-        />
-      ))}
+    <svg
+      ref={svgRef}
+      width={width}
+      height={height}
+      className="w-full h-full cursor-pointer"
+      onPointerDown={handlePointerDown}
+    >
+      {/* Full waveform background */}
+      <path d={fullPath} fill="#4a5568" />
+      {/* Progress waveform */}
+      {progressPath && <path d={progressPath} fill="#1DF7CE" />}
     </svg>
-  );
-}; 
   );
 }; 

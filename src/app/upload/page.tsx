@@ -32,6 +32,9 @@ export default function UploadPage() {
     waveform?: number[];
     mp3Status?: 'idle' | 'uploading' | 'success' | 'error';
     wavStatus?: 'idle' | 'uploading' | 'success' | 'error';
+    mp3Url?: string;
+    wavUrl?: string;
+    id?: string;
   }[]>([]);
   const [stemPrices, setStemPrices] = useState<{[key: string]: string}>({});
   const [trackTitle, setTrackTitle] = useState('');
@@ -61,6 +64,7 @@ export default function UploadPage() {
   const [stemTimeRemaining, setStemTimeRemaining] = useState(0);
   const [artistName, setArtistName] = useState('');
   const [waveformGenerated, setWaveformGenerated] = useState(false);
+  const [stemWaveformStatus, setStemWaveformStatus] = useState<Record<number, 'idle' | 'loading' | 'success' | 'error'>>({});
 
   useEffect(() => {
     async function fetchTags() {
@@ -684,6 +688,42 @@ export default function UploadPage() {
     }
   };
 
+  // Add this handler function inside UploadPage
+  const handleUploadStem = async (idx: number) => {
+    const stem = stems[idx];
+    let mp3Url = '';
+    let wavUrl = '';
+    let duration = 0;
+    let waveform: number[] = [];
+    // Set uploading status
+    updateStem(idx, 'mp3Status', stem.mp3File ? 'uploading' : 'idle');
+    updateStem(idx, 'wavStatus', stem.wavFile ? 'uploading' : 'idle');
+    try {
+      if (stem.mp3File) {
+        const mp3Upload = await uploadFileInChunks(stem.mp3File, 'stem');
+        mp3Url = mp3Upload.url;
+        duration = mp3Upload.duration || duration;
+        waveform = mp3Upload.waveform || waveform;
+        updateStem(idx, 'mp3Status', 'success');
+      }
+      if (stem.wavFile) {
+        const wavUpload = await uploadFileInChunks(stem.wavFile, 'stem');
+        wavUrl = wavUpload.url;
+        duration = wavUpload.duration || duration;
+        waveform = wavUpload.waveform || waveform;
+        updateStem(idx, 'wavStatus', 'success');
+      }
+      // Save remote URLs and duration/waveform in stem object
+      updateStem(idx, 'mp3Url', mp3Url);
+      updateStem(idx, 'wavUrl', wavUrl);
+      updateStem(idx, 'duration', duration);
+      updateStem(idx, 'waveform', waveform);
+    } catch (err) {
+      if (stem.mp3File) updateStem(idx, 'mp3Status', 'error');
+      if (stem.wavFile) updateStem(idx, 'wavStatus', 'error');
+    }
+  };
+
   return (
     <PageContainer className="min-h-screen bg-gray-50">
       <ContentWrapper>
@@ -856,7 +896,6 @@ export default function UploadPage() {
                     <p className="text-sm text-gray-500 mb-4">
                       Upload individual stems for the track (drums, bass, etc.). You can select multiple files at once.
                     </p>
-                    
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold mt-8 mb-2">Stems</h3>
                       <div className="space-y-4 mb-4">
@@ -883,7 +922,6 @@ export default function UploadPage() {
                                   }}
                                 />
                                 {stem.mp3File && <span className="text-green-600 text-xs ml-2">Loaded ✓</span>}
-                                {/* Status indicator for MP3 upload */}
                                 {stem.mp3Status === 'uploading' && <span className="text-xs text-blue-500 ml-2">Uploading...</span>}
                                 {stem.mp3Status === 'success' && <span className="text-xs text-green-600 ml-2">Uploaded</span>}
                                 {stem.mp3Status === 'error' && <span className="text-xs text-red-600 ml-2">Error</span>}
@@ -900,7 +938,6 @@ export default function UploadPage() {
                                   }}
                                 />
                                 {stem.wavFile && <span className="text-green-600 text-xs ml-2">Loaded ✓</span>}
-                                {/* Status indicator for WAV upload */}
                                 {stem.wavStatus === 'uploading' && <span className="text-xs text-blue-500 ml-2">Uploading...</span>}
                                 {stem.wavStatus === 'success' && <span className="text-xs text-green-600 ml-2">Uploaded</span>}
                                 {stem.wavStatus === 'error' && <span className="text-xs text-red-600 ml-2">Error</span>}
@@ -917,6 +954,14 @@ export default function UploadPage() {
                                 />
                               </div>
                             </div>
+                            <button
+                              type="button"
+                              className="mt-2 bg-accent text-white rounded px-4 py-2"
+                              disabled={(!stem.mp3File && !stem.wavFile) || stem.mp3Status === 'uploading' || stem.wavStatus === 'uploading'}
+                              onClick={() => handleUploadStem(idx)}
+                            >
+                              {stem.mp3Status === 'uploading' || stem.wavStatus === 'uploading' ? 'Uploading...' : 'Upload Stem'}
+                            </button>
                             <button type="button" className="mt-2 text-red-500 text-xs" onClick={() => removeStem(idx)}>Remove</button>
                           </div>
                         ))}
@@ -943,11 +988,49 @@ export default function UploadPage() {
                             <p>MP3: {stem.mp3Status === 'success' ? 'Uploaded' : stem.mp3Status === 'error' ? 'Error' : 'Not uploaded'}</p>
                             <p>WAV: {stem.wavStatus === 'success' ? 'Uploaded' : stem.wavStatus === 'error' ? 'Error' : 'Not uploaded'}</p>
                             {/* Optionally, add a preview link if the stem has a URL */}
-                            {stem.mp3File && stem.mp3Status === 'success' && (
-                              <a href={URL.createObjectURL(stem.mp3File)} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Preview MP3</a>
+                            {stem.mp3Url && (
+                              <a href={stem.mp3Url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Preview MP3</a>
                             )}
-                            {stem.wavFile && stem.wavStatus === 'success' && (
-                              <a href={URL.createObjectURL(stem.wavFile)} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline ml-4">Preview WAV</a>
+                            {stem.wavUrl && (
+                              <a href={stem.wavUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline ml-4">Preview WAV</a>
+                            )}
+                            {/* Generate Waveform button for uploaded stems with remote URL */}
+                            {(stem.mp3Url || stem.wavUrl) && (
+                              <button
+                                type="button"
+                                className={`mt-2 ml-4 rounded px-4 py-2 flex items-center
+                                  ${stemWaveformStatus[idx] === 'success' ? 'bg-green-500 text-white' : ''}
+                                  ${stemWaveformStatus[idx] === 'error' ? 'bg-red-500 text-white' : ''}
+                                  ${!stemWaveformStatus[idx] || stemWaveformStatus[idx] === 'loading' ? 'bg-accent text-white' : ''}
+                                `}
+                                disabled={stemWaveformStatus[idx] === 'loading'}
+                                onClick={async () => {
+                                  setStemWaveformStatus(s => ({ ...s, [idx]: 'loading' }));
+                                  try {
+                                    const res = await fetch('/api/generate-stem-waveform', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ audioUrl: stem.mp3Url || stem.wavUrl }),
+                                    });
+                                    const data = await res.json();
+                                    if (data.success) {
+                                      setStemWaveformStatus(s => ({ ...s, [idx]: 'success' }));
+                                    } else {
+                                      setStemWaveformStatus(s => ({ ...s, [idx]: 'error' }));
+                                    }
+                                  } catch {
+                                    setStemWaveformStatus(s => ({ ...s, [idx]: 'error' }));
+                                  }
+                                }}
+                              >
+                                {stemWaveformStatus[idx] === 'loading'
+                                  ? 'Generating...'
+                                  : stemWaveformStatus[idx] === 'success'
+                                    ? 'Waveform Generated ✓'
+                                    : stemWaveformStatus[idx] === 'error'
+                                      ? 'Error'
+                                      : 'Generate Waveform'}
+                              </button>
                             )}
                           </div>
                         </div>

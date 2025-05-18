@@ -98,11 +98,28 @@ export const LazyWaveform: React.FC<LazyWaveformProps> = ({
     setError(null);
     
     try {
-      // For now, let's skip the data generation and just render the WaveformPlayer
-      // This will help us isolate if the issue is with WaveSurfer or our data generation
-      console.log('Skipping waveform data generation, rendering WaveformPlayer directly');
-      setIsLoaded(true);
-      setWaveformData([0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.9, 0.8, 0.7, 0.6]); // Dummy data
+      // Extract S3 key from audioUrl
+      const s3Key = audioUrl.replace(/^https?:\/\/[^/]+\//, '');
+      
+      // Fetch waveform data from the API
+      const response = await fetch('/api/get-waveform', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ s3Key }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch waveform data');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.waveform) {
+        setWaveformData(data.waveform);
+        setIsLoaded(true);
+      } else {
+        throw new Error(data.error || 'No waveform data available');
+      }
     } catch (err) {
       console.error('Failed to load waveform data:', err);
       setError('Failed to load waveform');
@@ -133,6 +150,7 @@ export const LazyWaveform: React.FC<LazyWaveformProps> = ({
               height={height}
               waveColor={waveColor}
               progressColor={progressColor}
+              waveformData={waveformData || undefined}
             />
           ) : (
             // Show a static placeholder before loading

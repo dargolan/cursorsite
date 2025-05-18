@@ -1692,7 +1692,7 @@ export default function AudioPlayer({
         <button
           className={`flex items-center py-1 px-3 rounded-full text-sm
             ${isStemsPopupOpen ? 'bg-[#1DF7CE] text-black' : 'bg-[#232323] text-white hover:bg-[#2a2a2a]'}`}
-          onClick={() => setIsStemsPopupOpen(true)}
+          onClick={openStemsPopup}
         >
           <svg 
             className="w-3 h-3 mr-1" 
@@ -1744,6 +1744,12 @@ export default function AudioPlayer({
   // Add state at the top of the component
   const [isStemsPopupOpen, setIsStemsPopupOpen] = useState(false);
   const [selectedTrackForStems, setSelectedTrackForStems] = useState<Track | null>(null);
+
+  // Function to open stems popup for the current track
+  const openStemsPopup = () => {
+    setSelectedTrackForStems(track);
+    setIsStemsPopupOpen(true);
+  };
 
   return (
     <div 
@@ -2201,11 +2207,17 @@ export default function AudioPlayer({
         </button>
       </div>
       )}
-      <StemsPopup
-        isOpen={isStemsPopupOpen}
-        onClose={() => setIsStemsPopupOpen(false)}
-        track={selectedTrackForStems || track}
-      />
+      {/* Only render StemsPopup if selectedTrackForStems is not null */}
+      {selectedTrackForStems && (
+        <StemsPopup
+          isOpen={isStemsPopupOpen}
+          onClose={() => {
+            setIsStemsPopupOpen(false);
+            setSelectedTrackForStems(null);
+          }}
+          track={selectedTrackForStems}
+        />
+      )}
     </div>
   );
 } 

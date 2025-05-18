@@ -7,6 +7,9 @@ import path from 'path';
 import os from 'os';
 import { extractAudioFeatures } from '@/lib/audio-analysis';
 
+const STRAPI_URL = process.env.STRAPI_URL;
+const STRAPI_TOKEN = process.env.STRAPI_API_TOKEN || process.env.NEXT_PUBLIC_STRAPI_API_TOKEN;
+
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks for better upload performance
 
 // Store temporary file paths for chunked uploads
@@ -139,6 +142,7 @@ export async function POST(request: NextRequest) {
       
       let duration = 0;
       let waveform: number[] = [];
+      let waveformUrl: string | undefined = undefined;
       if (fileType === 'stem') {
         // Save the file temporarily to disk for analysis
         const tempPath = path.join(os.tmpdir(), `${filename}`);
@@ -147,10 +151,54 @@ export async function POST(request: NextRequest) {
           const features = await extractAudioFeatures(tempPath);
           duration = features.duration;
           waveform = features.waveform;
+          // Write waveform to JSON file
+          const waveformJsonPath = path.join(os.tmpdir(), `${filename}.waveform.json`);
+          fs.writeFileSync(waveformJsonPath, JSON.stringify(waveform));
+          // Upload waveform JSON to S3
+          const waveformS3Key = s3Key.replace(/\.(mp3|wav|flac)$/i, '.waveform.json');
+          const waveformBuffer = fs.readFileSync(waveformJsonPath);
+          waveformUrl = await uploadToS3(waveformBuffer, waveformS3Key, 'application/json');
+          fs.unlinkSync(waveformJsonPath);
         } catch (err) {
           console.error('Audio analysis failed:', err);
         }
         fs.unlinkSync(tempPath);
+      }
+      
+      if (fileType === 'stem') {
+        const stemId = formData.get('stemId') as string | undefined;
+        if (stemId && STRAPI_URL && STRAPI_TOKEN) {
+          // Compose URLs for mp3, wav, and waveform
+          let mp3Url, wavUrl;
+          if (filename.endsWith('.mp3')) mp3Url = s3Url;
+          if (filename.endsWith('.wav')) wavUrl = s3Url;
+          // Try to fetch existing stem to merge URLs
+          try {
+            const res = await fetch(`${STRAPI_URL}/api/stems/${stemId}`, {
+              headers: { 'Authorization': `Bearer ${STRAPI_TOKEN}` }
+            });
+            if (res.ok) {
+              const stemData = await res.json();
+              if (!mp3Url && stemData?.data?.attributes?.mp3Url) mp3Url = stemData.data.attributes.mp3Url;
+              if (!wavUrl && stemData?.data?.attributes?.wavUrl) wavUrl = stemData.data.attributes.wavUrl;
+            }
+          } catch {}
+          // Update Strapi stem with URLs
+          await fetch(`${STRAPI_URL}/api/stems/${stemId}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${STRAPI_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              data: {
+                mp3Url,
+                wavUrl,
+                waveform: waveformUrl,
+              }
+            }),
+          });
+        }
       }
       
       // Return response with file details and trackId
@@ -164,7 +212,8 @@ export async function POST(request: NextRequest) {
         fileType,
         folderName, // Return the folder name for reference
         duration,
-        waveform
+        waveform,
+        waveformUrl,
       });
     } catch (s3Error: any) {
       console.error('S3 upload error:', s3Error);
@@ -308,6 +357,7 @@ async function handleChunkedUpload(
       
       let duration = 0;
       let waveform: number[] = [];
+      let waveformUrl: string | undefined = undefined;
       if (fileType === 'stem') {
         // Save the file temporarily to disk for analysis
         const tempPath = path.join(os.tmpdir(), `${filename}`);
@@ -316,10 +366,54 @@ async function handleChunkedUpload(
           const features = await extractAudioFeatures(tempPath);
           duration = features.duration;
           waveform = features.waveform;
+          // Write waveform to JSON file
+          const waveformJsonPath = path.join(os.tmpdir(), `${filename}.waveform.json`);
+          fs.writeFileSync(waveformJsonPath, JSON.stringify(waveform));
+          // Upload waveform JSON to S3
+          const waveformS3Key = s3Key.replace(/\.(mp3|wav|flac)$/i, '.waveform.json');
+          const waveformBuffer = fs.readFileSync(waveformJsonPath);
+          waveformUrl = await uploadToS3(waveformBuffer, waveformS3Key, 'application/json');
+          fs.unlinkSync(waveformJsonPath);
         } catch (err) {
           console.error('Audio analysis failed:', err);
         }
         fs.unlinkSync(tempPath);
+      }
+      
+      if (fileType === 'stem') {
+        const stemId = formData.get('stemId') as string | undefined;
+        if (stemId && STRAPI_URL && STRAPI_TOKEN) {
+          // Compose URLs for mp3, wav, and waveform
+          let mp3Url, wavUrl;
+          if (filename.endsWith('.mp3')) mp3Url = s3Url;
+          if (filename.endsWith('.wav')) wavUrl = s3Url;
+          // Try to fetch existing stem to merge URLs
+          try {
+            const res = await fetch(`${STRAPI_URL}/api/stems/${stemId}`, {
+              headers: { 'Authorization': `Bearer ${STRAPI_TOKEN}` }
+            });
+            if (res.ok) {
+              const stemData = await res.json();
+              if (!mp3Url && stemData?.data?.attributes?.mp3Url) mp3Url = stemData.data.attributes.mp3Url;
+              if (!wavUrl && stemData?.data?.attributes?.wavUrl) wavUrl = stemData.data.attributes.wavUrl;
+            }
+          } catch {}
+          // Update Strapi stem with URLs
+          await fetch(`${STRAPI_URL}/api/stems/${stemId}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${STRAPI_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              data: {
+                mp3Url,
+                wavUrl,
+                waveform: waveformUrl,
+              }
+            }),
+          });
+        }
       }
       
       // Clean up the temp file
@@ -345,7 +439,8 @@ async function handleChunkedUpload(
         chunks: totalChunks,
         folderName, // Return the folder name for reference
         duration,
-        waveform
+        waveform,
+        waveformUrl,
       });
     }
     
