@@ -86,7 +86,7 @@ export default function GalleryStrip() {
           );
           return (
             <div
-              className="keen-slider__slide flex items-center justify-center bg-black"
+              className="keen-slider__slide flex items-center justify-center bg-black relative"
               key={item.id}
               style={{ width: '100%', height: '260px' }}
             >
@@ -114,6 +114,55 @@ export default function GalleryStrip() {
                 )
               ) : (
                 media
+              )}
+              {/* Overlay caption and button */}
+              {(item.caption || item.buttonText) && (
+                <div className="absolute left-0 bottom-0 h-full flex flex-col items-start justify-end pl-10 pb-8" style={{ width: '100%', pointerEvents: 'none' }}>
+                  <div
+                    className="flex flex-col items-start"
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      height: '100%',
+                      maxWidth: 700,
+                      width: '80%',
+                      background: 'linear-gradient(90deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.0) 100%)',
+                      padding: '1.5rem 2.5rem',
+                      pointerEvents: 'auto',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    {item.caption && (
+                      <div
+                        className="text-white font-bold text-3xl md:text-4xl lg:text-5xl mb-2 leading-tight z-10"
+                        style={{ lineHeight: 1.1 }}
+                        // SECURITY: Only use this if you trust Strapi content
+                        dangerouslySetInnerHTML={{ __html: item.caption }}
+                      />
+                    )}
+                    {item.subtitle && (
+                      <div
+                        className="text-[15px] md:text-[17px] text-gray-200 mb-4 z-10"
+                        style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif', fontWeight: 400, lineHeight: 1.25 }}
+                        dangerouslySetInnerHTML={{ __html: item.subtitle }}
+                      />
+                    )}
+                    {item.buttonText && (
+                      <a
+                        href={item.buttonUrl || item.linkUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-accent text-black px-6 py-3 rounded-full font-medium hover:bg-accent/80 transition-all text-lg shadow-lg z-10"
+                        style={{ marginTop: '0.5rem', pointerEvents: 'auto' }}
+                      >
+                        {item.buttonText}
+                      </a>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           );
