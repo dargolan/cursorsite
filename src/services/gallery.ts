@@ -7,6 +7,10 @@ export interface GalleryItem {
   type: 'video' | 'image';
   mediaUrl: string;
   linkUrl: string;
+  caption?: string;
+  buttonText?: string;
+  buttonUrl?: string;
+  subtitle?: string;
 }
 
 function normalizeMediaUrl(url: string): string {
@@ -36,5 +40,9 @@ export async function getGalleryItems(): Promise<GalleryItem[]> {
       type: item.Type,
       mediaUrl: normalizeMediaUrl(item.MediaUrl),
       linkUrl: item.LinkURL,
+      caption: item.caption,
+      buttonText: item.buttonText,
+      buttonUrl: item.buttonUrl,
+      subtitle: item.subtitle,
     }));
 } 

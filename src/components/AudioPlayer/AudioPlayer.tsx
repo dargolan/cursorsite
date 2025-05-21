@@ -189,14 +189,14 @@ export default function AudioPlayer({
           <button 
             className={`flex items-center text-sm px-3 py-1.5 rounded ${
               stemsExpanded 
-                ? 'bg-[#1DF7CE] text-black hover:bg-[#1DF7CE]/90' 
-                : 'bg-[#282828] text-white hover:bg-[#333]'
+                ? 'bg-yellow-400 text-black hover:bg-yellow-500'
+                : 'bg-yellow-300 text-black hover:bg-yellow-400'
             } transition-colors`}
             onClick={handleToggleStems}
           >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-            </svg>
+            <span className="material-symbols-outlined w-4 h-4 mr-1" style={{ fontSize: '18px', lineHeight: 1 }}>
+              water
+            </span>
             Stems {stems.length > 0 && `(${stems.length})`}
           </button>
         </div>

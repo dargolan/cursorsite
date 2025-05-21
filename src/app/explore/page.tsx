@@ -431,8 +431,6 @@ export default function MusicLibrary() {
 
   return (
     <div className="min-h-screen bg-[#121212] text-white overflow-x-hidden">
-      <Header />
-      
       <main className="relative min-h-screen">
         <FilterSidebar
           selectedTags={selectedTags}
@@ -447,8 +445,8 @@ export default function MusicLibrary() {
           onSearch={handleSearch}
           existingSearch={searchQuery}
         />
-        
         <ContentWrapper>
+          <Header />
           <div className="p-8 pt-24">
             <GalleryStrip />
             {/* Fixed height container for selected tags */}

@@ -9,14 +9,22 @@ export default function GalleryStrip() {
   const [loading, setLoading] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
-  const [sliderRef, instanceRef] = useKeenSlider({
-    slides: { perView: 1 },
-    slideChanged(s: any) {
-      setCurrentSlide(s.track.details.rel);
-    },
-    loop: true,
-    renderMode: 'performance',
-  });
+  const [sliderRef, instanceRef] = useKeenSlider(
+    items.length > 1
+      ? {
+          slides: { perView: 1 },
+          slideChanged(s: any) {
+            setCurrentSlide(s.track.details.rel);
+          },
+          loop: true,
+          renderMode: 'performance',
+        }
+      : {
+          slides: { perView: 1 },
+          renderMode: 'performance',
+          // No slideChanged, no loop
+        }
+  );
 
   useEffect(() => {
     getGalleryItems().then(data => {
@@ -43,9 +51,9 @@ export default function GalleryStrip() {
     });
   }, [currentSlide, items]);
 
-  // Autoplay slide change every 10 seconds
+  // Autoplay slide change every 10 seconds (only if more than one item)
   useEffect(() => {
-    if (!items.length) return;
+    if (items.length <= 1) return;
     const timer = setTimeout(() => {
       instanceRef.current?.next();
     }, 10000);
@@ -168,16 +176,18 @@ export default function GalleryStrip() {
           );
         })}
       </div>
-      <div className="flex justify-center mt-2 space-x-2">
-        {items.map((_, idx) => (
-          <button
-            key={idx}
-            className={`w-2 h-2 rounded-full ${currentSlide === idx ? 'bg-blue-500' : 'bg-gray-400'}`}
-            onClick={() => instanceRef.current?.moveToIdx(idx)}
-            aria-label={`Go to slide ${idx + 1}`}
-          />
-        ))}
-      </div>
+      {items.length > 1 && (
+        <div className="flex justify-center mt-2 space-x-2">
+          {items.map((_, idx) => (
+            <button
+              key={idx}
+              className={`w-2 h-2 rounded-full ${currentSlide === idx ? 'bg-blue-500' : 'bg-gray-400'}`}
+              onClick={() => instanceRef.current?.moveToIdx(idx)}
+              aria-label={`Go to slide ${idx + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 } 

@@ -42,6 +42,18 @@
     },
     "MediaUrl": {
       "type": "string"
+    },
+    "caption": {
+      "type": "string"
+    },
+    "buttonText": {
+      "type": "string"
+    },
+    "buttonUrl": {
+      "type": "string"
+    },
+    "subtitle": {
+      "type": "string"
     }
   }
 }

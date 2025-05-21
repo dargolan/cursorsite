@@ -1421,11 +1421,19 @@ export default function AudioPlayer({
           try {
             // Mark the stem as loading
             setStemLoading(prev => ({...prev, [stem.id]: true}));
-            
-            // Always use the convertUrlToProxyUrl function from our library
-            const initialProxyUrl = toCdnUrl(getStemUrl(stem.name, track.title));
-            console.log(`Initial proxy URL for stem ${stem.name}: ${initialProxyUrl}`);
-            
+
+            // Prefer direct URLs from Strapi
+            const directUrl = stem.mp3Url || stem.wavUrl;
+            let audioUrl: string | undefined = undefined;
+            if (directUrl) {
+              audioUrl = directUrl;
+              console.log(`Using direct URL for stem ${stem.name}: ${audioUrl}`);
+            } else {
+              // Fallback to old discovery logic if no direct URL is present
+              audioUrl = toCdnUrl(getStemUrl(stem.name, track.title));
+              console.warn(`No direct URL for stem ${stem.name}, using fallback: ${audioUrl}`);
+            }
+
             // Create audio element with cross-origin attribute
             const audio = new Audio();
             audio.crossOrigin = "anonymous"; // Add this to prevent CORS issues
@@ -1433,55 +1441,56 @@ export default function AudioPlayer({
             audio.dataset.track = track.title;
             audio.dataset.stemId = stem.id;
             audio.dataset.trackId = track.id;
-            
-            // Set the source to the proxied URL
-            audio.src = initialProxyUrl;
-            
-            // Create an array of alternative URLs to try if the first one fails
-            // We'll only use proxy URLs to avoid CORS issues
-            const alternativeUrls = [
-              // First, try to get the actual URL via the API with our improved search function
-              async () => {
-                console.log(`Finding stem file URL for ${stem.name} in track ${track.title}...`);
-                const apiUrl = await findStemFileUrl(stem.name, track.title);
-                if (apiUrl) {
-                  console.log(`Found stem file URL for ${stem.name}: ${apiUrl}`);
-                  return apiUrl; // Already proxied by findStemFileUrl
-                }
-                return null;
-              },
-              
-              // Try hash-based URLs for known tracks - all properly proxied
-              track.title.toLowerCase().includes('elevator music') && ELEVATOR_MUSIC_STEM_HASHES[stem.name]
-                ? convertUrlToProxyUrl(`${STRAPI_URL}/uploads/${stem.name}_Elevator_music_${ELEVATOR_MUSIC_STEM_HASHES[stem.name]}.mp3`)
-                : null,
-              track.title.toLowerCase().includes('crazy meme') && CRAZY_MEME_MUSIC_STEM_HASHES[stem.name]
-                ? convertUrlToProxyUrl(`${STRAPI_URL}/uploads/${stem.name}_Crazy_meme_music_${CRAZY_MEME_MUSIC_STEM_HASHES[stem.name]}.mp3`)
-                : null,
-              (track.title.toLowerCase().includes('lo-fi beat') || track.title.toLowerCase().includes('lo-fi beats')) && LOFI_BEATS_STEM_HASHES[stem.name]
-                ? convertUrlToProxyUrl(`${STRAPI_URL}/uploads/${stem.name}_Lo_Fi_Beat_${LOFI_BEATS_STEM_HASHES[stem.name]}.mp3`)
-                : null,
-              (track.title.toLowerCase().includes('dramatic countdown') || track.title.toLowerCase().includes('dramatic epic')) && DRAMATIC_EPIC_CINEMA_STEM_HASHES[stem.name]
-                ? convertUrlToProxyUrl(`${STRAPI_URL}/uploads/${stem.name}_Dramatic_Countdown_${DRAMATIC_EPIC_CINEMA_STEM_HASHES[stem.name]}.mp3`)
-                : null
-            ].filter(Boolean);
-            
+
+            // Set the source to the direct or fallback URL
+            audio.src = audioUrl;
+
+            // Only set up fallback/alternative URLs if no direct URL is present
+            let alternativeUrls: (string | (() => Promise<string | null>))[] = [];
+            if (!directUrl) {
+              alternativeUrls = [
+                // First, try to get the actual URL via the API with our improved search function
+                async () => {
+                  console.log(`Finding stem file URL for ${stem.name} in track ${track.title}...`);
+                  const apiUrl = await findStemFileUrl(stem.name, track.title);
+                  if (apiUrl) {
+                    console.log(`Found stem file URL for ${stem.name}: ${apiUrl}`);
+                    return apiUrl; // Already proxied by findStemFileUrl
+                  }
+                  return null;
+                },
+                // Try hash-based URLs for known tracks - all properly proxied
+                track.title.toLowerCase().includes('elevator music') && ELEVATOR_MUSIC_STEM_HASHES[stem.name]
+                  ? convertUrlToProxyUrl(`${STRAPI_URL}/uploads/${stem.name}_Elevator_music_${ELEVATOR_MUSIC_STEM_HASHES[stem.name]}.mp3`)
+                  : null,
+                track.title.toLowerCase().includes('crazy meme') && CRAZY_MEME_MUSIC_STEM_HASHES[stem.name]
+                  ? convertUrlToProxyUrl(`${STRAPI_URL}/uploads/${stem.name}_Crazy_meme_music_${CRAZY_MEME_MUSIC_STEM_HASHES[stem.name]}.mp3`)
+                  : null,
+                (track.title.toLowerCase().includes('lo-fi beat') || track.title.toLowerCase().includes('lo-fi beats')) && LOFI_BEATS_STEM_HASHES[stem.name]
+                  ? convertUrlToProxyUrl(`${STRAPI_URL}/uploads/${stem.name}_Lo_Fi_Beat_${LOFI_BEATS_STEM_HASHES[stem.name]}.mp3`)
+                  : null,
+                (track.title.toLowerCase().includes('dramatic countdown') || track.title.toLowerCase().includes('dramatic epic')) && DRAMATIC_EPIC_CINEMA_STEM_HASHES[stem.name]
+                  ? convertUrlToProxyUrl(`${STRAPI_URL}/uploads/${stem.name}_Dramatic_Countdown_${DRAMATIC_EPIC_CINEMA_STEM_HASHES[stem.name]}.mp3`)
+                  : null
+              ].filter(Boolean) as (string | (() => Promise<string | null>))[];
+            }
+
             // Use a timeout to avoid hanging on loading forever
             const loadTimeout = setTimeout(() => {
               console.warn(`Timeout loading audio for ${stem.name}`);
               setStemLoadErrors(prev => ({...prev, [stem.id]: true}));
               setStemLoading(prev => ({...prev, [stem.id]: false}));
             }, 5000);
-            
+
             // Track which URL attempt we're on
             let currentUrlIndex = 0;
             const maxAttempts = alternativeUrls.length;
-            
+
             // Function to try loading with next URL
             const tryNextUrl = async () => {
               if (currentUrlIndex < maxAttempts) {
                 const nextUrlOrFunc = alternativeUrls[currentUrlIndex++];
-                
+
                 // Handle function-based URLs (like API discovery)
                 let nextUrl: string;
                 if (typeof nextUrlOrFunc === 'function') {
@@ -1498,9 +1507,9 @@ export default function AudioPlayer({
                 } else {
                   nextUrl = nextUrlOrFunc as string;
                 }
-                
+
                 console.log(`Trying alternative URL for ${stem.name}: ${nextUrl}`);
-                
+
                 // Try the next URL
                 audio.src = nextUrl;
                 audio.load();
@@ -1512,25 +1521,25 @@ export default function AudioPlayer({
                 setStemLoading(prev => ({...prev, [stem.id]: false}));
               }
             };
-            
-            // Add error handler with URL retry logic
-            audio.addEventListener('error', (e) => {
-              console.error(`Error loading audio for stem ${stem.name} with URL ${audio.src}:`, e);
-              console.log(`❌ FAILED URL: ${audio.src}`);
-              
-              // Try the next URL in our list
-              tryNextUrl();
-            });
-            
+
+            // Add error handler with URL retry logic (only if no direct URL)
+            if (!directUrl) {
+              audio.addEventListener('error', (e) => {
+                clearTimeout(loadTimeout); // Ensure timeout is cleared on error
+                console.error(`Error loading audio for stem ${stem.name} with URL ${audio.src}:`, e);
+                console.log(`❌ FAILED URL: ${audio.src}`);
+                // Try the next URL in our list
+                tryNextUrl();
+              });
+            }
+
             // Add canplaythrough handler
             audio.addEventListener('canplaythrough', () => {
               clearTimeout(loadTimeout);
               console.log(`Audio loaded successfully for stem: ${stem.name} with URL ${audio.src}`);
-              
               // Store the successful URL in our cache
               saveStemUrlToCache(track.title, stem.name, audio.src);
               console.log(`✅ SUCCESSFUL URL: ${audio.src}`);
-              
               setStemLoading(prev => ({...prev, [stem.id]: false}));
               setStemLoadErrors(prev => {
                 const newErrors = {...prev};
@@ -1538,28 +1547,26 @@ export default function AudioPlayer({
                 return newErrors;
               });
             });
-            
+
             // Set up event handlers for audio playback
             audio.addEventListener('timeupdate', () => {
               const current = audio.currentTime;
               const duration = audio.duration || stem.duration || 30;
               setStemProgress(prev => ({...prev, [stem.id]: (current / duration) * 100}));
             });
-            
+
             audio.addEventListener('ended', () => {
               // When a stem ends, update our UI and the global audio manager
               setPlayingStems(prev => ({...prev, [stem.id]: false}));
               setStemProgress(prev => ({...prev, [stem.id]: 0}));
-              
               // If this is the currently active audio in the global manager, clear it
               if (globalAudioManager.activeAudio === audio) {
                 globalAudioManager.stop();
               }
             });
-            
+
             // Preload the audio
             audio.load();
-            
             newStemAudio[stem.id] = audio;
           } catch (err) {
             console.error(`Failed to create audio element for ${stem.name}:`, err);
@@ -1682,7 +1689,7 @@ export default function AudioPlayer({
       });
     }
   }, [isStemsOpen, openStemsTrackId]);
-
+  
   // Stem button rendering
   const renderStemsButton = () => {
     const hasStems = track.hasStems || (track.stems && track.stems.length > 0);
@@ -1690,22 +1697,36 @@ export default function AudioPlayer({
     return (
       <div className="flex items-center mt-1">
         <button
-          className={`flex items-center py-1 px-3 rounded-full text-sm
-            ${isStemsPopupOpen ? 'bg-[#1DF7CE] text-black' : 'bg-[#232323] text-white hover:bg-[#2a2a2a]'}`}
+          className="flex items-center py-1 px-3 text-sm"
+          style={{
+            background: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '9999px',
+            boxShadow: 'none',
+            paddingLeft: '10px',
+            paddingRight: '10px',
+            height: '28px',
+            minWidth: '64px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
           onClick={openStemsPopup}
         >
-          <svg 
-            className="w-3 h-3 mr-1" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            xmlns="http://www.w3.org/2000/svg"
+          <svg
+            className="w-4 h-4 mr-1"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#fff"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ transform: 'translateY(1px)' }}
           >
-            <path 
-              d="M2 5H12M2 12H12M2 19H22M12 5L22 5M12 12H22" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round"
-            />
+            <path d="M2 6c2-2 6-2 8 0s6 2 8 0 6-2 8 0" />
+            <path d="M2 12c2-2 6-2 8 0s6 2 8 0 6-2 8 0" />
+            <path d="M2 18c2-2 6-2 8 0s6 2 8 0 6-2 8 0" />
           </svg>
           Stems
           <span className="ml-1 text-xs">
@@ -1744,9 +1765,18 @@ export default function AudioPlayer({
   // Add state at the top of the component
   const [isStemsPopupOpen, setIsStemsPopupOpen] = useState(false);
   const [selectedTrackForStems, setSelectedTrackForStems] = useState<Track | null>(null);
+  // At the top, add state to track the time to start stems playback
+  const [stemsStartTime, setStemsStartTime] = useState<number | null>(null);
 
   // Function to open stems popup for the current track
   const openStemsPopup = () => {
+    // Capture the current playback time from the main audio element
+    let currentPlaybackTime = 0;
+    if (audioRef.current) {
+      currentPlaybackTime = audioRef.current.currentTime;
+      audioRef.current.pause(); // Stop main player
+    }
+    setStemsStartTime(currentPlaybackTime);
     setSelectedTrackForStems(track);
     setIsStemsPopupOpen(true);
   };
@@ -1768,15 +1798,19 @@ export default function AudioPlayer({
               className={`absolute inset-0 bg-black ${isHovering || isPlaying ? 'opacity-50' : 'opacity-0'} transition-opacity z-10`}
             />
             {!imageLoadFailed ? (
-              <img 
-                src={trackImageUrl} 
+              <Image
+                src={trackImageUrl}
                 alt={track.title}
                 className="object-cover w-14 h-14"
+                width={56}
+                height={56}
                 crossOrigin="anonymous"
-                onError={(e) => {
+                onError={() => {
                   console.error(`[AudioPlayer] Failed to load image: ${trackImageUrl}`);
                   setImageLoadFailed(true);
                 }}
+                unoptimized={trackImageUrl.startsWith('http') && !trackImageUrl.includes(process.env.NEXT_PUBLIC_CDN_DOMAIN || 'd1r94114aksajj.cloudfront.net')}
+                loading="lazy"
               />
             ) : (
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1877,7 +1911,7 @@ export default function AudioPlayer({
           {/* Action buttons area */}
           <div className="flex items-center space-x-3 flex-shrink-0 min-w-[110px]">
             {/* Consistent width container for Stems button or placeholder */}
-            <div className="w-[68px] flex justify-end">
+            <div className="w-[68px] flex items-center justify-end h-8">
               {renderStemsButton()}
             </div>
             {/* Hide the Generate Waveform Button as it should only be in the upload page */}
@@ -1917,7 +1951,7 @@ export default function AudioPlayer({
             </button>
             */}
             <button 
-              className="w-10 h-10 flex items-center justify-center text-[#1E1E1E] hover:text-[#1DF7CE] transition-colors border-2 border-[#1DF7CE] rounded-full bg-[#1DF7CE] hover:bg-transparent focus:outline-none"
+              className="w-8 h-8 flex items-center justify-center text-[#1E1E1E] hover:text-[#1DF7CE] transition-colors border-2 border-[#1DF7CE] rounded-full bg-[#1DF7CE] hover:bg-transparent focus:outline-none"
               onClick={async () => {
                 try {
                   // Fetch the file as a blob
@@ -1951,10 +1985,10 @@ export default function AudioPlayer({
               }}
               title="Download track"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="4" x2="12" y2="16" />
+                <polyline points="8 12 12 16 16 12" />
+                <line x1="6" y1="20" x2="18" y2="20" />
               </svg>
             </button>
           </div>
@@ -2208,7 +2242,7 @@ export default function AudioPlayer({
       </div>
       )}
       {/* Only render StemsPopup if selectedTrackForStems is not null */}
-      {selectedTrackForStems && (
+      {isStemsPopupOpen && selectedTrackForStems && (
         <StemsPopup
           isOpen={isStemsPopupOpen}
           onClose={() => {
@@ -2216,6 +2250,7 @@ export default function AudioPlayer({
             setSelectedTrackForStems(null);
           }}
           track={selectedTrackForStems}
+          startTime={stemsStartTime}
         />
       )}
     </div>

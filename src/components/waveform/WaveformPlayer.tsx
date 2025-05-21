@@ -278,54 +278,74 @@ export const StaticWaveform: React.FC<{
   progress?: number,
   width?: number|string,
   height?: number|string,
-  onScrub?: (relative: number) => void
-}> = ({ data, progress = 0, width = '100%', height = 40, onScrub }) => {
-  // Create a solid SVG waveform
+  onScrub?: (relative: number) => void,
+  leftPadding?: number // optional, default 0
+}> = ({ data, progress = 0, width = '100%', height = 24, onScrub, leftPadding = 0 }) => {
   const maxValue = Math.max(...data, 1);
+  // Linear normalization for better dynamics
   const normalizedData = data.map(val => val / maxValue);
 
-  const svgWidth = typeof width === 'number' ? width : 400;
-  const svgHeight = typeof height === 'number' ? height : 40;
-  const totalPoints = Math.floor(svgWidth);
-  const sampledData = normalizedData.length > totalPoints
-    ? normalizedData.filter((_, i) => i % Math.ceil(normalizedData.length / totalPoints) === 0).slice(0, totalPoints)
-    : normalizedData;
+  // Use a fixed viewBox for path calculation, SVG itself will scale via width/height props
+  const viewBoxWidth = 200; // Arbitrary width for viewBox calculation
+  const svgHeight = typeof height === 'number' ? height : 24;
+  const totalPoints = viewBoxWidth; // Number of points for the path data, matching viewBoxWidth
 
-  // Minimum visible amplitude (e.g. 10% of height)
-  const minAmp = 0.1;
+  // Interpolate or spread data to fill the totalPoints for the viewBoxWidth
+  let stretchedData: number[];
+  if (normalizedData.length === 0) { // Handle empty data case
+    stretchedData = Array(totalPoints).fill(0);
+  } else if (normalizedData.length === totalPoints) {
+    stretchedData = normalizedData;
+  } else {
+    stretchedData = Array.from({ length: totalPoints }, (_, i) => {
+      const idx = (i / (totalPoints - 1)) * (normalizedData.length - 1);
+      const left = Math.floor(idx);
+      const right = Math.ceil(idx);
+      if (left === right) return normalizedData[left]; // Avoid issues if idx is an integer
+      const frac = idx - left;
+      return normalizedData[left] * (1 - frac) + normalizedData[right] * frac;
+    });
+  }
 
-  // Build the path for the waveform area
-  const pathPoints = sampledData.map((value, i) => {
-    const x = (i / (sampledData.length - 1)) * svgWidth;
-    // Ensure min amplitude is visible
-    const y = ((1 - Math.max(value, minAmp)) * svgHeight) / 2;
+  const minAmpNormalized = 0.01; // Minimum amplitude as a fraction of svgHeight
+
+  const pathPoints = stretchedData.map((value, i) => {
+    const x = leftPadding + (i / (totalPoints - 1)) * (viewBoxWidth - leftPadding);
+    const barAmplitude = Math.max(value, minAmpNormalized) * svgHeight;
+    const y = (svgHeight - barAmplitude) / 2; // Top of the centered bar
     return `${x},${y}`;
   });
-  // Mirror for the bottom half
-  const pathPointsBottom = sampledData.map((value, i) => {
-    const x = ((sampledData.length - 1 - i) / (sampledData.length - 1)) * svgWidth;
-    const y = svgHeight - (((1 - Math.max(value, minAmp)) * svgHeight) / 2);
-    return `${x},${y}`;
-  });
-  const fullPath = `M${pathPoints[0]} L${pathPoints.slice(1).join(' ')} L${pathPointsBottom.join(' ')} Z`;
 
-  // Progress path (up to playhead)
-  const progressIdx = Math.floor((progress || 0) * sampledData.length);
-  const progressPoints = sampledData.slice(0, progressIdx).map((value, i) => {
-    const x = (i / (sampledData.length - 1)) * svgWidth;
-    const y = ((1 - Math.max(value, minAmp)) * svgHeight) / 2;
+  const pathPointsBottom = stretchedData.map((value, i) => {
+    const x = leftPadding + ((totalPoints - 1 - i) / (totalPoints - 1)) * (viewBoxWidth - leftPadding); // Reversed X for path drawing
+    const barAmplitude = Math.max(value, minAmpNormalized) * svgHeight;
+    const y = (svgHeight + barAmplitude) / 2; // Bottom of the centered bar
     return `${x},${y}`;
   });
-  const progressPointsBottom = sampledData.slice(0, progressIdx).map((value, i) => {
-    const x = ((progressIdx - 1 - i) / (sampledData.length - 1)) * svgWidth;
-    const y = svgHeight - (((1 - Math.max(value, minAmp)) * svgHeight) / 2);
-    return `${x},${y}`;
-  });
-  const progressPath = progressIdx > 1
-    ? `M${progressPoints[0]} L${progressPoints.slice(1).join(' ')} L${progressPointsBottom.join(' ')} Z`
-    : '';
+  
+  const fullPath = stretchedData.length > 0 ? `M${pathPoints[0]} L${pathPoints.slice(1).join(' ')} L${pathPointsBottom.join(' ')} Z` : 'M0,0'; // Fallback for empty data
 
-  // Add pointer event handler for scrubbing
+  const progressIdx = Math.floor((progress || 0) * totalPoints);
+  
+  let progressPath = '';
+  if (stretchedData.length > 0 && progressIdx > 0) {
+    const currentProgressPoints = stretchedData.slice(0, progressIdx).map((value, i) => {
+        const x = leftPadding + (i / (totalPoints - 1)) * (viewBoxWidth - leftPadding);
+        const barAmplitude = Math.max(value, minAmpNormalized) * svgHeight;
+        const y = (svgHeight - barAmplitude) / 2;
+        return `${x},${y}`;
+    });
+    const currentProgressPointsBottom = stretchedData.slice(0, progressIdx).map((value, i) => {
+        const x = leftPadding + ((progressIdx - 1 - i) / (totalPoints - 1)) * (viewBoxWidth - leftPadding); // Reversed X
+        const barAmplitude = Math.max(value, minAmpNormalized) * svgHeight;
+        const y = (svgHeight + barAmplitude) / 2;
+        return `${x},${y}`;
+    });
+    if (currentProgressPoints.length > 0) {
+        progressPath = `M${currentProgressPoints[0]} L${currentProgressPoints.slice(1).join(' ')} L${currentProgressPointsBottom.join(' ')} Z`;
+    }
+  }
+
   const svgRef = useRef<SVGSVGElement>(null);
   const handlePointer = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!onScrub) return;
@@ -335,7 +355,6 @@ export const StaticWaveform: React.FC<{
     const rel = Math.max(0, Math.min(1, x / rect.width));
     onScrub(rel);
   };
-  // Support dragging for continuous scrubbing
   const isDragging = useRef(false);
   const handlePointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
     isDragging.current = true;
@@ -359,14 +378,15 @@ export const StaticWaveform: React.FC<{
   return (
     <svg
       ref={svgRef}
-      width={width}
-      height={height}
+      width={width} // e.g., "100%"
+      height={height} // e.g., 24
+      viewBox={`0 0 ${viewBoxWidth} ${svgHeight}`}
+      preserveAspectRatio="none"
       className="w-full h-full cursor-pointer"
-      onPointerDown={handlePointerDown}
+      onPointerDown={onScrub ? handlePointerDown : undefined}
+      style={{ marginLeft: 0, paddingLeft: 0 }}
     >
-      {/* Full waveform background */}
       <path d={fullPath} fill="#4a5568" />
-      {/* Progress waveform */}
       {progressPath && <path d={progressPath} fill="#1DF7CE" />}
     </svg>
   );

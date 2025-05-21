@@ -381,6 +381,9 @@ export interface ApiGalleryItemGalleryItem extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
+    buttonText: Schema.Attribute.String;
+    buttonUrl: Schema.Attribute.String;
+    caption: Schema.Attribute.String;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -394,6 +397,7 @@ export interface ApiGalleryItemGalleryItem extends Struct.CollectionTypeSchema {
     MediaUrl: Schema.Attribute.String;
     Order: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
+    subtitle: Schema.Attribute.String;
     Thumbnail: Schema.Attribute.Media<
       'images' | 'files' | 'videos' | 'audios',
       true

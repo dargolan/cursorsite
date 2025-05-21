@@ -60,9 +60,8 @@ export class StemAudioManager extends EventEmitter<StemAudioEventMap> {
   private _loading = false;
   private _error: string | null = null;
 
-  private audioContextTimeAtPlayStart = 0; // audioContext.currentTime when play() was last called successfully
-  private accumulatedPauseDuration = 0;    // Total duration spent in a paused state
-  private lastPauseTimeContext = 0;        // audioContext.currentTime when pause() was last called
+  private playStartTime = 0;               // When we started playing
+  private playOffset = 0;                  // Where in the track we started playing from
 
   private progressIntervalId: number | null = null;
   private isDestroyed = false;
@@ -159,9 +158,8 @@ export class StemAudioManager extends EventEmitter<StemAudioEventMap> {
     this._mutedStemIds = new Set<string>();
     this._loading = false;
     this._error = null;
-    this.audioContextTimeAtPlayStart = 0;
-    this.accumulatedPauseDuration = 0;
-    this.lastPauseTimeContext = 0;
+    this.playStartTime = 0;
+    this.playOffset = 0;
   }
 
   private createGainNodes() {
@@ -214,13 +212,8 @@ export class StemAudioManager extends EventEmitter<StemAudioEventMap> {
     this.stopAllSources(false); 
     this.applyGainToStems(); 
 
-    if (this.lastPauseTimeContext > 0) {
-        this.accumulatedPauseDuration += (this.audioContext.currentTime - this.lastPauseTimeContext);
-        this.lastPauseTimeContext = 0; // Reset after accumulating
-    }
-    this.audioContextTimeAtPlayStart = this.audioContext.currentTime;
-    // Effective start time for sources is _currentTime, which accounts for previous pauses/seeks.
-    const sourceStartTime = this._currentTime;
+    this.playStartTime = this.audioContext.currentTime;
+    this.playOffset = this._currentTime;  // Start from current position
 
     let sourcesCreated = 0;
     this.stems.forEach(stem => {
@@ -228,7 +221,7 @@ export class StemAudioManager extends EventEmitter<StemAudioEventMap> {
         const source = this.audioContext.createBufferSource();
         source.buffer = this.stemBuffers[stem.id];
         source.connect(this.stemGainNodes[stem.id]);
-        source.start(0, sourceStartTime); 
+        source.start(0, this.playOffset); 
         this.stemSources[stem.id] = source;
         sourcesCreated++;
         source.onended = () => {
@@ -258,12 +251,12 @@ export class StemAudioManager extends EventEmitter<StemAudioEventMap> {
           return;
         }
         
-        const elapsedSincePlay = this.audioContext.currentTime - this.audioContextTimeAtPlayStart;
-        this._currentTime = this.accumulatedPauseDuration + elapsedSincePlay;
+        // Calculate current position: start position + elapsed time
+        this._currentTime = this.playOffset + (this.audioContext.currentTime - this.playStartTime);
 
         if (this._currentTime >= this._duration) {
           this._currentTime = this._duration;
-          if (this._isPlaying) { // Check ensures this doesn't conflict with onended
+          if (this._isPlaying) {
             this.pause(); 
             this.emit('trackended');
           }
@@ -277,40 +270,36 @@ export class StemAudioManager extends EventEmitter<StemAudioEventMap> {
   }
 
   private resetTimingForStop() {
-    this.accumulatedPauseDuration = 0;
-    this.lastPauseTimeContext = 0;
-    this.audioContextTimeAtPlayStart = 0;
+    this.playStartTime = 0;
+    this.playOffset = 0;
   }
 
   pause() {
     if (this.isDestroyed || !this._isPlaying) return;
-    this.lastPauseTimeContext = this.audioContext.currentTime;
     this._isPlaying = false;
     this.stopAllSources(true);
-    // Update _currentTime based on how much has played since play() was called this last time
-    const elapsedSincePlay = this.audioContext.currentTime - this.audioContextTimeAtPlayStart;
-    this._currentTime = this.accumulatedPauseDuration + elapsedSincePlay;
+    // Update current time to exact position where we paused
+    this._currentTime = this.playOffset + (this.audioContext.currentTime - this.playStartTime);
     if(this._currentTime > this._duration) this._currentTime = this._duration;
-
     this.emitStateChange();
   }
 
   seek(time: number) {
     if (this.isDestroyed || this._duration === 0) return;
     const newTime = Math.max(0, Math.min(time, this._duration));
-    
-    this._currentTime = newTime;
-    // To maintain correct playback position if play() is called next:
-    // Treat all time before the seek point as accumulated pause duration.
-    // When play() is called, audioContextTimeAtPlayStart will be now, and playback will start from _currentTime.
-    this.accumulatedPauseDuration = newTime;
-    this.audioContextTimeAtPlayStart = this.audioContext.currentTime; // Reset reference for future play
-    this.lastPauseTimeContext = 0; // Not paused if we just seeked
+    const wasPlaying = this._isPlaying;
 
-    this.emitStateChange();
-    if (this._isPlaying) {
-      this.stopAllSources(false); 
+    this._currentTime = newTime;
+    // Update playOffset to new position
+    this.playOffset = newTime;
+    this.playStartTime = this.audioContext.currentTime;
+
+    if (wasPlaying) {
+      this.stopAllSources(false);
+      this._isPlaying = false; 
       this.play();
+    } else {
+      this.emitStateChange();
     }
   }
 

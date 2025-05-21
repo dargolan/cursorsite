@@ -37,8 +37,8 @@ export const TrackDetails = ({ track, onTagClick, openStemsHandler, isOpen }: Tr
       {track.stems && track.stems.length > 0 && (
         <button
           onClick={openStemsHandler}
-          className={`px-4 py-2 rounded-md text-white font-medium ${
-            isOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-transparent hover:bg-gray-700 border border-gray-600'
+          className={`px-4 py-2 rounded-md text-black font-medium ${
+            isOpen ? 'bg-yellow-400 hover:bg-yellow-500' : 'bg-yellow-300 hover:bg-yellow-400 border border-yellow-500'
           }`}
         >
           {isOpen ? 'Hide Stems' : 'Show Stems'}

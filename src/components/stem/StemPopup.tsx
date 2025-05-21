@@ -21,6 +21,7 @@ interface StemsPopupProps {
   isOpen: boolean;
   onClose: () => void;
   track: Track; // Contains track.stems and potentially track.audioUrl for a main mix
+  startTime?: number | null;
 }
 
 interface StemPeaksData {
@@ -29,7 +30,7 @@ interface StemPeaksData {
   error: string | null;
 }
 
-const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
+const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track, startTime }) => {
   const { addItem, removeItem, items } = useCart();
   const audioManagerRef = useRef<StemAudioManager | null>(null);
 
@@ -67,14 +68,18 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
     [items, track]
   );
 
+  // Add a ref to track if we've done the initial seek
+  const hasInitialSeekRef = useRef(false);
+
   // Initialize and destroy StemAudioManager
   useEffect(() => {
     if (isOpen) {
       console.log("[StemsPopup] Initializing StemAudioManager");
       const manager = new StemAudioManager();
       audioManagerRef.current = manager;
-      setIsLoadingStems(true); // Set loading true when manager starts
-      setStemPeaksCache({}); // Clear old peaks cache
+      setIsLoadingStems(true);
+      setStemPeaksCache({});
+      hasInitialSeekRef.current = false; // Reset on new manager initialization
 
       // Attempt to load the main track URL for duration if stems are empty or main track is primary
       // For simplicity, we'll assume track.stems are the primary source of audio here.
@@ -111,7 +116,14 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
       };
       const handleBuffersLoaded = (payload: StemAudioEventMap['buffersloaded']) => {
         setDuration(payload.duration); 
-        setIsLoadingStems(false); // Buffers loaded, main loading is done
+        setIsLoadingStems(false);
+        // Only use startTime for initial seek and only once
+        if (startTime != null && audioManagerRef.current && !hasInitialSeekRef.current) {
+          console.log("[StemsPopup] Stems loaded, seeking to startTime:", startTime);
+          audioManagerRef.current.seek(startTime);
+          audioManagerRef.current.play();
+          hasInitialSeekRef.current = true;
+        }
       };
        const handleTrackEnded = () => {
         // Reset relevant UI or let statechange handle it
@@ -143,8 +155,10 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
   const handlePlayPause = useCallback(() => {
     if (audioManagerRef.current) {
       if (isPlaying) {
+        // Just pause, maintaining current position
         audioManagerRef.current.pause();
       } else {
+        // Resume from current position (don't seek to startTime)
         audioManagerRef.current.play();
       }
     }
@@ -355,6 +369,8 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
                   peaks={mainWaveformPeaks}
                   progress={duration > 0 ? currentTime / duration : 0}
                   height={24}
+                  waveColor="#2b2b2b"
+                  progressColor="#1DF7CE"
                   onScrub={progress => {
                     if (audioManagerRef.current && duration) {
                       const newTime = progress * duration;
@@ -366,7 +382,7 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
                 !mainWaveformLoading && !mainWaveformError && <p className="text-xs text-gray-500">No waveform data</p>
               )}
             </div>
-            <span className="text-sm font-mono min-w-[60px] text-right">{formatDisplayTime(currentTime)} / {formatDisplayTime(duration)}</span>
+            <span className="text-sm font-mono min-w-[60px] text-right" style={{ fontFamily: 'Inter, sans-serif' }}>{formatDisplayTime(currentTime)} / {formatDisplayTime(duration)}</span>
           </div>
         )}
 
@@ -416,9 +432,14 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track }) => {
               </div>
               <button
                 onClick={handleBuyAll}
-                className="bg-accent text-black px-6 py-2 rounded-full font-semibold hover:bg-accent/80 shadow-lg transition-all text-lg"
+                className="px-4 py-2 rounded-full font-medium transition-colors"
+                style={{
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)',
+                  color: '#fff',
+                  border: 'none'
+                }}
               >
-                Buy All
+                Buy All Stems
               </button>
             </div>
             {/* Toast for add/buy all actions */}
@@ -506,6 +527,8 @@ const StemWaveformRow: React.FC<StemWaveformRowProps> = React.memo(({
             peaks={stemPeaks} 
             progress={duration > 0 ? currentTime / duration : 0}
             height={24}
+            waveColor="#2b2b2b"
+            progressColor="#1DF7CE"
             onScrub={(progress) => {
               if (audioManager && duration) {
                 const newTime = progress * duration;

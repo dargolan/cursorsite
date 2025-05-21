@@ -28,7 +28,7 @@ export default function TrackListItem({
       setIsUrlLoading(true);
       try {
         // If track has an audioUrl, use it directly
-        const audioUrl = track.audioUrl || (track.audio && track.audio.url) || '';
+        const audioUrl = track.audioUrl || '';
         if (audioUrl) {
           setTrackUrl(audioUrl);
           return;
@@ -155,7 +155,8 @@ export default function TrackListItem({
       
       {/* Stems dropdown (optional) */}
       <button 
-        className="ml-2 w-8 h-8 flex items-center justify-center bg-transparent text-white rounded-full hover:bg-[#272727] transition-colors"
+        className="ml-2 w-8 h-8 flex items-center justify-center rounded-full transition-colors"
+        style={{ background: 'yellow', color: 'black', border: '2px solid red' }}
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
