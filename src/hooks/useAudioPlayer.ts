@@ -33,6 +33,20 @@ export function useAudioPlayer({
   const play = useCallback(() => {
     if (!audioRef.current) return;
     
+    // Check if audio playback is being prevented by stem operations
+    if ((window as any).preventStemAudioPlay) {
+      console.log('Audio playback prevented by stem operation');
+      return;
+    }
+    
+    // Check if there's a recent cart operation (last 1.5 seconds)
+    const now = Date.now();
+    const lastCartOperation = (window as any).lastCartOperationTime || 0;
+    if (now - lastCartOperation < 1500) {
+      console.log('Audio playback prevented by recent cart operation');
+      return;
+    }
+    
     // Use our new global audio controller instead of audioManager
     globalAudioController.play(audioRef.current)
       .then(() => setIsPlaying(true))

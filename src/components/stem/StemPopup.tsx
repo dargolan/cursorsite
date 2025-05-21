@@ -9,6 +9,9 @@ import { StemVisualWaveform } from '../waveform/StemVisualWaveform'; // Import t
 import PlayButton from '../AudioPlayer/PlayButton';
 import Image from 'next/image';
 import StemToast from '../AudioPlayer/StemToast';
+import { globalAudioController } from '../../lib/global-audio-controller';
+import { unifiedAudioManager } from '../../lib/unified-audio-manager';
+import { globalAudioManager } from '../../utils/audio-player-utils';
 
 // Helper to format time (MM:SS)
 const formatDisplayTime = (timeInSeconds: number): string => {
@@ -184,7 +187,27 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track, startTi
 
   // Add stem to cart with animation and toast, and remove bundle if present
   const handleAddStemToCart = useCallback((stem: Stem) => {
-    // Remove bundle if present
+    // Create an explicit lock that prevents ANY audio playback for 1.5 seconds
+    (window as any).preventStemAudioPlay = true;
+    (window as any).lastCartOperationTime = Date.now();
+    
+    // Add a stop-all-audio event to ensure immediate stop of audio on explore page
+    const stopEvent = new CustomEvent('stop-all-audio', { detail: { source: 'stem-cart-operation' } });
+    window.dispatchEvent(stopEvent);
+    document.dispatchEvent(stopEvent);
+    
+    // IMPORTANT: Force pause ANY active audio to ensure main page audio doesn't play
+    if (globalAudioManager.activeAudio) {
+      globalAudioManager.activeAudio.pause();
+    }
+    if (globalAudioController.isPlaying()) {
+      globalAudioController.pause();
+    }
+    if (unifiedAudioManager.isPlaying()) {
+      unifiedAudioManager.pause();
+    }
+    
+    // Now proceed with cart operations
     removeItem(`${track.id}-bundle`);
     setCartedStems(prev => new Set(prev).add(stem.id));
     addItem({
@@ -196,17 +219,44 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track, startTi
       type: 'stem',
     });
     setShowToast({ message: `${stem.name} added to cart`, type: 'add', price: stem.price });
-    setTimeout(() => setShowToast(null), 2500);
+    
+    // Clear the flag after a delay
+    setTimeout(() => {
+      setShowToast(null);
+      (window as any).preventStemAudioPlay = false;
+    }, 2500);
   }, [addItem, removeItem, track]);
 
   // Buy all stems (add bundle), and remove all individual stems for this track
   const handleBuyAll = useCallback(() => {
+    // Create an explicit lock that prevents ANY audio playback for 1.5 seconds
+    (window as any).preventStemAudioPlay = true;
+    (window as any).lastCartOperationTime = Date.now();
+    
+    // Add a stop-all-audio event to ensure immediate stop of audio on explore page
+    const stopEvent = new CustomEvent('stop-all-audio', { detail: { source: 'stem-cart-operation' } });
+    window.dispatchEvent(stopEvent);
+    document.dispatchEvent(stopEvent);
+    
+    // IMPORTANT: Force pause ANY active audio to ensure main page audio doesn't play
+    if (globalAudioManager.activeAudio) {
+      globalAudioManager.activeAudio.pause();
+    }
+    if (globalAudioController.isPlaying()) {
+      globalAudioController.pause();
+    }
+    if (unifiedAudioManager.isPlaying()) {
+      unifiedAudioManager.pause();
+    }
+    
+    // Now proceed with cart operations
     // Remove all individual stems for this track from the cart
     (track.stems || []).forEach(stem => {
       removeItem(`${track.id}-${stem.id}`);
     });
     const allIds = new Set((track.stems || []).map(s => s.id));
     setCartedStems(allIds);
+    
     // Add a single bundle item
     const total = (track.stems || []).reduce((sum, s) => sum + (s.price || 0), 0);
     const discounted = Math.round(total * 0.75 * 100) / 100;
@@ -219,7 +269,12 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track, startTi
       type: 'stem',
     });
     setShowToast({ message: `All stems bundle added to cart`, type: 'buyAll', price: discounted });
-    setTimeout(() => setShowToast(null), 2500);
+    
+    // Clear the flag after a delay
+    setTimeout(() => {
+      setShowToast(null);
+      (window as any).preventStemAudioPlay = false;
+    }, 2500);
   }, [addItem, removeItem, track]);
 
   const memoizedStems = useMemo(() => track.stems || [], [track.stems]);
@@ -323,9 +378,22 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track, startTi
 
   if (!isOpen) return null;
 
+  const preventBubbling = (e: React.MouseEvent) => {
+    // Stop propagation for all click events in the popup
+    e.stopPropagation();
+    
+    // Explicitly ensure we don't accidentally trigger the main track to play
+    if (globalAudioManager && globalAudioManager.activeAudio) {
+      if (globalAudioManager.activeTrackId !== track.id) {
+        // Pause any audio that's not from our own stem player
+        globalAudioManager.activeAudio.pause();
+      }
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm">
-      <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl w-full max-w-3xl mx-auto p-6 relative text-white" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm" onClick={preventBubbling}>
+      <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl w-full max-w-3xl mx-auto p-6 relative text-white" onClick={preventBubbling}>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">Stems for: {track.title}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
@@ -431,7 +499,30 @@ const StemsPopup: React.FC<StemsPopupProps> = ({ isOpen, onClose, track, startTi
                 </span>
               </div>
               <button
-                onClick={handleBuyAll}
+                onClick={(e) => {
+                  // Comprehensive event stopping
+                  e.stopPropagation();
+                  e.preventDefault();
+                  e.nativeEvent.stopImmediatePropagation();
+                  
+                  // Block any audio playback in the main page 
+                  const stopEvent = new CustomEvent('stop-all-audio', { detail: { source: 'stem-buy-all-button' } });
+                  window.dispatchEvent(stopEvent);
+                  document.dispatchEvent(stopEvent);
+                  
+                  // Force pause ALL audio managers to be absolutely certain
+                  try {
+                    if (globalAudioManager && globalAudioManager.activeAudio) {
+                      globalAudioManager.activeAudio.pause();
+                    }
+                    if (globalAudioController) globalAudioController.pause();
+                    if (unifiedAudioManager) unifiedAudioManager.pause();
+                  } catch (err) {
+                    console.error("Error pausing audio:", err);
+                  }
+                  
+                  handleBuyAll();
+                }}
                 className="px-4 py-2 rounded-full font-medium transition-colors"
                 style={{
                   background: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)',
@@ -509,12 +600,18 @@ const StemWaveformRow: React.FC<StemWaveformRowProps> = React.memo(({
         <button
           title={isSoloed ? "Unsolo" : "Solo"}
           className={`w-7 h-7 rounded font-bold text-xs transition-colors ${isSoloed ? 'bg-accent text-black' : 'bg-gray-600 hover:bg-gray-500 text-white'}`}
-          onClick={() => handleSolo(stem.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSolo(stem.id);
+          }}
         >S</button>
         <button
           title={isMuted ? "Unmute" : "Mute"}
           className={`w-7 h-7 rounded font-bold text-xs transition-colors ${isMuted ? 'bg-accent text-black' : 'bg-gray-600 hover:bg-gray-500 text-white'}`}
-          onClick={() => handleMute(stem.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleMute(stem.id);
+          }}
         >M</button>
       </div>
 
@@ -544,7 +641,30 @@ const StemWaveformRow: React.FC<StemWaveformRowProps> = React.memo(({
       {/* Add to cart icon and price */}
       <div className="flex flex-col items-center flex-shrink-0 ml-2">
         <button
-          onClick={() => !isInCart && !disableAdd && addItem(stem)}
+          onClick={(e) => {
+            // Comprehensive event stopping
+            e.stopPropagation();
+            e.preventDefault();
+            e.nativeEvent.stopImmediatePropagation();
+            
+            // Block any audio playback in the main page 
+            const stopEvent = new CustomEvent('stop-all-audio', { detail: { source: 'stem-cart-button' } });
+            window.dispatchEvent(stopEvent);
+            document.dispatchEvent(stopEvent);
+            
+            // Force pause ALL audio managers to be absolutely certain
+            try {
+              if (globalAudioManager && globalAudioManager.activeAudio) {
+                globalAudioManager.activeAudio.pause();
+              }
+              if (globalAudioController) globalAudioController.pause();
+              if (unifiedAudioManager) unifiedAudioManager.pause();
+            } catch (err) {
+              console.error("Error pausing audio:", err);
+            }
+            
+            if (!isInCart && !disableAdd) addItem(stem);
+          }}
           className={`flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200 ${isInCart ? 'bg-accent/20' : 'hover:scale-110 hover:shadow-lg'} ${disableAdd ? 'opacity-50 cursor-not-allowed' : ''}`}
           title={isInCart ? 'Added to cart' : disableAdd ? 'Bundle in cart' : 'Add to cart'}
           disabled={isInCart || disableAdd}
