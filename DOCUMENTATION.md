@@ -89,6 +89,7 @@ The Explore page features a dynamic, scrollable carousel (GalleryStrip) that dis
 - Supports both video and image media types
 - Videos autoplay and loop when their slide is active
 - Carousel auto-advances every 10 seconds
+- **If there is only one image or video, the navigation dot is hidden and swiping/autoplay are disabled for a cleaner UI.**
 
 ### Link Handling
 - Each gallery item can have a `LinkURL` field in Strapi
@@ -155,6 +156,152 @@ The stems system now allows users to preview, solo/mute, and purchase individual
 - Add stems to cart as needed.
 
 This system is fully dynamic, scalable, and does not rely on hardcoded media or static assets. All stem management is handled via Strapi and S3/CDN, and playback is powered by the Web Audio API for a modern, DAW-like user experience.
+
+## Robust Timing Logic for Stems Playback (May 2025)
+
+The stems system implements a sophisticated timing model to ensure perfect synchronization between all stems during playback, seeking, and pause/resume operations. This is achieved through a precise timing system in the `StemAudioManager` class.
+
+### Core Timing Model
+
+The timing system uses two key variables to track playback position:
+- `playStartTime`: The `audioContext.currentTime` when playback started
+- `playOffset`: The position in the track (in seconds) where playback started
+
+The current playback position is always calculated as:
+```typescript
+currentTime = playOffset + (audioContext.currentTime - playStartTime)
+```
+
+### Key Operations
+
+1. **Play:**
+   - Records current `audioContext.currentTime` as `playStartTime`
+   - Sets `playOffset` to the current position
+   - Starts all stem sources at the same offset
+   - Updates position every 100ms via interval
+
+2. **Pause:**
+   - Stops all sources
+   - Updates `playOffset` to the exact pause position
+   - Resets `playStartTime` to 0
+   - Preserves position for resume
+
+3. **Seek:**
+   - Updates `playOffset` to new position
+   - Resets `playStartTime` to current context time
+   - If playing, restarts all sources at new position
+
+4. **Resume:**
+   - Uses preserved `playOffset` from pause
+   - Sets new `playStartTime` to current context time
+   - Starts all sources at preserved offset
+
+### Benefits
+
+- **Perfect Sync:** All stems maintain sample-accurate synchronization
+- **Accurate Seeking:** Position is always precise, even after multiple seeks
+- **Seamless Pause/Resume:** No position drift after pausing and resuming
+- **Waveform Sync:** Waveform visualization stays perfectly aligned with audio
+
+### Implementation Details
+
+```typescript
+// In StemAudioManager.ts
+play() {
+  this.playStartTime = this.audioContext.currentTime;
+  this.playOffset = this._currentTime;
+  
+  this.stems.forEach(stem => {
+    const source = this.audioContext.createBufferSource();
+    source.buffer = this.stemBuffers[stem.id];
+    source.connect(this.stemGainNodes[stem.id]);
+    source.start(0, this.playOffset);
+  });
+}
+
+pause() {
+  this._currentTime = this.playOffset + (this.audioContext.currentTime - this.playStartTime);
+  this.playOffset = this._currentTime;
+  this.playStartTime = 0;
+  this.stopAllSources();
+}
+
+seek(time: number) {
+  this.playOffset = time;
+  this.playStartTime = this.audioContext.currentTime;
+  if (this._isPlaying) {
+    this.stopAllSources(false);
+    this.play();
+  }
+}
+```
+
+This timing model ensures professional-grade stem playback with perfect synchronization across all operations, matching the quality of commercial DAWs.
+
+## Stems Popup Responsiveness Fix (May 2025)
+
+The stems popup has been optimized to ensure instant responsiveness of Solo (S) and Mute (M) buttons during playback. This was achieved through a systematic investigation and optimization of React's rendering behavior.
+
+### Problem Analysis
+The original implementation suffered from delayed S/M button responses during playback, requiring multiple clicks to take effect. This was traced to excessive re-rendering caused by:
+1. Frequent progress bar updates (every 100ms)
+2. Individual stem waveform rendering for each stem
+3. Unnecessary prop passing to stem rows
+
+### Solution Implementation
+
+1. **Component Memoization**
+   - Wrapped `StemWaveformRow` in `React.memo` to prevent unnecessary re-renders
+   - Removed unnecessary props from stem rows (currentTime, isPlaying, duration, onScrub)
+   - Implemented proper prop comparison to ensure re-renders only when needed
+
+2. **State Management Optimization**
+   - Used `flushSync` for critical state updates (solo/mute changes)
+   - Implemented direct gain node updates after state changes
+   - Maintained persistent gain nodes throughout playback
+
+3. **Performance Improvements**
+   - Throttled progress bar updates to 250ms intervals
+   - Removed redundant state updates during playback
+   - Optimized waveform rendering to prevent UI thread blocking
+
+### Technical Implementation Details
+
+```tsx
+// Memoized stem row component
+const StemWaveformRow: React.FC<StemWaveformRowProps> = React.memo(({
+  stem,
+  soloed,
+  muted,
+  handleSolo,
+  handleMute,
+  addItem,
+  trackId,
+  trackImageUrl,
+  audioManager,
+  currentTime,
+  duration,
+  waveformCache,
+  setWaveformCache
+}) => {
+  // Component implementation
+}, (prevProps, nextProps) => {
+  // Custom comparison function to prevent unnecessary re-renders
+  return (
+    prevProps.stem.id === nextProps.stem.id &&
+    prevProps.soloed.has(prevProps.stem.id) === nextProps.soloed.has(nextProps.stem.id) &&
+    prevProps.muted.has(prevProps.stem.id) === nextProps.muted.has(nextProps.stem.id)
+  );
+});
+```
+
+### Results
+- S/M buttons now respond instantly during playback
+- UI remains smooth and responsive even with multiple stems
+- Waveform visualization maintains perfect sync
+- Memory usage optimized through proper cleanup
+
+This optimization ensures a professional, DAW-like experience for users previewing and mixing stems.
 
 ## Stems Pause/Resume Solution (May 2025)
 
@@ -513,3 +660,32 @@ Stems are being reintroduced with a new, scalable, and user-focused approach. Th
 2. Prototype audio engine (Web Audio API) for synchronized stem playback.
 3. Design popup UI for stem mixing, waveform display, and download options.
 4. Update upload pipeline to generate/store waveform data for each stem.
+
+## UI Button Reference
+
+### Stems Button in Track List
+- **Location:** `src/components/AudioPlayer.tsx`
+- **Function:** `renderStemsButton`
+- **Lines:** ~1690+
+- **Description:** This function renders the "Stems (N)" button visible in the track list (e.g., on the /explore page). To change its appearance or behavior, edit this function and its button.
+
+## Header Alignment Fix (May 2025)
+
+To ensure the top navigation menu (Home, Music, etc.) and the right group (Sign In + cart) are perfectly aligned with the main content and the carousel, the following changes were made:
+
+1. **Header Positioning:**
+   - The `Header` component was changed from `fixed` to `sticky` positioning. This allows it to remain at the top during scroll, but as part of the normal document flow.
+
+2. **Layout Hierarchy:**
+   - The `Header` was moved *inside* the `ContentWrapper` component (in `src/app/explore/page.tsx` and other relevant pages). This ensures it inherits the same `marginLeft` and `width` constraints as the main content area, which is offset by the sidebar.
+
+3. **Style Simplification:**
+   - All custom `marginLeft` and `width` styles were removed from the `Header`'s inner container. The header now uses only `px-8 w-full flex h-16 items-center` for its layout, inheriting constraints from its parent.
+
+**Result:**
+- The navigation menu is now flush with the left edge of the main content/carousel.
+- The Sign In and cart group are flush with the right edge of the main content.
+- The header remains visually consistent and responsive across all pages.
+
+**Troubleshooting Note:**
+If alignment issues reappear, ensure the `Header` is rendered *inside* the same layout wrapper as the main content, and avoid using absolute/fixed positioning or custom margin/width styles that break the inherited layout.
