@@ -25,9 +25,6 @@ export const globalAudioManager = {
   play(audio: HTMLAudioElement, info?: { stemId?: string, trackId?: string }) {
     // Stop any currently playing audio
     if (this.activeAudio && this.activeAudio !== audio && !this.activeAudio.paused) {
-      console.log('Stopping previously playing audio');
-      this.activeAudio.pause();
-      
       // Reset currentTime if needed
       this.activeAudio.currentTime = 0;
       
@@ -93,7 +90,6 @@ function saveStemUrlToCache(trackTitle: string, stemName: string, url: string) {
       const cache = existingCache ? JSON.parse(existingCache) : {};
       cache[cacheKey] = url;
       localStorage.setItem('stemUrlCache', JSON.stringify(cache));
-      console.log(`Cached URL for ${stemName} (${trackTitle}) to localStorage`);
     }
   } catch (e) {
     console.warn('Failed to save to localStorage:', e);
@@ -105,13 +101,11 @@ if (typeof window !== 'undefined' && window.localStorage) {
   try {
     // Clear cache first to ensure we don't use old URLs (uncomment to reset cache)
     localStorage.removeItem('stemUrlCache');
-    console.log('Cleared stem URL cache for fresh loading');
     
     const storedCache = localStorage.getItem('stemUrlCache');
     if (storedCache) {
       const parsedCache = JSON.parse(storedCache);
       Object.assign(stemUrlCache, parsedCache);
-      console.log('Loaded stem URL cache from localStorage:', Object.keys(parsedCache).length, 'entries');
     }
   } catch (e) {
     console.warn('Failed to load from localStorage:', e);
@@ -122,96 +116,10 @@ if (typeof window !== 'undefined' && window.localStorage) {
 async function listAllStrapiFiles() {
   try {
     const apiUrl = `${STRAPI_URL}/api/upload/files`;
-    console.log(`[DEBUG] Fetching all files from Strapi: ${apiUrl}`);
     
     const response = await fetch(apiUrl);
     if (response.ok) {
       const files = await response.json();
-      console.log(`[DEBUG] Found ${files.length} files in Strapi uploads:`);
-      
-      // Group files by track patterns to help identify all available tracks and their stems
-      const trackPatterns: Record<string, any[]> = {};
-      const stemFiles: Record<string, any[]> = {};
-      
-      // Common stem names to look for
-      const stemNames = ['Drums', 'Bass', 'Keys', 'Guitars', 'Synth', 'Strings', 'FX', 'Brass'];
-      
-      files.forEach((file: any) => {
-        const fileName = file.name.toLowerCase();
-        const url = `${STRAPI_URL}${file.url}`;
-        
-        // Log each file with its URL
-        console.log(`[DEBUG] File: ${file.name} -> ${url}`);
-        
-        // Try to identify which track it belongs to
-        let trackName = null;
-        
-        // Extract track name from common patterns
-        stemNames.forEach(stemName => {
-          const stemPattern = new RegExp(`${stemName.toLowerCase()}_(.+?)(?:_[a-z0-9]+)?\.mp3`, 'i');
-          const match = fileName.match(stemPattern);
-          if (match) {
-            trackName = match[1].replace(/_/g, ' ');
-            
-            // Capitalize track name for display
-            trackName = trackName.split(' ')
-              .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-              .join(' ');
-              
-            // Add to stem files for this track
-            if (!stemFiles[trackName]) {
-              stemFiles[trackName] = [];
-            }
-            
-            stemFiles[trackName].push({
-              fileName: file.name,
-              url,
-              stemName,
-              hash: fileName.match(/_([a-z0-9]+)\.mp3$/)?.[1] || null
-            });
-          }
-        });
-        
-        // If we've identified a track, add it to track patterns
-        if (trackName && !trackPatterns[trackName]) {
-          trackPatterns[trackName] = [];
-        }
-        
-        if (trackName) {
-          trackPatterns[trackName].push({
-            fileName: file.name,
-            url
-          });
-        }
-      });
-      
-      // Log organized files by track
-      console.log('[DEBUG] Files by track:');
-      Object.entries(stemFiles).forEach(([track, files]) => {
-        console.log(`[DEBUG] Track "${track}": ${files.length} stem files`);
-        
-        // Create a hash map for this track's stems
-        const hashMap: Record<string, string> = {};
-        
-        files.forEach(file => {
-          console.log(`[DEBUG]   - ${file.stemName}: ${file.fileName} -> ${file.url}`);
-          
-          // If this file has a hash, add it to the hash map
-          if (file.hash) {
-            hashMap[file.stemName] = file.hash;
-          }
-        });
-        
-        // Log the hash map in a format that can be directly copied into code
-        if (Object.keys(hashMap).length > 0) {
-          console.log('[DEBUG] Hash map for this track:');
-          console.log('const ' + track.toUpperCase().replace(/\s+/g, '_') + '_STEM_HASHES: Record<string, string> = {');
-          Object.entries(hashMap).forEach(([stem, hash]) => {
-            console.log(`  '${stem}': '${hash}',`);
-          });
-          console.log('};');
-        }
-      });
     } else {
       console.error(`[DEBUG] Failed to fetch files: ${response.status}`);
     }
@@ -261,17 +169,12 @@ async function discoverStemUrl(stemName: string, trackTitle: string): Promise<st
         trackTitle.replace(/\s+/g, '-'),          // Replace spaces with hyphens
       ];
       
-      console.log(`[DEBUG] Looking for stem "${stemName}" for track "${trackTitle}"`);
-      console.log(`[DEBUG] Trying ${stemVariants.length} stem variants and ${trackVariants.length} track variants`);
-      
       // First check: just the stem name without filtering by track
       const stemApiUrl = `${STRAPI_URL}/api/upload/files?filters[name][$contains]=${encodeURIComponent(stemName)}`;
-      console.log(`[DEBUG] Querying files containing stem name: ${stemApiUrl}`);
       
       const stemResponse = await fetch(stemApiUrl);
       if (stemResponse.ok) {
         const stemFiles = await stemResponse.json();
-        console.log(`[DEBUG] Found ${stemFiles.length} files containing "${stemName}"`);
         
         // First look for exact matches containing both stem and track name
         const exactMatches = stemFiles.filter((file: any) => {
@@ -283,10 +186,6 @@ async function discoverStemUrl(stemName: string, trackTitle: string): Promise<st
                             (fileName.includes(trackTitleLower) || 
                              fileName.includes(trackTitleLower.replace(/\s+/g, '_')) ||
                              fileName.includes(trackTitleLower.replace(/\s+/g, '-')));
-                             
-          if (exactMatch) {
-            console.log(`[DEBUG] EXACT MATCH: ${file.name} -> ${STRAPI_URL}${file.url}`);
-          }
           
           return exactMatch;
         });
@@ -297,14 +196,11 @@ async function discoverStemUrl(stemName: string, trackTitle: string): Promise<st
             ? `${STRAPI_URL}${exactMatches[0].url}` 
             : `${STRAPI_URL}/${exactMatches[0].url}`;
             
-          console.log(`✅ Found exact match via API for ${stemName}: ${url}`);
           stemUrlCache[cacheKey] = url;
           return url;
         }
         
         // If no exact match, try a more lenient match
-        console.log(`[DEBUG] No exact matches, trying more lenient matching...`);
-        
         // Look through all files
         const filesForStemAndTrack = stemFiles.filter((file: any) => {
           const fileName = file.name.toLowerCase();
@@ -318,10 +214,6 @@ async function discoverStemUrl(stemName: string, trackTitle: string): Promise<st
           const hasTrackTitle = trackVariants.some(variant => 
             fileName.includes(variant.toLowerCase())
           );
-          
-          if (hasStemName && hasTrackTitle) {
-            console.log(`[DEBUG] POTENTIAL MATCH: ${file.name} -> ${STRAPI_URL}${file.url}`);
-          }
           
           return hasStemName && hasTrackTitle;
         });
@@ -350,14 +242,11 @@ async function discoverStemUrl(stemName: string, trackTitle: string): Promise<st
             ? `${STRAPI_URL}${bestMatch.url}` 
             : `${STRAPI_URL}/${bestMatch.url}`;
           
-          console.log(`✅ Found best match for ${stemName}: ${bestMatch.name} -> ${url}`);
           stemUrlCache[cacheKey] = url;
           return url;
         }
         
         // If still no matches, try just matching the stem name
-        console.log(`[DEBUG] No stem + track matches, trying just stem matches...`);
-        
         if (stemFiles.length > 0) {
           // Sort by relevance - shorter names first as they're likely cleaner
           stemFiles.sort((a: any, b: any) => a.name.length - b.name.length);
@@ -367,7 +256,6 @@ async function discoverStemUrl(stemName: string, trackTitle: string): Promise<st
             ? `${STRAPI_URL}${bestStemMatch.url}` 
             : `${STRAPI_URL}/${bestStemMatch.url}`;
             
-          console.log(`✅ Found stem-only match for ${stemName}: ${bestStemMatch.name} -> ${url}`);
           stemUrlCache[cacheKey] = url;
           return url;
         }
@@ -395,7 +283,6 @@ async function discoverStemUrl(stemName: string, trackTitle: string): Promise<st
     for (const filename of filenamesToTry) {
       const url = await findFileInStrapiByName(filename);
       if (url) {
-        console.log(`✅ Found stem URL for ${stemName}: ${url}`);
         stemUrlCache[cacheKey] = url;
         return url;
       }
@@ -530,15 +417,12 @@ async function findStemFileUrl(stemName: string, trackTitle: string): Promise<st
       stemName     // stemName
     );
     if (strapiStemUrl) {
-      console.log(`✅ Found stem file via strapi.ts findStemFile: ${strapiStemUrl}`);
       return strapiStemUrl;
     }
     
     // If the utility function doesn't find it, fall back to our own implementation
     const basePattern = getConsistentStemUrl(stemName, trackTitle);
     const apiUrl = `${STRAPI_URL}/api/upload/files?filters[name][$contains]=${encodeURIComponent(basePattern)}`;
-    
-    console.log(`Searching for stem file with pattern: ${basePattern} via API: ${apiUrl}`);
     
     const response = await fetch(apiUrl);
     if (!response.ok) {
@@ -578,11 +462,9 @@ async function findStemFileUrl(stemName: string, trackTitle: string): Promise<st
         ? `${STRAPI_URL}${bestMatch.url}` 
         : `${STRAPI_URL}/${bestMatch.url}`;
       
-      console.log(`✅ Found stem file: ${bestMatch.name} -> ${url}`);
       return url;
     }
     
-    console.log(`No files found matching pattern: ${basePattern}`);
     return null;
   } catch (error) {
     console.error(`Error searching for stem file: ${error}`);
@@ -595,7 +477,6 @@ function getStemUrl(stemName: string, trackTitle: string): string {
   // First check our cache
   const cacheKey = `${trackTitle}:${stemName}`;
   if (stemUrlCache[cacheKey]) {
-    console.log(`Using existing URL for stem ${stemName}: ${stemUrlCache[cacheKey]}`);
     return stemUrlCache[cacheKey];
   }
   
@@ -622,13 +503,11 @@ function getStemUrl(stemName: string, trackTitle: string): string {
   findStemFileUrl(stemName, trackTitle)
     .then(url => {
       if (url) {
-        console.log(`Successfully discovered URL via API for ${stemName} (${trackTitle}): ${url}`);
         saveStemUrlToCache(trackTitle, stemName, url);
         
         // If we have audio elements already created, update their src
         const audio = document.querySelector(`audio[data-stem="${stemName}"][data-track="${trackTitle}"]`) as HTMLAudioElement;
         if (audio) {
-          console.log(`Updating existing audio element for ${stemName} with discovered URL: ${url}`);
           audio.src = url;
           audio.load();
         }
@@ -636,7 +515,6 @@ function getStemUrl(stemName: string, trackTitle: string): string {
       }
       
       // If API search fails, try our old method
-      console.log(`API search failed for ${stemName} (${trackTitle}), falling back to pattern-based URLs`);
       return null;
     })
     .catch(err => console.error(`Error discovering stem URL: ${err}`));
@@ -655,7 +533,6 @@ function getStemUrl(stemName: string, trackTitle: string): string {
   const placeholderHash = 'placeholder';
   const url = `${STRAPI_URL}/uploads/${normalizedStemName}_${normalizedTrackTitle}_${placeholderHash}.mp3`;
   
-  console.log(`Using pattern-based URL for ${stemName} (${trackTitle}): ${url}`);
   return url;
 }
 
@@ -683,9 +560,7 @@ async function urlExists(url: string): Promise<boolean> {
 // Function to find the first valid URL from a list
 async function findFirstValidUrl(urls: string[]): Promise<string | null> {
   for (const url of urls) {
-    console.log(`Checking if URL exists: ${url}`);
     if (await urlExists(url)) {
-      console.log(`✅ Found valid URL: ${url}`);
       return url;
     }
   }
@@ -754,17 +629,12 @@ export default function AudioPlayer({
   setOpenStemsTrackId
 }: AudioPlayerProps): React.ReactElement {
   // Add detailed debugging for tags
-  console.log('[AudioPlayer] Component rendering with track:', {
-    id: track.id,
-    title: track.title,
-    tagCount: track.tags?.length || 0
-  });
+  // console.log('[AudioPlayer] Component rendering with track:', {
+  //   id: track.id,
+  //   title: track.title,
+  //   tagCount: track.tags?.length || 0
+  // });
   
-  if (track.tags && Array.isArray(track.tags)) {
-    console.log('[AudioPlayer] Track tags:', JSON.stringify(track.tags));
-  } else {
-    console.log('[AudioPlayer] Track has no tags array:', track.tags);
-  }
   
   const progressBarRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -806,34 +676,14 @@ export default function AudioPlayer({
   
   // Fetch tags if none are provided
   useEffect(() => {
-    console.log(`[AudioPlayer] Track ${track.id} useEffect for tags triggered`, {
-      tagsExist: !!track.tags,
-      tagsIsArray: Array.isArray(track.tags),
-      tagsLength: track.tags?.length || 0,
-      rawTags: JSON.stringify(track.tags)
-    });
-    
     if (track.tags && Array.isArray(track.tags) && track.tags.length > 0) {
-      console.log(`[AudioPlayer] Track ${track.id} has ${track.tags.length} tags from Strapi:`, 
-        track.tags.map(tag => ({id: tag.id, name: tag.name, type: tag.type})));
       setTrackTags(track.tags);
     } else {
-      console.log(`[AudioPlayer] Track ${track.id} has no tags from Strapi. Track data:`, {
-        id: track.id,
-        title: track.title,
-        allKeys: Object.keys(track)
-      });
       setTrackTags([]);
     }
   }, [track.id, track.tags]);
   
   // Group tags by type for display
-  console.log('[AudioPlayer] Processing tags for track:', {
-    trackId: track.id,
-    trackTitle: track.title,
-    tagsCount: trackTags?.length || 0,
-    rawTags: JSON.stringify(trackTags)
-  });
   
   const tagsByType = (trackTags || []).reduce<Record<string, Tag[]>>((acc, tag) => {
     // Get the tag type, defaulting to 'genre' if not specified
@@ -854,11 +704,6 @@ export default function AudioPlayer({
   const filteredTrackTags = Array.isArray(trackTags) ? trackTags.filter(tag => tag.type !== 'instrument') : [];
   
   // Log the final tag structure
-  console.log('[AudioPlayer] Tag structure for display:', {
-    trackId: track.id,
-    tagsByTypeKeys: Object.keys(tagsByType),
-    tagCount: filteredTrackTags.length
-  });
   
   // Add an effect to listen for stem-stopped events from other components
   useEffect(() => {
@@ -867,8 +712,6 @@ export default function AudioPlayer({
       
       // Check if this event is for a stem in our track
       if (detail && detail.trackId === track.id) {
-        console.log('Received stem-stopped event for current track:', detail);
-        
         // Find the stem by ID
         if (track.stems && detail.stemId) {
           // Update UI to show the stem as stopped
@@ -908,16 +751,16 @@ export default function AudioPlayer({
   // Initialize audio element
   useEffect(() => {
     // Log track information for debugging
-    console.log(`[AudioPlayer] Initializing track:`, {
-      id: track.id,
-      title: track.title,
-      hasImageUrl: !!track.imageUrl,
-      hasAudioUrl: !!track.audioUrl,
-      imageUrl: track.imageUrl,
-      audioUrl: track.audioUrl,
-      hasStems: track.hasStems,
-      stemsCount: track.stems?.length || 0
-    });
+      console.log(`[AudioPlayer] Initializing track:`, {
+        id: track.id,
+        title: track.title,
+        hasImageUrl: !!track.imageUrl,
+        hasAudioUrl: !!track.audioUrl,
+        imageUrl: track.imageUrl,
+        audioUrl: track.audioUrl,
+        hasStems: track.hasStems,
+        stemsCount: track.stems?.length || 0
+      });
 
     if (!audioRef.current) {
       const audio = new Audio();
@@ -936,16 +779,13 @@ export default function AudioPlayer({
       
       // Add event listeners with debug logging
       audio.addEventListener('timeupdate', (e) => {
-        console.log('[AudioEvent] timeupdate fired');
         handleTimeUpdate();
       });
       
       audio.addEventListener('durationchange', (e) => {
-        console.log(`[AudioEvent] durationchange: ${audio.duration}s`);
       });
       
       audio.addEventListener('playing', (e) => {
-        console.log('[AudioEvent] playing started');
       });
       
       audio.addEventListener('ended', handleAudioEnded);
@@ -999,11 +839,8 @@ export default function AudioPlayer({
     if (audioRef.current) {
       const current = audioRef.current.currentTime;
       const duration = audioRef.current.duration || track.duration;
-      console.log(`[TimeUpdate] Current: ${current}, Duration: ${duration}, Progress: ${(current / duration) * 100}%`);
       setCurrentTime(current);
       setProgress((current / duration) * 100);
-    } else {
-      console.warn('[TimeUpdate] audioRef.current is null');
     }
   };
   
@@ -1132,13 +969,6 @@ export default function AudioPlayer({
     } else {
       // Start playing this track, which will automatically stop any other audio
       if (audioRef.current) {
-        console.log('[PlayPause] Playing audio:', {
-          currentTime: audioRef.current.currentTime,
-          duration: audioRef.current.duration,
-          hasEvents: audioRef.current.ontimeupdate !== null,
-          paused: audioRef.current.paused,
-          src: audioRef.current.src
-        });
         globalAudioManager.play(audioRef.current, { trackId: track.id });
         onPlay(); // Make sure onPlay is called to update the parent component's state
       } else {
@@ -1150,7 +980,6 @@ export default function AudioPlayer({
   const handleStemPlayPause = (stemId: string) => {
     const stem = track.stems?.find(s => s.id === stemId);
     if (!stem) {
-      console.error('Stem not found:', stemId);
       return;
     }
         
@@ -1414,8 +1243,6 @@ export default function AudioPlayer({
     const newStemAudio: Record<string, HTMLAudioElement> = {};
     
     if (track.stems) {
-      console.log('Number of stems:', track.stems.length);
-      
       track.stems.forEach(stem => {
         if (!stemAudio[stem.id]) {
           try {
@@ -1427,7 +1254,6 @@ export default function AudioPlayer({
             let audioUrl: string | undefined = undefined;
             if (directUrl) {
               audioUrl = directUrl;
-              console.log(`Using direct URL for stem ${stem.name}: ${audioUrl}`);
             } else {
               // Fallback to old discovery logic if no direct URL is present
               audioUrl = toCdnUrl(getStemUrl(stem.name, track.title));
@@ -1451,10 +1277,8 @@ export default function AudioPlayer({
               alternativeUrls = [
                 // First, try to get the actual URL via the API with our improved search function
                 async () => {
-                  console.log(`Finding stem file URL for ${stem.name} in track ${track.title}...`);
                   const apiUrl = await findStemFileUrl(stem.name, track.title);
                   if (apiUrl) {
-                    console.log(`Found stem file URL for ${stem.name}: ${apiUrl}`);
                     return apiUrl; // Already proxied by findStemFileUrl
                   }
                   return null;
@@ -1477,7 +1301,6 @@ export default function AudioPlayer({
 
             // Use a timeout to avoid hanging on loading forever
             const loadTimeout = setTimeout(() => {
-              console.warn(`Timeout loading audio for ${stem.name}`);
               setStemLoadErrors(prev => ({...prev, [stem.id]: true}));
               setStemLoading(prev => ({...prev, [stem.id]: false}));
             }, 5000);
@@ -1494,12 +1317,10 @@ export default function AudioPlayer({
                 // Handle function-based URLs (like API discovery)
                 let nextUrl: string;
                 if (typeof nextUrlOrFunc === 'function') {
-                  console.log(`Trying to discover URL via API for ${stem.name}...`);
                   const discoveredUrl = await nextUrlOrFunc();
                   if (discoveredUrl) {
                     nextUrl = discoveredUrl as string;
                   } else {
-                    console.log(`API discovery returned no URL, trying next alternative...`);
                     // Move to next option if API returns nothing
                     tryNextUrl();
                     return;
@@ -1508,15 +1329,12 @@ export default function AudioPlayer({
                   nextUrl = nextUrlOrFunc as string;
                 }
 
-                console.log(`Trying alternative URL for ${stem.name}: ${nextUrl}`);
-
                 // Try the next URL
                 audio.src = nextUrl;
                 audio.load();
               } else {
                 // We've tried all URLs and failed
                 clearTimeout(loadTimeout);
-                console.error(`All URL attempts failed for stem ${stem.name}`);
                 setStemLoadErrors(prev => ({...prev, [stem.id]: true}));
                 setStemLoading(prev => ({...prev, [stem.id]: false}));
               }
@@ -1527,8 +1345,6 @@ export default function AudioPlayer({
               audio.addEventListener('error', (e) => {
                 clearTimeout(loadTimeout); // Ensure timeout is cleared on error
                 console.error(`Error loading audio for stem ${stem.name} with URL ${audio.src}:`, e);
-                console.log(`❌ FAILED URL: ${audio.src}`);
-                // Try the next URL in our list
                 tryNextUrl();
               });
             }
@@ -1536,10 +1352,8 @@ export default function AudioPlayer({
             // Add canplaythrough handler
             audio.addEventListener('canplaythrough', () => {
               clearTimeout(loadTimeout);
-              console.log(`Audio loaded successfully for stem: ${stem.name} with URL ${audio.src}`);
               // Store the successful URL in our cache
               saveStemUrlToCache(track.title, stem.name, audio.src);
-              console.log(`✅ SUCCESSFUL URL: ${audio.src}`);
               setStemLoading(prev => ({...prev, [stem.id]: false}));
               setStemLoadErrors(prev => {
                 const newErrors = {...prev};
@@ -1601,7 +1415,6 @@ export default function AudioPlayer({
       if (hasError && playingStems[stemId]) {
         // If the stem has an error but is set to "playing", simulate progress
         if (!progressIntervals[stemId]) {
-          console.log(`Setting up progress simulation for stem ${stemId}`);
           const interval = window.setInterval(() => {
             setStemProgress(prev => {
               const current = prev[stemId] || 0;
@@ -1745,7 +1558,11 @@ export default function AudioPlayer({
   // Add this after the other useEffects in the AudioPlayer component
   useEffect(() => {
     const handleStopAllAudio = () => {
-      globalAudioManager.stop();
+      if (isPlaying) {
+        onStop();
+        globalAudioManager.stop();
+        setIsInteracting(false);
+      }
     };
     window.addEventListener('stop-all-audio', handleStopAllAudio);
     document.addEventListener('stop-all-audio', handleStopAllAudio);
@@ -1753,7 +1570,7 @@ export default function AudioPlayer({
       window.removeEventListener('stop-all-audio', handleStopAllAudio);
       document.removeEventListener('stop-all-audio', handleStopAllAudio);
     };
-  }, []);
+  }, [isPlaying, onStop]);
   
   // Stop audio on unmount
   useEffect(() => {
@@ -1865,7 +1682,6 @@ export default function AudioPlayer({
                     <React.Fragment key={tag.id}>
                       <button 
                         onClick={() => {
-                          console.log('[AudioPlayer] Tag clicked:', tag);
                           onTagClick(tag);
                         }}
                         className="hover:text-[#1DF7CE] transition-colors cursor-pointer"
@@ -1920,26 +1736,20 @@ export default function AudioPlayer({
               className="w-auto h-10 flex items-center justify-center px-4 text-[#1E1E1E] hover:text-[#1DF7CE] transition-colors border-2 border-[#1DF7CE] rounded-full bg-[#1DF7CE] hover:bg-transparent focus:outline-none font-bold z-10"
               style={{ minWidth: 180, marginLeft: 8, display: 'flex' }}
               onClick={async () => {
-                console.log('Generate Waveform button clicked for track:', track.title, track.audioUrl);
-                try {
-                  // Extract S3 key from audioUrl (remove protocol and domain)
-                  const audioUrl = track.audioUrl || '';
-                  const s3Key = audioUrl.replace(/^https?:\/\/[^/]+\//, '');
-                  const res = await fetch('/api/generate-waveform', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ s3Key }),
-                  });
-                  const data = await res.json();
-                  if (data.success) {
-                    alert('Waveform generated!');
-                  } else {
-                    alert('Error: ' + data.error);
-                    console.error('Waveform generation error:', data.error);
-                  }
-                } catch (error) {
-                  alert('Error: ' + (error instanceof Error ? error.message : String(error)));
-                  console.error('Waveform generation error:', error);
+                // Extract S3 key from audioUrl (remove protocol and domain)
+                const audioUrl = track.audioUrl || '';
+                const s3Key = audioUrl.replace(/^https?:\/\/[^/]+\//, '');
+                const res = await fetch('/api/generate-waveform', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ s3Key }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                  alert('Waveform generated!');
+                } else {
+                  alert('Error: ' + data.error);
+                  console.error('Waveform generation error:', data.error);
                 }
               }}
               title="Generate waveform JSON for this track"

@@ -4,7 +4,7 @@ import { getProxiedMediaUrl } from '../utils/media-helpers';
 import { toCdnUrl } from '../utils/cdn-url';
 
 // Debug info for environment setup (only log once)
-if (typeof window !== 'undefined') {
+if (process.env.NODE_ENV === 'development') {
   console.log('=== Strapi Configuration ===\n', {
     STRAPI_URL,
     API_URL,
@@ -145,7 +145,9 @@ export function normalizeTrack(strapiTrack: any): Track {
 // Get all tags from Strapi
 export async function getTags(): Promise<Tag[]> {
   try {
-    console.log('[getTags] Fetching tags from Strapi API');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[getTags] Fetching tags from Strapi API');
+    }
     const response = await fetch(`${API_URL}/tags?populate=*&pagination[pageSize]=100`, getRequestOptions());
 
     if (!response.ok) {
@@ -161,7 +163,16 @@ export async function getTags(): Promise<Tag[]> {
       return [];
     }
 
-    console.log(`[getTags] Successfully retrieved ${data.data.length} tags from Strapi`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[getTags] Successfully retrieved ${data.data.length} tags from Strapi`);
+      
+      // Log tag categories for debugging
+      const genres = data.data.filter((tag: Tag) => tag.type === 'genre');
+      const moods = data.data.filter((tag: Tag) => tag.type === 'mood');
+      const instruments = data.data.filter((tag: Tag) => tag.type === 'instrument');
+      
+      console.log(`[getTags] Tag breakdown - Genres: ${genres.length}, Moods: ${moods.length}, Instruments: ${instruments.length}`);
+    }
     
     const tags = data.data.map((item: any) => ({
       id: item.id.toString(),
@@ -183,13 +194,6 @@ export async function getTags(): Promise<Tag[]> {
         return null;
       })(),
     }));
-    
-    // Log tag categories for debugging
-    const genres = tags.filter((tag: Tag) => tag.type === 'genre');
-    const moods = tags.filter((tag: Tag) => tag.type === 'mood');
-    const instruments = tags.filter((tag: Tag) => tag.type === 'instrument');
-    
-    console.log(`[getTags] Tag breakdown - Genres: ${genres.length}, Moods: ${moods.length}, Instruments: ${instruments.length}`);
     
     return tags;
   } catch (error) {

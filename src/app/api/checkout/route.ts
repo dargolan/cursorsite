@@ -93,7 +93,7 @@ async function handleSingleItemCheckout(body: any) {
     ],
     mode: 'payment',
     success_url: `${domain}/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${domain}/stems/${trackId || ''}`,
+    cancel_url: `${domain}/checkout`,
     metadata: {
       stemId,
       trackId: trackId || '',

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { ReactNode } from 'react';
-import Header from './Header';
+// import Header from './Header'; // Header removed
 
 interface PageContainerProps {
   children: ReactNode;
@@ -11,7 +11,7 @@ interface PageContainerProps {
 export default function PageContainer({ children, className = '' }: PageContainerProps) {
   return (
     <div className={`min-h-screen flex flex-col ${className}`}>
-      <Header />
+      {/* <Header /> */}{/* Header removed */}
       <main className="flex-grow">{children}</main>
     </div>
   );

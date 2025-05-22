@@ -28,9 +28,35 @@ class GlobalAudioController {
   }
 
   /**
+   * Check if it's safe to play audio right now
+   */
+  public isSafeToPlayAudio(): boolean {
+    // Check the global flag
+    if ((window as any).preventStemAudioPlay) {
+      console.log('Audio playback prevented by stem operation flag');
+      return false;
+    }
+    
+    // Check if we're in a cart operation
+    const now = Date.now();
+    const lastCartOperation = (window as any).lastCartOperationTime || 0;
+    if (now - lastCartOperation < 1000) { // 1000ms safety window
+      console.log('Audio playback prevented by recent cart operation');
+      return false;
+    }
+    
+    return true;
+  }
+
+  /**
    * Plays an audio element and stops any currently playing audio
    */
   public play(audio: HTMLAudioElement): Promise<void> {
+    // Check if audio playback is being prevented by stem operations
+    if (!this.isSafeToPlayAudio()) {
+      return Promise.resolve();
+    }
+    
     // Stop any currently playing audio
     this.stopCurrent();
     
@@ -68,6 +94,11 @@ class GlobalAudioController {
    * Toggle play/pause for the current audio
    */
   public toggle(): void {
+    // Check if audio playback is being prevented
+    if (!this.isSafeToPlayAudio()) {
+      return;
+    }
+    
     if (!this.currentAudio) return;
     
     if (this.currentAudio.paused) {

@@ -51,6 +51,7 @@ export default function MusicLibrary() {
   
   // Audio player state
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
+  const [currentlyPlayingTrack, setCurrentlyPlayingTrack] = useState<Track | null>(null);
   
   // Access cart functions from CartContext
   const { items: cartItems, addItem, removeItem, getTotalPrice } = useCart();
@@ -176,13 +177,11 @@ export default function MusicLibrary() {
     
     // Filter by selected tags
     if (selectedTags.length > 0) {
-      console.log('Filtering by tags:', selectedTags.map(t => `${t.name} (${t.id})`));
       filtered = filtered.filter(track => {
         // Track must have ALL selected tags
         const matches = selectedTags.every(selectedTag => 
           track.tags.some(tag => tag.id === selectedTag.id)
         );
-        console.log('Track', track.title, 'has tags:', track.tags.map(t => t.name), 'matches?', matches);
         return matches;
       });
     }
@@ -210,8 +209,16 @@ export default function MusicLibrary() {
       track.duration >= durationRange[0] && track.duration <= durationRange[1]
     );
     
+    // Check if currently playing track is still in filtered list
+    if (currentlyPlayingTrack && !filtered.some(track => track.id === currentlyPlayingTrack.id)) {
+      // Stop audio if the currently playing track is filtered out
+      const stopEvent = new CustomEvent('stop-all-audio');
+      window.dispatchEvent(stopEvent);
+      setCurrentlyPlayingTrack(null);
+    }
+    
     setFilteredTracks(filtered);
-  }, [tracks, selectedTags, searchQuery, bpmRange, durationRange]);
+  }, [tracks, selectedTags, searchQuery, bpmRange, durationRange, currentlyPlayingTrack]);
 
   // Handler for toggling a tag
   const handleTagToggle = useCallback((tag: Tag) => {
@@ -341,21 +348,14 @@ export default function MusicLibrary() {
       <div className="flex flex-col w-full">
         {/* Track row */}
         {filteredTracks.map((track, index) => {
-          console.log('Rendering AudioPlayerComponent for track:', track);
-          // Debug log track ID to identify any issues
-          console.log(`[Track ${index}] ID: ${track.id}, title: ${track.title}, imageUrl: ${track.imageUrl}`);
-          
           // Ensure track.id exists and is properly formatted
           if (!track.id || track.id === index.toString() || track.id === `${index}`) {
-            console.error(`[Track ${index}] Invalid ID: "${track.id}" appears to be a sequential number`);
-            
             // Try to extract UUID from imageUrl if available
             let extractedId = null;
             if (track.imageUrl && track.imageUrl.includes('/tracks/')) {
               const matches = track.imageUrl.match(/\/tracks\/([^\/]+)\/cover/);
               if (matches && matches[1]) {
                 extractedId = matches[1];
-                console.log(`[Track ${index}] Extracted ID from imageUrl: ${extractedId}`);
               }
             }
             
@@ -367,7 +367,6 @@ export default function MusicLibrary() {
                 ? `/api/direct-s3/tracks/${extractedId}/image` // Use dynamic /image endpoint
                 : `/api/placeholder-image` // Placeholder image path
             };
-            console.log(`[Track ${index}] Fixed track with ID: ${track.id}`);
           }
           
           return (
@@ -375,8 +374,14 @@ export default function MusicLibrary() {
               <AudioPlayerComponent 
                 track={track} 
                 isPlaying={playingTrackId === track.id}
-                onPlay={() => setPlayingTrackId(track.id)}
-                onStop={() => setPlayingTrackId(null)}
+                onPlay={() => {
+                  setPlayingTrackId(track.id);
+                  setCurrentlyPlayingTrack(track);
+                }}
+                onStop={() => {
+                  setPlayingTrackId(null);
+                  setCurrentlyPlayingTrack(null);
+                }}
                 onTagClick={handleTagClick}
                 openStemsTrackId={openStemsTrackId}
                 setOpenStemsTrackId={setOpenStemsTrackId}
@@ -430,8 +435,8 @@ export default function MusicLibrary() {
   }, [genres, moods, instruments, searchParams]);
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white overflow-x-hidden">
-      <main className="relative min-h-screen">
+    <div style={{ display: 'flex', minHeight: '100vh' }}>
+      <aside style={{ width: 295, flexShrink: 0 }}>
         <FilterSidebar
           selectedTags={selectedTags}
           genres={genres}
@@ -445,9 +450,11 @@ export default function MusicLibrary() {
           onSearch={handleSearch}
           existingSearch={searchQuery}
         />
+      </aside>
+      <div style={{ flex: 1, position: 'relative', background: '#121212', height: '100vh', overflowY: 'auto' }}>
         <ContentWrapper>
           <Header />
-          <div className="p-8 pt-24">
+          <div className="p-8">
             <GalleryStrip />
             {/* Fixed height container for selected tags */}
             <div className="h-[40px] mb-4">
@@ -521,8 +528,7 @@ export default function MusicLibrary() {
             )}
           </div>
         </ContentWrapper>
-      </main>
-      <Footer />
+      </div>
     </div>
   );
 } 

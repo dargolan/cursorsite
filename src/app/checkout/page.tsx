@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useCart } from '@/contexts/CartContext';
+import Header from '@/components/Header';
 
 export default function CheckoutPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -61,92 +62,91 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Checkout</h1>
+    <div className="bg-[#121212] min-h-screen">
+      <Header />
+      <div className="max-w-3xl mx-auto px-4 py-10 bg-[#1E1E1E] min-h-screen rounded-xl shadow-lg mt-16">
+        <h1 className="text-3xl font-bold mb-8 text-white">Checkout</h1>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
+        {error && (
+          <div className="bg-red-500/10 border border-red-400 text-red-200 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
 
-      {cartItems.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-gray-500 mb-4">Your cart is empty</p>
-          <Link 
-            href="/" 
-            className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-md transition-colors"
-          >
-            Browse Tracks
-          </Link>
-        </div>
-      ) : (
-        <>
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
-            <div className="border-b pb-2 pt-4 px-6 font-medium text-gray-700 flex justify-between">
-              <span className="w-2/5">Item</span>
-              <span className="w-1/5 text-right">Price</span>
-              <span className="w-1/5 text-right">Action</span>
-            </div>
-            <ul className="divide-y">
-              {cartItems.map((item) => (
-                <li key={item.id} className="flex justify-between items-center py-4 px-6">
-                  <div className="flex items-center w-2/5">
-                    {item.imageUrl && (
-                      <div className="h-12 w-12 mr-3 relative">
-                        <Image 
-                          src={item.imageUrl}
-                          alt={item.name}
-                          fill
-                          className="object-cover rounded-md"
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <p className="font-medium">{item.name}</p>
-                      <p className="text-sm text-gray-500">{item.trackName}</p>
-                    </div>
-                  </div>
-                  <div className="w-1/5 text-right">
-                    {item.price.toFixed(2)}€
-                  </div>
-                  <div className="w-1/5 text-right">
-                    <button 
-                      onClick={() => removeItem(item.id)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-          <div className="flex justify-between items-center py-4 px-6 bg-gray-50 rounded-lg mb-6">
-            <span className="font-bold">Total:</span>
-            <span className="font-bold text-xl">{totalAmount.toFixed(2)}€</span>
-          </div>
-          
-          <div className="flex justify-between">
+        {cartItems.length === 0 ? (
+          <div className="text-center py-16">
+            <p className="text-gray-400 mb-4">Your cart is empty</p>
             <Link 
-              href="/"
-              className="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-6 rounded-md transition-colors"
+              href="/explore" 
+              className="inline-block bg-[#1DF7CE] hover:bg-[#19d4b1] text-black font-medium py-2 px-6 rounded-md transition-all shadow-md"
             >
-              Continue Shopping
+              Browse Tracks
             </Link>
-            
-            <button
-              onClick={handleCheckout}
-              disabled={isLoading || cartItems.length === 0}
-              className={`bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-md 
-                        transition-colors ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
-            >
-              {isLoading ? 'Processing...' : 'Proceed to Payment'}
-            </button>
           </div>
-        </>
-      )}
+        ) : (
+          <>
+            <div className="bg-[#232323] rounded-lg shadow-md overflow-hidden mb-8">
+              <ul>
+                {cartItems.map((item) => (
+                  <li key={item.id} className="flex justify-between items-center py-5 px-8 border-b border-[#282828] last:border-b-0">
+                    <div className="flex items-center w-2/5">
+                      <button 
+                        onClick={() => removeItem(item.id)}
+                        className="group p-2 mr-3 rounded-full hover:bg-[#282828] transition-colors"
+                        aria-label="Remove"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white group-hover:text-[#1DF7CE] transition-colors" viewBox="0 0 24 24" fill="none">
+                          <path d="M6 7V19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M19 7H5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M10 11V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M14 11V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M9 7V5C9 4.44772 9.44772 4 10 4H14C14.5523 4 15 4.44772 15 5V7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                      {item.imageUrl && (
+                        <div className="h-14 w-14 mr-4 relative flex-shrink-0">
+                          <Image 
+                            src={item.imageUrl}
+                            alt={item.name}
+                            fill
+                            className="object-cover rounded-md border border-[#333]"
+                          />
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-semibold text-white">{item.name}</p>
+                        <p className="text-xs text-[#CDCDCD]">{item.trackName}</p>
+                      </div>
+                    </div>
+                    <div className="w-1/5 text-right text-[#1DF7CE] font-medium ml-auto">
+                      {item.price.toFixed(2)}€
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 py-6 px-8 bg-[#232323] rounded-lg mb-8">
+              <span className="font-bold text-white text-lg">Total:</span>
+              <span className="font-bold text-2xl text-[#1DF7CE]">{totalAmount.toFixed(2)}€</span>
+            </div>
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-4">
+              <Link 
+                href="/explore"
+                className="bg-[#232323] hover:bg-[#282828] text-[#CDCDCD] py-2 px-6 rounded-full transition-all border border-[#333] font-medium shadow-sm"
+              >
+                Continue Shopping
+              </Link>
+              <button
+                onClick={handleCheckout}
+                disabled={isLoading || cartItems.length === 0}
+                className={`bg-[#1DF7CE] hover:bg-[#19d4b1] text-black py-2 px-6 rounded-full font-semibold transition-all shadow-md ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+              >
+                {isLoading ? 'Processing...' : 'Proceed to Payment'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 } 

@@ -139,4 +139,9 @@ input[type="range"]::-moz-range-thumb {
   .btn-secondary {
     @apply bg-transparent border border-accent text-accent hover:bg-accent hover:bg-opacity-10;
   }
+}
+
+/* TEST: Force overflow visible for sticky debugging */
+html, body, main {
+  overflow: visible !important;
 } 

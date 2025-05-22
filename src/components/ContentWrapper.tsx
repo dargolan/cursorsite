@@ -9,10 +9,9 @@ interface ContentWrapperProps {
 export default function ContentWrapper({ children }: ContentWrapperProps) {
   return (
     <div 
-      className="transition-all duration-300 w-full overflow-hidden"
+      className="transition-all duration-300 w-full"
       style={{ 
-        marginLeft: '295px',
-        width: 'calc(100% - 295px)',
+        position: 'relative',
         paddingTop: '0px'
       }}
     >

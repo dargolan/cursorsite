@@ -7,6 +7,7 @@ import { Tag } from '../../types';
 import { toCdnUrl } from '../../utils/cdn-url';
 import Header from '../../components/Header';
 import FilterSidebar from '../../components/FilterSidebar/index';
+import ContentWrapper from '../../components/ContentWrapper';
 
 export default function GenresPage() {
   const [genres, setGenres] = useState<Tag[]>([]);
@@ -40,11 +41,11 @@ export default function GenresPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white">
-      <Header />
+    <div className="min-h-screen bg-[#121212] text-white flex">
       <FilterSidebar {...sidebarProps} />
-      <main className="ml-[295px] pt-24 pb-8">
-        <section className="py-8 px-8 bg-[#0A0A0A]">
+      <ContentWrapper>
+        <Header />
+        <section className="py-8 px-8 bg-[#0A0A0A] pt-24 flex-grow">
           <div className="max-w-7xl mx-auto">
             <div className="mb-4">
               <Link href="/" className="text-[#1DF7CE] hover:text-[#1DF7CE]/80 flex items-center text-sm font-medium w-fit mb-2">
@@ -93,7 +94,7 @@ export default function GenresPage() {
             </div>
           </div>
         </section>
-      </main>
+      </ContentWrapper>
     </div>
   );
 } 

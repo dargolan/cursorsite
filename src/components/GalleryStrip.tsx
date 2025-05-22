@@ -4,6 +4,21 @@ import { useKeenSlider } from 'keen-slider/react';
 import Link from 'next/link';
 import 'keen-slider/keen-slider.min.css';
 
+// Helper function to normalize URLs for internal navigation
+function normalizeInternalUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  // Remove protocol and domain for internal navigation
+  return url.replace(/^https?:\/\/[^/]+/, '');
+}
+
+// Helper function to check if URL is internal
+function isInternalUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  return url.startsWith('/') || 
+         url.includes('localhost:3000') || 
+         url.includes('wavecave.com');
+}
+
 export default function GalleryStrip() {
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,8 +45,9 @@ export default function GalleryStrip() {
     getGalleryItems().then(data => {
       setItems(data);
       setLoading(false);
-      // Debug log for mediaUrl and linkUrl
-      console.log('[GalleryStrip] Gallery items:', data.map(i => ({ mediaUrl: i.mediaUrl, linkUrl: i.linkUrl, type: i.type })));
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[GalleryStrip] Gallery items:', data.map(i => ({ mediaUrl: i.mediaUrl, linkUrl: i.linkUrl, type: i.type })));
+      }
     });
   }, []);
 
@@ -159,15 +175,25 @@ export default function GalleryStrip() {
                       />
                     )}
                     {item.buttonText && (
-                      <a
-                        href={item.buttonUrl || item.linkUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="bg-accent text-black px-6 py-3 rounded-full font-medium hover:bg-accent/80 transition-all text-lg shadow-lg z-10"
-                        style={{ marginTop: '0.5rem', pointerEvents: 'auto' }}
-                      >
-                        {item.buttonText}
-                      </a>
+                      isInternalUrl(item.buttonUrl) || isInternalUrl(item.linkUrl) ? (
+                        <Link
+                          href={normalizeInternalUrl(item.buttonUrl) || normalizeInternalUrl(item.linkUrl) || '#'}
+                          className="bg-accent text-black px-6 py-3 rounded-full font-medium hover:bg-accent/80 transition-all text-lg shadow-lg z-10 hover:scale-105 active:scale-95 inline-block"
+                          style={{ marginTop: '0.5rem', pointerEvents: 'auto' }}
+                        >
+                          {item.buttonText}
+                        </Link>
+                      ) : (
+                        <a
+                          href={item.buttonUrl || item.linkUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-accent text-black px-6 py-3 rounded-full font-medium hover:bg-accent/80 transition-all text-lg shadow-lg z-10 hover:scale-105 active:scale-95"
+                          style={{ marginTop: '0.5rem', pointerEvents: 'auto' }}
+                        >
+                          {item.buttonText}
+                        </a>
+                      )
                     )}
                   </div>
                 </div>

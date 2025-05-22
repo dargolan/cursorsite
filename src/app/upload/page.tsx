@@ -6,6 +6,7 @@ import ImageUpload from '@/components/ImageUpload';
 import TagSelector from '@/components/TagSelector';
 import PageContainer from '@/components/PageContainer';
 import ContentWrapper from '@/components/ContentWrapper';
+import Header from '@/components/Header';
 import { PlusCircleIcon, TrashIcon, ArrowDownTrayIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import { v4 as uuidv4 } from 'uuid';
 import { Tag } from '../../types';
@@ -727,6 +728,7 @@ export default function UploadPage() {
   return (
     <PageContainer className="min-h-screen bg-gray-50">
       <ContentWrapper>
+        <Header nonSticky />
         <div className="py-8 px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl mx-auto">
             <h1 className="text-2xl font-bold text-gray-900 mb-6">Upload Your Track</h1>

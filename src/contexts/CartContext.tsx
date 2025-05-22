@@ -30,11 +30,15 @@ const CartContext = createContext<CartContextType>({
 
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
   
   // Load cart from localStorage on initial render
   useEffect(() => {
     try {
       const storedCart = localStorage.getItem('wavecave_cart');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Loaded cart from localStorage:', storedCart);
+      }
       if (storedCart) {
         // Convert any old cart format to new format if needed
         const parsedCart = JSON.parse(storedCart);
@@ -50,6 +54,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (err) {
       console.error('Error loading cart from localStorage:', err);
+    } finally {
+      setIsLoaded(true);
     }
   }, []);
   
@@ -57,6 +63,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     try {
       localStorage.setItem('wavecave_cart', JSON.stringify(items));
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Saved cart to localStorage:', items);
+      }
     } catch (err) {
       console.error('Error saving cart to localStorage:', err);
     }
@@ -97,6 +106,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const getTotalPrice = () => {
     return items.reduce((total, item) => total + item.price, 0);
   };
+  
+  if (!isLoaded) return null;
   
   return (
     <CartContext.Provider 

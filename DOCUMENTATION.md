@@ -238,6 +238,24 @@ seek(time: number) {
 
 This timing model ensures professional-grade stem playback with perfect synchronization across all operations, matching the quality of commercial DAWs.
 
+## Audio Playback Stops When Filtering Out Current Track (May 2025)
+
+**Problem:**
+When a user played a track on the /explore page and then filtered out that track using the BPM Range or Duration slider, the audio would sometimes continue playing, and sometimes the track could not be played again after filtering.
+
+**Solution:**
+A robust solution was implemented to ensure that if the currently playing track is filtered out (i.e., no longer present in the filtered track list), playback is stopped and the audio state is reset. This is achieved by:
+
+- Tracking the currently playing track in the explore page state.
+- When filters (BPM, duration, tags, or search) are applied, checking if the currently playing track is still in the filtered list.
+- If not, dispatching a `stop-all-audio` event and clearing the currently playing track state.
+- The `AudioPlayer` component listens for this event and stops playback, resets its state, and clears the global audio manager.
+
+**Result:**
+- When a user drags the BPM or Duration slider and the current track is filtered out, playback stops immediately.
+- The track can be played again if it reappears in the filtered list.
+- This ensures a seamless and bug-free user experience when filtering tracks during playback.
+
 ## Stems Popup Responsiveness Fix (May 2025)
 
 The stems popup has been optimized to ensure instant responsiveness of Solo (S) and Mute (M) buttons during playback. This was achieved through a systematic investigation and optimization of React's rendering behavior.
@@ -669,23 +687,97 @@ Stems are being reintroduced with a new, scalable, and user-focused approach. Th
 - **Lines:** ~1690+
 - **Description:** This function renders the "Stems (N)" button visible in the track list (e.g., on the /explore page). To change its appearance or behavior, edit this function and its button.
 
-## Header Alignment Fix (May 2025)
+## Sticky Menu/Header and Layout Alignment (June 2025)
 
-To ensure the top navigation menu (Home, Music, etc.) and the right group (Sign In + cart) are perfectly aligned with the main content and the carousel, the following changes were made:
+- The Header is implemented as a sticky element using Tailwind classes: 'sticky top-0 z-50 bg-[#121212]'.
+- The Header is always placed inside the main content area, not spanning the full width, and is always left-aligned with the main content (carousel/tracks grid).
+- Both the /explore page and the homepage use a flex layout: sidebar and main content are siblings, and the Header is inside the main content area for consistent alignment.
+- The main content area is scrollable (height: 100vh, overflow-y: auto) so the sticky menu never disappears except at the very bottom, and always reappears when scrolling up.
+- The Header's z-index is set high (z-50) so overlays and play/pause buttons never cover it.
+- The Header's background is fully opaque (#121212) so nothing shows through.
+- The Header is always rendered inside the same layout wrapper as the main content, inheriting the same margin and width constraints.
+- The left edge of the menu is always aligned with the left edge of the carousel/tracks grid, both on the homepage and /explore.
+- The sidebar is never covered by the sticky menu, and the menu never overlaps the sidebar.
+- The sticky menu provides a seamless navigation experience and is always accessible when scrolling up, even if it temporarily disappears at the very bottom of the scrollable area.
+- All layout adjustments and alignment fixes made to ensure the menu is visually consistent and professional across all pages.
+- **Recent work summary:**
+  - Refactored both homepage and /explore to use the same flex layout for sidebar/main content separation.
+  - Moved the Header inside the main content area for consistent alignment.
+  - Removed extra padding/margin from the Header to ensure perfect left alignment with the carousel/tracks grid.
+  - Set the main content area to be scrollable (height: 100vh, overflow-y: auto) so the sticky menu never disappears except at the very bottom.
+  - Increased the Header's z-index to z-50 so overlays and play/pause buttons never cover it.
+  - Ensured the Header's background is fully opaque (#121212) so nothing shows through.
+  - The sidebar is never covered by the sticky menu, and the menu never overlaps the sidebar.
+  - The sticky menu is always accessible when scrolling up, providing a seamless navigation experience.
 
-1. **Header Positioning:**
-   - The `Header` component was changed from `fixed` to `sticky` positioning. This allows it to remain at the top during scroll, but as part of the normal document flow.
+## Add To Cart Button Audio Playback Issue Fix (June 2025)
 
-2. **Layout Hierarchy:**
-   - The `Header` was moved *inside* the `ContentWrapper` component (in `src/app/explore/page.tsx` and other relevant pages). This ensures it inherits the same `marginLeft` and `width` constraints as the main content area, which is offset by the sidebar.
+**Problem:**
+When users clicked the "Add to Cart" buttons in the Stems popup, the main audio track on the /explore page would unexpectedly start playing. This issue created a jarring user experience, as users expected to only add items to their cart without affecting playback on the parent page.
 
-3. **Style Simplification:**
-   - All custom `marginLeft` and `width` styles were removed from the `Header`'s inner container. The header now uses only `px-8 w-full flex h-16 items-center` for its layout, inheriting constraints from its parent.
+**Root Causes:**
+1. Click events on cart buttons were propagating up to parent elements
+2. State changes triggered by cart operations were inadvertently causing audio playback
+3. The global audio management system had no mechanism to distinguish cart operations from playback requests
 
-**Result:**
-- The navigation menu is now flush with the left edge of the main content/carousel.
-- The Sign In and cart group are flush with the right edge of the main content.
-- The header remains visually consistent and responsive across all pages.
+**Comprehensive Solution:**
+A robust, multi-layered approach was implemented:
 
-**Troubleshooting Note:**
-If alignment issues reappear, ensure the `Header` is rendered *inside* the same layout wrapper as the main content, and avoid using absolute/fixed positioning or custom margin/width styles that break the inherited layout.
+1. **Aggressive Event Isolation:**
+   - Added complete event stopping to cart buttons:
+     ```tsx
+     onClick={(e) => {
+       e.stopPropagation();
+       e.preventDefault();
+       e.nativeEvent.stopImmediatePropagation();
+       // ...rest of handler
+     }}
+     ```
+   - Dispatched explicit `stop-all-audio` events when cart operations occur:
+     ```tsx
+     const stopEvent = new CustomEvent('stop-all-audio', { 
+       detail: { source: 'stem-cart-button' } 
+     });
+     window.dispatchEvent(stopEvent);
+     document.dispatchEvent(stopEvent);
+     ```
+
+2. **Global Audio Protection Flags:**
+   - Implemented a global flag to prevent audio playback during cart operations:
+     ```tsx
+     (window as any).preventStemAudioPlay = true;
+     ```
+   - Added a timestamp system to block playback for 1.5 seconds after cart actions:
+     ```tsx
+     (window as any).lastCartOperationTime = Date.now();
+     ```
+
+3. **Direct Audio Manager Control:**
+   - Force-paused all audio managers during cart operations:
+     ```tsx
+     if (globalAudioManager && globalAudioManager.activeAudio) {
+       globalAudioManager.activeAudio.pause();
+     }
+     if (globalAudioController) globalAudioController.pause();
+     if (unifiedAudioManager) unifiedAudioManager.pause();
+     ```
+
+4. **Audio Hook Safety:**
+   - Added safety checks in the `useAudioPlayer` hook:
+     ```tsx
+     // Check for recent cart operation
+     const now = Date.now();
+     const lastCartOperation = (window as any).lastCartOperationTime || 0;
+     if (now - lastCartOperation < 1500) {
+       console.log('Audio playback prevented by recent cart operation');
+       return;
+     }
+     ```
+
+**Technical Results:**
+- Cart operations now never trigger unwanted audio playback
+- Multiple layers of protection ensure robustness against future changes
+- The fix is non-invasive to the core architecture
+- User experience is improved with predictable cart behavior
+
+This solution ensures that when users interact with cart functionality in the stems popup, they experience a clean separation between cart operations and audio playback controls.

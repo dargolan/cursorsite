@@ -7,7 +7,11 @@ import { usePathname } from 'next/navigation';
 import { useCart } from '@/contexts/CartContext';
 import { toCdnUrl } from '../utils/cdn-url';
 
-export default function Header(): React.ReactElement {
+interface HeaderProps {
+  nonSticky?: boolean;
+}
+
+export default function Header({ nonSticky = false }: HeaderProps): React.ReactElement {
   const [showCart, setShowCart] = useState(false);
   const { items: cartItems, removeItem, getTotalPrice } = useCart();
   const pathname = usePathname();
@@ -37,8 +41,8 @@ export default function Header(): React.ReactElement {
   }, []);
 
   return (
-    <header className="sticky top-0 bg-[#121212] z-10 transition-all duration-300">
-      <div className="px-8 w-full flex h-16 items-center">
+    <header className="sticky top-0 z-50 px-8 w-full flex h-16 items-center bg-[#121212]">
+      <div className="w-full flex h-16 items-center">
         <nav className="hidden md:block">
           <ul className="flex space-x-8">
             <li>

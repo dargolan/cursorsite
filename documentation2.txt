@@ -649,3 +649,35 @@ seek(time: number) {
 ```
 
 This timing model ensures professional-grade stem playback with perfect synchronization across all operations, matching the quality of commercial DAWs.
+
+## Audio Playback Stops When Filtering Out Current Track (May 2025)
+
+**Problem:**
+When a user played a track on the /explore page and then filtered out that track using the BPM Range or Duration slider, the audio would sometimes continue playing, and sometimes the track could not be played again after filtering.
+
+**Solution:**
+A robust solution was implemented to ensure that if the currently playing track is filtered out (i.e., no longer present in the filtered track list), playback is stopped and the audio state is reset. This is achieved by:
+
+- Tracking the currently playing track in the explore page state.
+- When filters (BPM, duration, tags, or search) are applied, checking if the currently playing track is still in the filtered list.
+- If not, dispatching a `stop-all-audio` event and clearing the currently playing track state.
+- The `AudioPlayer` component listens for this event and stops playback, resets its state, and clears the global audio manager.
+
+**Result:**
+- When a user drags the BPM or Duration slider and the current track is filtered out, playback stops immediately.
+- The track can be played again if it reappears in the filtered list.
+- This ensures a seamless and bug-free user experience when filtering tracks during playback.
+
+# Sticky Menu/Header Implementation and Layout Alignment
+
+- The menu is implemented as a sticky Header component using Tailwind classes: 'sticky top-0 z-50 bg-[#121212]'.
+- The Header is placed inside the main content area, not spanning the full width, and is always left-aligned with the main content (carousel/tracks grid).
+- Both the /explore page and the homepage use a flex layout: sidebar and main content are siblings, and the Header is inside the main content area for consistent alignment.
+- The main content area is scrollable (height: 100vh, overflow-y: auto) so the sticky menu never disappears except at the very bottom, and always reappears when scrolling up.
+- The Header's z-index is set high (z-50) so overlays and play/pause buttons never cover it.
+- The Header's background is fully opaque (#121212) so nothing shows through.
+- All layout adjustments and alignment fixes made to ensure the menu is visually consistent and professional across all pages.
+- The Header is always rendered inside the same layout wrapper as the main content, inheriting the same margin and width constraints.
+- The left edge of the menu is always aligned with the left edge of the carousel/tracks grid, both on the homepage and /explore.
+- The sidebar is never covered by the sticky menu, and the menu never overlaps the sidebar.
+- The sticky menu provides a seamless navigation experience and is always accessible when scrolling up, even if it temporarily disappears at the very bottom of the scrollable area.

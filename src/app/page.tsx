@@ -186,250 +186,259 @@ export default function HomePage() {
       .catch(() => setHeroImageUrl(null));
   }, []);
 
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[fetchTracksPage] Fetching page 1 with size 20');
+  }
+
   return (
-    <main className="min-h-screen bg-[#121212] text-white pb-8">
-      <FilterSidebar
-        selectedTags={selectedTags}
-        genres={genres}
-        moods={moods}
-        instruments={instruments}
-        bpmRange={bpmRange}
-        durationRange={durationRange}
-        onTagToggle={handleTagToggle}
-        onBpmChange={handleBpmChange}
-        onDurationChange={handleDurationChange}
-        onSearch={handleSearch}
-      />
-      
-      <ContentWrapper>
-        <Header />
-        
-        {/* Hero Section */}
-        <section className="relative w-full px-8 py-4 md:py-6 mt-16">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch">
-            <div className="w-full md:w-1/2 flex flex-col justify-center">
-              <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-6">
-                You've Just Discovered the <span className="text-[#1DF7CE]">Secret Stash</span>
-              </h1>
-              <p className="text-xl text-gray-300 mb-8">
-                Yes, it's free. Yes, really. High-quality, royalty-free music, ready for whatever you're making.
-              </p>
-              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
-                <Link href="/explore" className="flex items-center justify-center px-6 py-3 bg-[#1DF7CE] hover:bg-[#1DF7CE]/90 text-black font-medium rounded-full transition-colors text-lg">
-                  Click the Thing
+    <div style={{ display: 'flex', minHeight: '100vh' }}>
+      <aside style={{ width: 295, flexShrink: 0 }}>
+        <FilterSidebar
+          selectedTags={selectedTags}
+          genres={genres}
+          moods={moods}
+          instruments={instruments}
+          bpmRange={bpmRange}
+          durationRange={durationRange}
+          onTagToggle={handleTagToggle}
+          onBpmChange={handleBpmChange}
+          onDurationChange={handleDurationChange}
+          onSearch={handleSearch}
+        />
+      </aside>
+      <div style={{ flex: 1, position: 'relative', background: '#121212' }}>
+        <ContentWrapper>
+          <div className="sticky top-0 z-50 bg-[#121212]">
+            <Header />
+          </div>
+          
+          {/* Hero Section */}
+          <section className="relative w-full px-8 py-4 md:py-6 mt-16">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch">
+              <div className="w-full md:w-1/2 flex flex-col justify-center">
+                <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-6">
+                  You've Just Discovered the <span className="text-[#1DF7CE]">Secret Stash</span>
+                </h1>
+                <p className="text-xl text-gray-300 mb-8">
+                  Yes, it's free. Yes, really. High-quality, royalty-free music, ready for whatever you're making.
+                </p>
+                <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+                  <Link href="/explore" className="flex items-center justify-center px-6 py-3 bg-[#1DF7CE] hover:bg-[#1DF7CE]/90 text-black font-medium rounded-full transition-colors text-lg">
+                    Click the Thing
+                  </Link>
+                </div>
+              </div>
+              <div className="w-full md:w-1/2 flex items-stretch">
+                <div className="w-full h-full relative">
+                  <Image
+                    src={heroImageUrl || '/images/hero-fallback.jpg'}
+                    alt="Music studio workspace"
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    className="object-contain w-full h-full"
+                    priority
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+          
+          {/* Featured Tracks Section */}
+          <section className="py-16 px-8 bg-[#121212]">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-2xl font-bold text-white">Trending Tracks</h2>
+                <Link href="/explore" className="text-[#1DF7CE] hover:text-[#1DF7CE]/80 flex items-center text-sm font-medium">
+                  View All
+                  <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </Link>
               </div>
-            </div>
-            <div className="w-full md:w-1/2 flex items-stretch">
-              <div className="w-full h-full relative">
-                <Image
-                  src={heroImageUrl || '/images/hero-fallback.jpg'}
-                  alt="Music studio workspace"
-                  fill
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  className="object-contain w-full h-full"
-                  priority
-                />
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {loading ? (
+                  // Loading skeletons
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="bg-[#1E1E1E] rounded-lg overflow-hidden animate-pulse">
+                      <div className="w-full h-48 bg-gray-800"></div>
+                      <div className="p-4">
+                        <div className="h-5 bg-gray-800 rounded w-3/4 mb-2"></div>
+                        <div className="h-4 bg-gray-800 rounded w-1/2 mb-4"></div>
+                        <div className="h-4 bg-gray-800 rounded w-1/4"></div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  featuredTracks.map(track => {
+                    // Only show genre and mood tags
+                    const tagsToShow = track.tags.filter(tag => tag.type === 'genre' || tag.type === 'mood');
+                    return (
+                      <Link key={track.id} href={`/explore?search=${encodeURIComponent(track.title)}`} className="bg-[#1E1E1E] rounded-lg overflow-hidden transition-transform hover:scale-[1.02] duration-200 block">
+                      <div className="relative w-full h-48 bg-gray-900 flex items-center justify-center">
+                        {track.imageUrl ? (
+                            <Image
+                              src={toCdnUrl(track.imageUrl)}
+                              alt={track.title}
+                              fill
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                              className="object-cover"
+                            />
+                        ) : (
+                          <div className="w-16 h-16 rounded-full bg-[#282828] flex items-center justify-center">
+                            <svg className="w-8 h-8 text-[#1DF7CE]" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                        <div className="p-4">
+                          <h3 className="text-white font-medium text-lg mb-1">{track.title}</h3>
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {tagsToShow.map(tag => (
+                              <span key={tag.id} className="bg-[#353535] text-[#CDCDCD] text-xs px-2 py-1 rounded-full font-medium">{tag.name}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })
+                )}
               </div>
             </div>
-          </div>
-        </section>
-        
-        {/* Featured Tracks Section */}
-        <section className="py-16 px-8 bg-[#121212]">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-bold text-white">Trending Tracks</h2>
-              <Link href="/explore" className="text-[#1DF7CE] hover:text-[#1DF7CE]/80 flex items-center text-sm font-medium">
-                View All
-                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {loading ? (
-                // Loading skeletons
-                Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="bg-[#1E1E1E] rounded-lg overflow-hidden animate-pulse">
-                    <div className="w-full h-48 bg-gray-800"></div>
-                    <div className="p-4">
-                      <div className="h-5 bg-gray-800 rounded w-3/4 mb-2"></div>
-                      <div className="h-4 bg-gray-800 rounded w-1/2 mb-4"></div>
-                      <div className="h-4 bg-gray-800 rounded w-1/4"></div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                featuredTracks.map(track => {
-                  // Only show genre and mood tags
-                  const tagsToShow = track.tags.filter(tag => tag.type === 'genre' || tag.type === 'mood');
-                  return (
-                    <Link key={track.id} href={`/explore?search=${encodeURIComponent(track.title)}`} className="bg-[#1E1E1E] rounded-lg overflow-hidden transition-transform hover:scale-[1.02] duration-200 block">
-                    <div className="relative w-full h-48 bg-gray-900 flex items-center justify-center">
-                      {track.imageUrl ? (
-                          <Image
-                            src={toCdnUrl(track.imageUrl)}
-                            alt={track.title}
-                            fill
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                            className="object-cover"
-                          />
+          </section>
+          
+          {/* Browse by Genre Section */}
+          <section className="py-16 px-8 bg-[#0A0A0A]">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-2xl font-bold text-white">Browse by Genre</h2>
+                <Link href="/genres" className="text-[#1DF7CE] hover:text-[#1DF7CE]/80 flex items-center text-sm font-medium">
+                  All Genres
+                  <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {(() => { console.log('Genres for Browse by Genre:', genres); console.table(genres); return null; })()}
+                {loading ? (
+                  // Loading skeletons for genres
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="bg-gradient-to-b from-[#1E1E1E] to-[#101010] rounded-lg h-48 animate-pulse"></div>
+                  ))
+                ) : (
+                  genres.slice(0, 8).map(genre => (
+                    <Link key={genre.id} href={`/explore?tags=${genre.id}`} className="relative block overflow-hidden rounded-lg h-48 group">
+                      {/* Genre image if available */}
+                      {genre.image?.url ? (
+                        <Image
+                          src={toCdnUrl(genre.image.url)}
+                          alt={genre.name}
+                          fill
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          className="object-cover"
+                        />
                       ) : (
-                        <div className="w-16 h-16 rounded-full bg-[#282828] flex items-center justify-center">
-                          <svg className="w-8 h-8 text-[#1DF7CE]" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-[#1E1E1E] to-[#101010]">
+                          <svg className="w-12 h-12 text-[#1DF7CE]" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+                            <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="1.5" />
+                            <circle cx="12" cy="12" r="2" stroke="currentColor" strokeWidth="1.5" />
+                            <path d="M12 12L18 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                           </svg>
                         </div>
                       )}
-                    </div>
-                      <div className="p-4">
-                        <h3 className="text-white font-medium text-lg mb-1">{track.title}</h3>
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          {tagsToShow.map(tag => (
-                            <span key={tag.id} className="bg-[#353535] text-[#CDCDCD] text-xs px-2 py-1 rounded-full font-medium">{tag.name}</span>
-                          ))}
-                        </div>
+                      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black opacity-70"></div>
+                      <div className="absolute inset-0 flex flex-col justify-end p-6">
+                        <h3 className="text-white font-bold text-xl mb-1">{genre.name}</h3>
                       </div>
                     </Link>
-                  );
-                })
-              )}
+                  ))
+                )}
+              </div>
             </div>
-          </div>
-        </section>
-        
-        {/* Browse by Genre Section */}
-        <section className="py-16 px-8 bg-[#0A0A0A]">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-bold text-white">Browse by Genre</h2>
-              <Link href="/genres" className="text-[#1DF7CE] hover:text-[#1DF7CE]/80 flex items-center text-sm font-medium">
-                All Genres
-                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {(() => { console.log('Genres for Browse by Genre:', genres); console.table(genres); return null; })()}
-              {loading ? (
-                // Loading skeletons for genres
-                Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="bg-gradient-to-b from-[#1E1E1E] to-[#101010] rounded-lg h-48 animate-pulse"></div>
-                ))
-              ) : (
-                genres.slice(0, 8).map(genre => (
-                  <Link key={genre.id} href={`/explore?tags=${genre.id}`} className="relative block overflow-hidden rounded-lg h-48 group">
-                    {/* Genre image if available */}
-                    {genre.image?.url ? (
+          </section>
+          
+          {/* Featured Projects Section */}
+          <section className="py-16 px-8 bg-[#121212]">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex flex-col mb-8">
+                <h2 className="text-2xl font-bold text-white mb-2">Featured Projects</h2>
+                <p className="text-gray-400">See how creators are using our music</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {featuredProjects.map(project => (
+                  <div key={project.id} className="bg-[#1E1E1E] rounded-lg overflow-hidden">
+                    <div className="relative w-full h-48 bg-gray-900">
                       <Image
-                        src={toCdnUrl(genre.image.url)}
-                        alt={genre.name}
+                        src={project.image}
+                        alt={project.title}
                         fill
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         className="object-cover"
                       />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-[#1E1E1E] to-[#101010]">
-                        <svg className="w-12 h-12 text-[#1DF7CE]" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
-                          <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="1.5" />
-                          <circle cx="12" cy="12" r="2" stroke="currentColor" strokeWidth="1.5" />
-                          <path d="M12 12L18 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black opacity-70"></div>
-                    <div className="absolute inset-0 flex flex-col justify-end p-6">
-                      <h3 className="text-white font-bold text-xl mb-1">{genre.name}</h3>
                     </div>
-                  </Link>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
-        
-        {/* Featured Projects Section */}
-        <section className="py-16 px-8 bg-[#121212]">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex flex-col mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">Featured Projects</h2>
-              <p className="text-gray-400">See how creators are using our music</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {featuredProjects.map(project => (
-                <div key={project.id} className="bg-[#1E1E1E] rounded-lg overflow-hidden">
-                  <div className="relative w-full h-48 bg-gray-900">
-                    <Image
-                      src={project.image}
-                      alt={project.title}
-                      fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover"
-                    />
+                    <div className="p-6">
+                      <h3 className="text-white font-bold text-xl mb-2">{project.title}</h3>
+                      <p className="text-gray-400 mb-4">{project.description}</p>
+                      <button className="flex items-center text-[#1DF7CE] hover:text-[#1DF7CE]/80 text-sm font-medium">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        </svg>
+                        Watch Project
+                      </button>
+                    </div>
                   </div>
-                  <div className="p-6">
-                    <h3 className="text-white font-bold text-xl mb-2">{project.title}</h3>
-                    <p className="text-gray-400 mb-4">{project.description}</p>
-                    <button className="flex items-center text-[#1DF7CE] hover:text-[#1DF7CE]/80 text-sm font-medium">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                      </svg>
-                      Watch Project
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-        
-        {/* Newsletter Section */}
-        <section className="py-16 px-8 bg-[#0A0A0A]">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-2xl font-bold text-white mb-4">Stay in the Loop</h2>
-            <p className="text-gray-300 mb-8 text-sm">Subscribe to get the latest updates on new tracks and exclusive offers</p>
-            
-            <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-2">
-              <div className="relative w-full sm:w-96">
-                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                  <svg 
-                    className="w-5 h-5 text-white" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24" 
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      strokeWidth="2" 
-                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    />
-                  </svg>
-                </div>
-                <input 
-                  type="email" 
-                  placeholder="Enter your email" 
-                  className="block w-full py-2 pl-12 pr-4 text-base rounded-full bg-[#1E1E1E] border border-[#CDCDCD] text-white focus:outline-none focus:ring-1 focus:ring-[#1DF7CE]" 
-                />
+                ))}
               </div>
-              <button className="w-full sm:w-auto whitespace-nowrap px-5 py-2 bg-[#1DF7CE] hover:bg-[#1DF7CE]/90 text-black font-medium rounded-full transition-colors text-sm">
-                Subscribe
-              </button>
             </div>
-          </div>
-        </section>
-        
-      <Footer />
-    </ContentWrapper>
-    </main>
+          </section>
+          
+          {/* Newsletter Section */}
+          <section className="py-16 px-8 bg-[#0A0A0A]">
+            <div className="max-w-3xl mx-auto text-center">
+              <h2 className="text-2xl font-bold text-white mb-4">Stay in the Loop</h2>
+              <p className="text-gray-300 mb-8 text-sm">Subscribe to get the latest updates on new tracks and exclusive offers</p>
+              
+              <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-2">
+                <div className="relative w-full sm:w-96">
+                  <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                    <svg 
+                      className="w-5 h-5 text-white" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24" 
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth="2" 
+                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+                  <input 
+                    type="email" 
+                    placeholder="Enter your email" 
+                    className="block w-full py-2 pl-12 pr-4 text-base rounded-full bg-[#1E1E1E] border border-[#CDCDCD] text-white focus:outline-none focus:ring-1 focus:ring-[#1DF7CE]" 
+                  />
+                </div>
+                <button className="w-full sm:w-auto whitespace-nowrap px-5 py-2 bg-[#1DF7CE] hover:bg-[#1DF7CE]/90 text-black font-medium rounded-full transition-colors text-sm">
+                  Subscribe
+                </button>
+              </div>
+            </div>
+          </section>
+          
+        <Footer />
+      </ContentWrapper>
+    </div>
+    </div>
   );
 }
 

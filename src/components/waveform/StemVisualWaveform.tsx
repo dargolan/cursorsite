@@ -119,6 +119,7 @@ export const StemVisualWaveform: React.FC<StemVisualWaveformProps> = ({
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (!onScrub || isLoading || error) return;
+    e.stopPropagation(); // Prevent events from reaching elements below
     isDragging.current = true;
     const rect = (e.target as HTMLElement).getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -128,13 +129,15 @@ export const StemVisualWaveform: React.FC<StemVisualWaveformProps> = ({
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!isDragging.current || !onScrub || isLoading || error) return;
+    e.stopPropagation(); // Prevent events from reaching elements below
     const rect = (e.target as HTMLElement).getBoundingClientRect();
     const x = e.clientX - rect.left;
     const newProgress = Math.min(1, Math.max(0, x / rect.width));
     onScrub(newProgress);
   };
 
-  const handlePointerUp = () => {
+  const handlePointerUp = (e: React.PointerEvent) => {
+    e.stopPropagation(); // Prevent events from reaching elements below
     isDragging.current = false;
   };
 
